@@ -1,5 +1,6 @@
 import customtkinter as ctk
 import tkinter as tk
+from tkinter import filedialog, messagebox
 import lexer
 
 ctk.set_appearance_mode("dark")
@@ -10,6 +11,23 @@ class App(ctk.CTk):
         super().__init__()
         self.title("Ludus")
         self.geometry("1300x800")
+
+        self.file_path = None
+        
+        # menu bar
+        self.menu_bar = tk.Menu(self)
+        self.config(menu=self.menu_bar)
+
+        self.file_menu = tk.Menu(self.menu_bar, tearoff=0)
+        self.menu_bar.add_cascade(label="File", menu=self.file_menu)
+        
+        # file options
+        self.file_menu.add_command(label="Open", command=self.open_file)
+        self.file_menu.add_command(label="Save", command=self.save_file)
+        self.file_menu.add_command(label="Save As", command=self.save_as_file)
+        self.file_menu.add_command(label="Close File", command=self.close_file)
+        self.file_menu.add_separator()
+        self.file_menu.add_command(label="Exit", command=self.exit_app)
 
         # text editor frame
         self.editor_frame = ctk.CTkFrame(self)
@@ -55,6 +73,45 @@ class App(ctk.CTk):
         self.error_label.pack(side="bottom",pady=5)
 
         self.error_field.config(state=tk.DISABLED)
+
+    def open_file(self):
+        self.file_path = filedialog.askopenfilename(filetypes=[("Ludus Files", "*.lds")])
+        if self.file_path:
+            with open(self.file_path, 'r') as file:
+                content = file.read()
+                self.code_editor.delete(1.0, tk.END)
+                self.code_editor.insert(tk.END, content)
+                
+    def save_file(self):
+        if self.file_path:
+            content = self.code_editor.get(1.0, tk.END)   
+            with open(self.file_path, 'w') as file:
+                file.write(content)  
+                messagebox.showinfo("File Saved", f"Saved: {self.file_path}")
+        else: 
+            self.save_as_file()  
+
+    def save_as_file(self):
+        self.file_path = filedialog.asksaveasfilename(defaultextension=".lds",
+                                                        filetypes=[("Ludus Files", "*.lds"), ("All Files", "*.*")])
+        if self.file_path:
+            with open(self.file_path, 'w') as file:
+                content = self.code_editor.get(1.0, tk.END) 
+                file.write(content)  
+                messagebox.showinfo("File Saved", f"Saved as: {self.file_path}")
+
+    def close_file(self):
+        self.lexeme_listbox.delete(0, tk.END)
+        self.token_listbox.delete(0, tk.END)
+        self.error_field.config(state=tk.NORMAL) 
+        self.error_field.delete(1.0, tk.END)      
+        self.error_field.config(state=tk.DISABLED)
+        self.code_editor.delete(1.0, tk.END)
+        self.file_path = None
+        messagebox.showinfo("File Closed", "The file has been closed.")
+
+    def exit_app(self):
+        self.quit()
 
     def process_text(self):
         input_text = self.code_editor.get("0.0", tk.END).strip()  
