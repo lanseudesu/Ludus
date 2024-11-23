@@ -90,54 +90,58 @@ TT_RCURLY     = 'right curly braces'
 TT_COMMA	  = 'comma'
 TT_PERIOD	  = 'period'
 
+# others:
 TT_KEYWORDS   = 'keyword'
+
+TT_COMMENTS1  = 'single-line comment'
+TT_COMMENTS2  = 'multi-line comment'
 
 TT_NEWLINE	  = 'newline'
 
 TT_XP_FORMATTING = 'xp formatting'
 
-# reserved words and their delims
+### RESERVED WORDS + THEIR  DELIMS ###
 
 KEYWORDS_DELIMS = {
-    # terminator
+    # terminator:
     'gameOver'  : whitespace,
-    # data types
+    # data types:
     'xp'        : ' ',
     'hp'        : ' ',
     'comms'     : ' ',
     'flag'      : ' ',
-    # bool
+    # bool:
     'true'      : flag_delim,
     'false'     : flag_delim,
-    # struct words
+    # struct words:
     'build'     : ' ',
     'access'    : ' ',
-    # logical 
+    # logical:
     'AND'       : ' ',
     'OR'        : ' ',
-    # constants declaration
+    # constants declaration:
     'immo'      : ' ',
-    # conditional
+    # conditional:
     'if'        : ' ',
     'elif'      : ' ',
     'else'      : delim2,
     'flank'     : ' ',
     'choice'    : ' ',
     'backup'    : ':',
-    # looping
+    # looping:
     'for'       : ' ',
     'while'     : ' ',
     'grind'     : delim2,
-    # loop control
+    # loop control:
     'checkpoint': whitespace,
     'resume'    : whitespace,
-    # return
+    # return:
     'recall'    : ' ',
-    # others
+    # others:
     'dead'      : delim1,
     'generate'  : ' ',
     'play'      : '(',
-    # built-in funcs
+    # built-in functions:
     'load'      : '(',
     'loadNum'   : '(',
     'shoot'     : '(',
@@ -225,14 +229,9 @@ class Lexer:
         while self.current_char is not None:
             if self.current_char in ' \t':
                 self.advance()
-
-            elif self.current_char == '#':
-                self.skip_comment()
-
             elif self.current_char == '\n': 
                 tokens.append(Token('\\n', TT_NEWLINE))
                 self.advance()
-
             elif self.current_char in NUM:
                 result, error = self.make_number('')
 
@@ -241,7 +240,6 @@ class Lexer:
                    continue  
                 
                 self.process_token(result.lexeme, result.token, numlit_delim, errors, tokens)
-
             elif self.current_char in ALPHA or self.current_char == '_':
                 result, error, is_keywords = self.make_identifier()
 
@@ -253,7 +251,6 @@ class Lexer:
                     self.process_token(result.lexeme, result.token, id_delim, errors, tokens)
                 else:
                     self.process_token(result.lexeme, result.token, KEYWORDS_DELIMS[result.lexeme], errors, tokens)
-            
             elif self.current_char == '"':
                 result, error = self.make_string()
 
@@ -262,7 +259,6 @@ class Lexer:
                    continue
 
                 self.process_token(result.lexeme, result.token, commslit_delim, errors, tokens)
-
             elif self.current_char in '+-':
                 token_map = {
                     '+': [(TT_PLUS_EQ, '=', delim6), (TT_INC, '+', delim7), (TT_PLUS, None, delim6)],
@@ -278,7 +274,6 @@ class Lexer:
                         self.advance()
                         self.process_token(char + next_char, token_type, valid_delims, errors, tokens)
                         break
-
             elif self.current_char in '*/%<>':
                 token_map = {
                     '*': [(TT_MUL_EQ, '='), (TT_MUL, None)],
@@ -297,7 +292,6 @@ class Lexer:
                         self.advance()
                         self.process_token(char + next_char, token_type, delim6, errors, tokens)
                         break
-
             elif self.current_char == '~':
                 num_str = '~'
                 self.advance()
@@ -311,7 +305,6 @@ class Lexer:
                     self.process_token(result.lexeme, result.token, numlit_delim, errors, tokens)
                 else: 
                     self.process_token('~', TT_NEG, delim12, errors, tokens)
-
             elif self.current_char in '^:()[]{},':
                 token_map = {
                     '^': [(TT_POW, delim6)],
@@ -329,7 +322,6 @@ class Lexer:
                 for token_type, valid_delims in token_map[char]:
                     self.process_token(char, token_type, valid_delims, errors, tokens)
                     break
-
             elif self.current_char == '.':
                 self.advance()
 
@@ -348,7 +340,6 @@ class Lexer:
                             continue  
 
                         self.process_token(result.lexeme, result.token, numlit_delim, errors, tokens)        
-
                 elif self.current_char is not None and self.current_char in NUM:
                     result, error = self.make_number('.')
 
@@ -360,7 +351,6 @@ class Lexer:
 
                 else:
                     self.process_token('.', TT_PERIOD, period_delim, errors, tokens)
-
             elif self.current_char in '=&|':
                 token_map = {
                     '=': [(TT_EE, delim6)],
@@ -375,7 +365,6 @@ class Lexer:
                         self.process_token(char + char, token_type, valid_delims, errors, tokens)
                     else:
                         errors.append(f"Invalid character error at line {self.pos.ln+1}, column {self.pos.col}. Cause: '{char}'")
-
             elif self.current_char == '!':
                 char = self.current_char
                 self.advance()
@@ -384,12 +373,48 @@ class Lexer:
                     self.process_token('!=', TT_NE, delim10, errors, tokens)
                 else:
                     self.process_token('!', TT_NOT, delim11, errors, tokens)   
-            else:
-                #todo mag-eextend lng error
-                # pos_start = self.pos.copy()
-                # char = self.current_char
+            elif self.current_char == '#':
+                comments = '#'
                 self.advance()
-                #return [], IllegalCharError(pos_start, self.pos, "'" + char + "'")
+                while self.current_char is not None:
+                    if self.current_char == '\n':
+                        self.process_token(comments, TT_COMMENTS1, '\n', errors, tokens)
+                        break
+                    comments += self.current_char
+                    self.advance()
+            elif self.current_char == '`':
+                backtick_count = 0
+                while self.current_char == '`' and backtick_count < 3:
+                    backtick_count += 1
+                    self.advance()
+
+                if backtick_count != 3:  
+                    errors.append(f"Incomplete comment delimiter at line {self.pos.ln + 1}, column {self.pos.col - backtick_count}")
+                    return
+
+                comment = ""
+                while True:
+                    if self.current_char is None: 
+                        errors.append(f"Unclosed multi-line comment starting at line {self.pos.ln + 1}")
+                        break
+
+                    if self.current_char == '`':  
+                        close_count = 0
+                        while self.current_char == '`' and close_count < 3:
+                            close_count += 1
+                            self.advance()
+
+                        if close_count == 3:  
+                            self.process_token(comment.strip(), TT_COMMENTS2, whitespace, errors, tokens)
+                            break
+                        else:  
+                            comment += '`' * close_count
+                    else:
+                        comment += self.current_char
+                        self.advance()
+            else:
+                errors.append(f"Unknown character '{self.current_char}' at line {self.pos.ln + 1}, column {self.pos.col + 1}")
+                self.advance()
         
         return tokens, errors
     
@@ -528,20 +553,8 @@ class Lexer:
 
         errors.append(f'Unclosed string literal "{string} at line {self.pos.ln + 1}, column {self.pos.col - len(string)}')
         return [], errors
-    
-    def make_newLine(self):
-        tok_type = TT_NEWLINE
-        return Token(tok_type, tok_type)
 
-    def skip_comment(self):
-        self.advance()
-
-        while self.current_char != '\n':
-            self.advance()
-
-        self.advance()
-    
-# run
+### RUN ###
 
 def run(fn, text):
     lexer = Lexer(fn, text)
