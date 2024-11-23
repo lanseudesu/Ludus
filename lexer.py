@@ -17,6 +17,7 @@ whitespace = '# \n'
 id_delim       = arith_op + relat_op + whitespace + '.,:[{}()'
 numlit_delim   = arith_op + relat_op + whitespace + '){}:],'
 commslit_delim = whitespace + ':,={[)'
+flag_delim     = whitespace + ',:])'
 
 lparen_delim   = ALPHANUM + '_ )"+-!~'
 rparen_delim   = whitespace + arith_op + relat_op + '{})],.'
@@ -27,7 +28,8 @@ rbracket_delim = whitespace + arith_op + relat_op + ',[:).}'
 comma_delim    = ALPHANUM + ' _'
 period_delim   = ALPHA + '_'  
 
-
+delim1 = whitespace + ','
+delim2  = ' {'
 delim6  = ALPHANUM + '_( '
 delim7  = whitespace + ALPHANUM + '_}()'
 delim9  = ALPHANUM + ' _"~+-(!'
@@ -88,66 +90,69 @@ TT_RCURLY     = 'right curly braces'
 TT_COMMA	  = 'comma'
 TT_PERIOD	  = 'period'
 
+TT_KEYWORDS   = 'keyword'
+
 TT_NEWLINE	  = 'newline'
 
 TT_XP_FORMATTING = 'xp formatting'
 
-# reserved words
+# reserved words and their delims
 
-KEYWORDS = [
+KEYWORDS_DELIMS = {
     # terminator
-    'gameOver',
+    'gameOver'  : whitespace,
     # data types
-    'xp',
-    'hp',
-    'comms',
-    'flag',
+    'xp'        : ' ',
+    'hp'        : ' ',
+    'comms'     : ' ',
+    'flag'      : ' ',
     # bool
-    'true',
-    'false',
+    'true'      : flag_delim,
+    'false'     : flag_delim,
     # struct words
-    'build',
-    'access',
-    'default',
+    'build'     : ' ',
+    'access'    : ' ',
     # logical 
-    'AND',
-    'OR',
+    'AND'       : ' ',
+    'OR'        : ' ',
     # constants declaration
-    'immo',
+    'immo'      : ' ',
     # conditional
-    'if',
-    'elif',
-    'else',
-    'flank',
-    'choice',
-    'backup',
+    'if'        : ' ',
+    'elif'      : ' ',
+    'else'      : delim2,
+    'flank'     : ' ',
+    'choice'    : ' ',
+    'backup'    : ':',
     # looping
-    'for',
-    'while',
-    'grind',
+    'for'       : ' ',
+    'while'     : ' ',
+    'grind'     : delim2,
     # loop control
-    'checkpoint',
-    'resume',
+    'checkpoint': whitespace,
+    'resume'    : whitespace,
     # return
-    'recall',
+    'recall'    : ' ',
     # others
-    'dead',
-    'generate',
-    'play',
-    '*args',
+    'dead'      : delim1,
+    'generate'  : ' ',
+    'play'      : '(',
     # built-in funcs
-    'load',
-    'loadNum'
-    'shoot',
-    'shootNxt',
-    'rounds',
-    'wipe',
-    'join',
-    'drop',
-    'seek',
-    'levelUp',
-    'levelDown',
-]
+    'load'      : '(',
+    'loadNum'   : '(',
+    'shoot'     : '(',
+    'shootNxt'  : '(',
+    'rounds'    : '(',
+    'wipe'      : '(',
+    'join'      : '(',
+    'drop'      : '(',
+    'seek'      : '(',
+    'levelUp'   : '(',
+    'levelDown' : '(',
+    'toHp'      : '(',
+    'toXp'      : '(',
+    'toComms'   : '(',
+}
 
 # position
 
@@ -202,13 +207,12 @@ class Lexer:
         return f"{error_msg} at line {self.pos.ln + 1}, column {self.pos.col + 1}"
     
     def process_token(self, lexeme, token, valid_delims, errors, tokens):
-        if self.current_char == '\n' and '\n' not in valid_delims:
+        if (self.current_char == '\n' and '\n' not in valid_delims) or (self.current_char is None and '\n' not in valid_delims):
             error_msg = f"Invalid delimiter for '{lexeme}'. Cause: '\\n'"
             error_msg = f"{error_msg} at line {self.pos.ln + 1}, column {self.pos.col + 1}"
             self.advance()
             errors.append(error_msg)
-
-        if self.current_char is not None and self.current_char not in valid_delims:
+        elif self.current_char is not None and self.current_char not in valid_delims:
             errors.append(self.invalid_delim_error(lexeme))
             self.advance()
         else:
@@ -225,7 +229,7 @@ class Lexer:
             elif self.current_char == '#':
                 self.skip_comment()
 
-            elif self.current_char == '\n': #todo
+            elif self.current_char == '\n': 
                 tokens.append(Token('\\n', TT_NEWLINE))
                 self.advance()
 
@@ -239,11 +243,24 @@ class Lexer:
                 self.process_token(result.lexeme, result.token, numlit_delim, errors, tokens)
 
             elif self.current_char in ALPHA or self.current_char == '_':
-                result = self.make_identifier()
-                self.process_token(result.lexeme, result.token, id_delim, errors, tokens)
+                result, error, is_keywords = self.make_identifier()
+
+                if error:
+                   errors.extend(error)
+                   continue
+
+                if not is_keywords:   
+                    self.process_token(result.lexeme, result.token, id_delim, errors, tokens)
+                else:
+                    self.process_token(result.lexeme, result.token, KEYWORDS_DELIMS[result.lexeme], errors, tokens)
             
             elif self.current_char == '"':
-                result = self.make_string()
+                result, error = self.make_string()
+
+                if error:
+                   errors.extend(error)
+                   continue
+
                 self.process_token(result.lexeme, result.token, commslit_delim, errors, tokens)
 
             elif self.current_char in '+-':
@@ -376,7 +393,7 @@ class Lexer:
         
         return tokens, errors
     
-    def make_number(self, num_str): #todo: number limit
+    def make_number(self, num_str): 
         negate = False
         dot_count = 0
         int_len = 0
@@ -445,19 +462,29 @@ class Lexer:
     def make_identifier(self): # todo
         id_str = ''
         id_len = 0
+        errors = []
+        is_keywords = False
+
+        def add_error(message):
+            errors.append(f"{message} at line {self.pos.ln + 1}, column {self.pos.col - len(id_str) + 1}")
 
         while self.current_char != None and self.current_char in ALPHANUM + '_':
-            if id_len < 15:
+            if id_len < 30:
                 id_str += self.current_char
                 id_len += 1
                 self.advance()
             else:
-                return Token(id_str, id_str)
-
-        if id_str in KEYWORDS:
-            return Token(id_str, id_str)
+                while self.current_char is not None and self.current_char not in id_delim:
+                        id_str += self.current_char
+                        self.advance()
+                add_error(f"Maximum number characters reached in {id_str}")
+                return [], errors, None
+            
+        if id_str in KEYWORDS_DELIMS:
+            is_keywords = True
+            return Token(id_str, TT_KEYWORDS), errors, is_keywords
         else:
-            return Token(id_str, self.identifiers(id_str))
+            return Token(id_str, self.identifiers(id_str)), errors, is_keywords
 
     def identifiers(self, id_str):
         if id_str not in self.identifier_map:
@@ -465,31 +492,42 @@ class Lexer:
             self.current_id += 1
 
         return self.identifier_map[id_str]
-    
+
     def make_string(self): # todo
-        string = ''
-        escape_character = False
-        self.advance()
+        string = ''  # Initialize the string being constructed
+        escape_character = False  # Flag for tracking escape sequences
+        errors = []
+        self.advance()  # Skip the opening quote
 
         escape_characters = {
-            'n': '\n',
-            't': '\t'
+            'n': '\n',   # Newline
+            't': '\t',   # Tab
+            '{': '{',    # Literal opening curly brace
+            '}': '}',    # Literal closing curly brace
+            '"': '"',    # Literal double quote
+            '\\': '\\' 
         }
 
-        while self.current_char != None and (self.current_char != '"' or escape_character):
+        while self.current_char is not None:
             if escape_character:
-                string += escape_characters.get(self.current_char, self.current_char)
-                escape_character = False
+                resolved_char = escape_characters.get(self.current_char, self.current_char)
+                string += resolved_char 
+                escape_character = False  
             else:
-                if self.current_char == '\\':
+                if self.current_char == '\\':  
                     escape_character = True
+                elif self.current_char == '"':  
+                    self.advance() 
+                    return Token('"' + string + '"', TT_COMMS), errors  
+                elif self.current_char == '\n':
+                    errors.append(f'Unclosed string literal "{string} at line {self.pos.ln + 1}, column {self.pos.col - len(string)}')
+                    return [], errors
                 else:
-                    string += self.current_char
+                    string += self.current_char  
             self.advance()
 
-        string = '"' + string + '"'
-        self.advance()
-        return Token(string, TT_COMMS)
+        errors.append(f'Unclosed string literal "{string} at line {self.pos.ln + 1}, column {self.pos.col - len(string)}')
+        return [], errors
     
     def make_newLine(self):
         tok_type = TT_NEWLINE

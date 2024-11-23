@@ -36,6 +36,7 @@ class App(ctk.CTk):
         # textbox
         self.code_editor = tk.Text(self.editor_frame, wrap=tk.NONE, font=("Consolas", 12))
         self.code_editor.pack(fill="both", expand=True)
+        # todo: may line numbers sa gilid
 
         # lexeme, token, error frame
         self.info_frame = ctk.CTkFrame(self)
@@ -131,7 +132,7 @@ class App(ctk.CTk):
         if error:  
             self.error_field.config(state=tk.NORMAL)
             for errors in error:
-                self.error_field.insert(tk.END, errors + '\n')  
+                self.error_field.insert(tk.END, errors + '\n\n')  
             self.error_field.config(state=tk.DISABLED)
             
         self.lexeme_listbox.delete(0, tk.END)
