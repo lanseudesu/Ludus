@@ -493,18 +493,18 @@ class Lexer:
 
         return self.identifier_map[id_str]
 
-    def make_string(self): # todo
-        string = ''  # Initialize the string being constructed
-        escape_character = False  # Flag for tracking escape sequences
+    def make_string(self): 
+        string = ''  
+        escape_character = False  
         errors = []
-        self.advance()  # Skip the opening quote
+        self.advance()  
 
         escape_characters = {
-            'n': '\n',   # Newline
-            't': '\t',   # Tab
-            '{': '{',    # Literal opening curly brace
-            '}': '}',    # Literal closing curly brace
-            '"': '"',    # Literal double quote
+            'n': '\n',   
+            't': '\t',   
+            '{': '{',    
+            '}': '}',    
+            '"': '"',    
             '\\': '\\' 
         }
 
