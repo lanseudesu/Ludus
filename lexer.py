@@ -1,41 +1,96 @@
 import string
 
-arith_op = '+-*/%^'
-relat_op = '<>=!'
-numlit_delim = arith_op + relat_op + '){}:], \n'
+### CONSTANTS ###
 
-# constants
+NUM             = '0123456789'
+ALPHA           = string.ascii_letters
+ALPHANUM        = ALPHA + NUM
+ASCII_PRINTABLE = ''.join(chr(i) for i in range(32, 127))
+NUM_TO_6        = '0123456' 
 
-DIGITS = '0123456789'
-LETTERS = string.ascii_letters
-LETTERS_DIGITS = LETTERS + DIGITS
+### DELIMITERS ###
 
-# tokens
+arith_op   = '+-*/%^'
+relat_op   = '<>=!'
+whitespace = '# \n'
 
-TT_INT		  = 'hp_literal'
-TT_FLOAT      = 'xp_literal'
-TT_STRING     = 'comms_literal'
-TT_COLON      = ':'
-TT_PLUS       = '+'
-TT_MINUS      = '-'
-TT_MUL        = '*'
-TT_DIV        = '/'
-TT_POW        = '^'
-TT_LPAREN     = '('
-TT_RPAREN     = ')'
-TT_LSQUARE    = '['
-TT_RSQUARE    = ']'
-TT_LCURLY     = '{'  
-TT_RCURLY     = '}'  
-TT_EE         = '=='
-TT_NE         = '!='
-TT_LT         = '<'
-TT_GT         = '>'
-TT_LTE        = '<='
-TT_GTE        = '>='
-TT_COMMA	  = ','
+id_delim       = arith_op + relat_op + whitespace + '.,:[{}()'
+numlit_delim   = arith_op + relat_op + whitespace + '){}:],'
+commslit_delim = whitespace + ':,={[)'
+
+lparen_delim   = ALPHANUM + '_ )"+-!~'
+rparen_delim   = whitespace + arith_op + relat_op + '{})],.'
+lcurly_delim   = whitespace + ALPHANUM + '_{(~+-'
+rcurly_delim   = whitespace + ASCII_PRINTABLE
+lbracket_delim = ALPHANUM + '_ ]'
+rbracket_delim = whitespace + arith_op + relat_op + ',[:).}'
+comma_delim    = ALPHANUM + ' _'
+period_delim   = ALPHA + '_'  
+
+
+delim6  = ALPHANUM + '_( '
+delim7  = whitespace + ALPHANUM + '_}()'
+delim9  = ALPHANUM + ' _"~+-(!'
+delim10 = ALPHANUM + ' _("'
+delim11 = ALPHA + '_('
+delim12 = ALPHANUM + '_(.'
+
+### TOKENS ###
+
+# literals:
+TT_HP	      = 'hp_ltr'
+TT_NHP        = 'nhp_ltr'
+TT_XP         = 'xp_ltr'
+TT_NXP        = 'nxp_ltr'
+TT_COMMS      = 'comms_ltr'
+
+# unary operators:
+TT_INC        = 'increment'
+TT_DEC        = 'decrement'
+TT_NEG        = 'negate'
+
+# arithmetic operators:
+TT_PLUS       = 'plus'
+TT_MINUS      = 'minus'
+TT_MUL        = 'multiply'
+TT_DIV        = 'divide'
+TT_MOD        = 'modulus'
+TT_POW        = 'power'
+
+# relational operators:
+TT_EE         = 'equals equals'
+TT_NE         = 'not equals'
+TT_LT         = 'less than'
+TT_GT         = 'greater than'
+TT_LTE        = 'greater than or equal'
+TT_GTE        = 'less than or equal'
+
+# logical operators:
+TT_AND        = 'AND'
+TT_OR         = 'OR'
+TT_NOT        = 'NOT'
+
+# assignment operators:
+TT_COLON      = 'colon'
+TT_PLUS_EQ    = 'plus and equals'
+TT_MINUS_EQ   = 'minus and equals'
+TT_MUL_EQ     = 'multiply and equals'
+TT_DIV_EQ     = 'divide and equals'
+TT_MOD_EQ     = 'modulus and equals'
+
+# other symbols:
+TT_LPAREN     = 'left parenthesis'
+TT_RPAREN     = 'right parenthesis'
+TT_LSQUARE    = 'left square bracket'
+TT_RSQUARE    = 'right square bracket'
+TT_LCURLY     = 'left curly braces'  
+TT_RCURLY     = 'right curly braces'  
+TT_COMMA	  = 'comma'
+TT_PERIOD	  = 'period'
+
 TT_NEWLINE	  = 'newline'
 
+TT_XP_FORMATTING = 'xp formatting'
 
 # reserved words
 
@@ -94,24 +149,6 @@ KEYWORDS = [
     'levelDown',
 ]
 
-# errors
-
-class Error:
-    def __init__(self, pos_start, pos_end, error_name, details):
-        self.pos_start = pos_start
-        self.pos_end = pos_end
-        self.error_name = error_name
-        self.details = details
-    
-    def as_string(self):
-        result  = f'{self.error_name}: {self.details}\n'
-        result += f'File {self.pos_start.fn}, line {self.pos_start.ln + 1}'
-        return result
-
-class IllegalCharError(Error):
-    def __init__(self, pos_start, pos_end, details):
-        super().__init__(pos_start, pos_end, 'Illegal Character', details)
-
 # position
 
 class Position:
@@ -159,9 +196,23 @@ class Lexer:
     def advance(self):
         self.pos.advance(self.current_char)
         self.current_char = self.text[self.pos.idx] if self.pos.idx < len(self.text) else None
-
-    def add_error_with_position(self, error_msg):
+    
+    def invalid_delim_error(self, lexeme):
+        error_msg = f"Invalid delimiter for '{lexeme}'. Cause: '{self.current_char}'"
         return f"{error_msg} at line {self.pos.ln + 1}, column {self.pos.col + 1}"
+    
+    def process_token(self, lexeme, token, valid_delims, errors, tokens):
+        if self.current_char == '\n' and '\n' not in valid_delims:
+            error_msg = f"Invalid delimiter for '{lexeme}'. Cause: '\\n'"
+            error_msg = f"{error_msg} at line {self.pos.ln + 1}, column {self.pos.col + 1}"
+            self.advance()
+            errors.append(error_msg)
+
+        if self.current_char is not None and self.current_char not in valid_delims:
+            errors.append(self.invalid_delim_error(lexeme))
+            self.advance()
+        else:
+            tokens.append(Token(lexeme, token)) 
 
     def make_tokens(self):
         tokens = []
@@ -170,78 +221,152 @@ class Lexer:
         while self.current_char is not None:
             if self.current_char in ' \t':
                 self.advance()
+
             elif self.current_char == '#':
                 self.skip_comment()
-            elif self.current_char == '\n':
+
+            elif self.current_char == '\n': #todo
                 tokens.append(Token('\\n', TT_NEWLINE))
                 self.advance()
-            elif self.current_char in DIGITS:
-                result, error = self.make_number()
+
+            elif self.current_char in NUM:
+                result, error = self.make_number('')
 
                 if error:
                    errors.extend(error)
                    continue  
+                
+                self.process_token(result.lexeme, result.token, numlit_delim, errors, tokens)
 
-                if self.current_char is not None and self.current_char not in numlit_delim:
-                    errors.append(self.add_error_with_position(f"Invalid delimiter for {result.lexeme}. Cause: '{self.current_char}'"))
-                    self.advance()
-                else:
-                    tokens.append(result)
-                    self.advance()
-            elif self.current_char in LETTERS or self.current_char == '_':
-                tokens.append(self.make_identifier())
+            elif self.current_char in ALPHA or self.current_char == '_':
+                result = self.make_identifier()
+                self.process_token(result.lexeme, result.token, id_delim, errors, tokens)
+            
             elif self.current_char == '"':
-                tokens.append(self.make_string())
-            elif self.current_char == '+':
-                tokens.append(Token(TT_PLUS, TT_PLUS))
+                result = self.make_string()
+                self.process_token(result.lexeme, result.token, commslit_delim, errors, tokens)
+
+            elif self.current_char in '+-':
+                token_map = {
+                    '+': [(TT_PLUS_EQ, '=', delim6), (TT_INC, '+', delim7), (TT_PLUS, None, delim6)],
+                    '-': [(TT_MINUS_EQ, '=', delim6), (TT_DEC, '-', delim7), (TT_MINUS, None, delim6)],
+                }
+                char = self.current_char
                 self.advance()
-            elif self.current_char == '-':
-                tokens.append(Token(TT_MINUS, TT_MINUS))
+                for token_type, next_char, valid_delims in token_map[char]:
+                    if next_char is None:  
+                        self.process_token(char, token_type, valid_delims, errors, tokens)
+                        break
+                    elif self.current_char == next_char:  
+                        self.advance()
+                        self.process_token(char + next_char, token_type, valid_delims, errors, tokens)
+                        break
+
+            elif self.current_char in '*/%<>':
+                token_map = {
+                    '*': [(TT_MUL_EQ, '='), (TT_MUL, None)],
+                    '/': [(TT_DIV_EQ, '='), (TT_DIV, None)],
+                    '%': [(TT_MOD_EQ, '='), (TT_MOD, None)],
+                    '<': [(TT_LT, '='), (TT_LTE, None)],
+                    '>': [(TT_GT, '='), (TT_GTE, None)],
+                }
+                char = self.current_char
                 self.advance()
-            elif self.current_char == '*':
-                tokens.append(Token(TT_MUL, TT_MUL))
+                for token_type, next_char in token_map[char]:
+                    if next_char is None:  
+                        self.process_token(char, token_type, delim6, errors, tokens)
+                        break
+                    elif self.current_char == '=':  
+                        self.advance()
+                        self.process_token(char + next_char, token_type, delim6, errors, tokens)
+                        break
+
+            elif self.current_char == '~':
+                num_str = '~'
                 self.advance()
-            elif self.current_char == '/':
-                tokens.append(Token(TT_DIV, TT_DIV))
+                if self.current_char in NUM + '.':
+                    result, error = self.make_number(num_str)
+
+                    if error:
+                        errors.extend(error)
+                        continue  
+
+                    self.process_token(result.lexeme, result.token, numlit_delim, errors, tokens)
+                else: 
+                    self.process_token('~', TT_NEG, delim12, errors, tokens)
+
+            elif self.current_char in '^:()[]{},':
+                token_map = {
+                    '^': [(TT_POW, delim6)],
+                    ':': [(TT_COLON, delim9)],
+                    '(': [(TT_LPAREN, lparen_delim)],
+                    ')': [(TT_RPAREN, rparen_delim)],
+                    '[': [(TT_LSQUARE, lbracket_delim)],
+                    ']': [(TT_RSQUARE, rbracket_delim)],
+                    '{': [(TT_LCURLY, lcurly_delim)],
+                    '}': [(TT_RCURLY, rcurly_delim)],
+                    ',': [(TT_COMMA, comma_delim)],
+                }
+                char = self.current_char
                 self.advance()
-            elif self.current_char == '^':
-                tokens.append(Token(TT_POW, TT_POW))
+                for token_type, valid_delims in token_map[char]:
+                    self.process_token(char, token_type, valid_delims, errors, tokens)
+                    break
+
+            elif self.current_char == '.':
                 self.advance()
-            elif self.current_char == '(':
-                tokens.append(Token(TT_LPAREN, TT_LPAREN))
+
+                if self.current_char is not None and self.current_char in NUM_TO_6:
+                    result = self.current_char
+                    self.advance()
+                    if self.current_char is not None and self.current_char == 'f':
+                        result = '.' + result + 'f'
+                        self.advance()
+                        self.process_token(result, TT_XP_FORMATTING, '}', errors, tokens)
+                    else:
+                        result, error = self.make_number('.' + result)
+
+                        if error:
+                            errors.extend(error)
+                            continue  
+
+                        self.process_token(result.lexeme, result.token, numlit_delim, errors, tokens)        
+
+                elif self.current_char is not None and self.current_char in NUM:
+                    result, error = self.make_number('.')
+
+                    if error:
+                        errors.extend(error)
+                        continue  
+
+                    self.process_token(result.lexeme, result.token, numlit_delim, errors, tokens)
+
+                else:
+                    self.process_token('.', TT_PERIOD, period_delim, errors, tokens)
+
+            elif self.current_char in '=&|':
+                token_map = {
+                    '=': [(TT_EE, delim6)],
+                    '&': [(TT_AND, ' ')],
+                    '|': [(TT_OR, ' ')],
+                }
+                char = self.current_char
                 self.advance()
-            elif self.current_char == ')':
-                tokens.append(Token(TT_RPAREN, TT_RPAREN))
-                self.advance()
-            elif self.current_char == '[':
-                tokens.append(Token(TT_LSQUARE, TT_LSQUARE))
-                self.advance()
-            elif self.current_char == ']':
-                tokens.append(Token(TT_RSQUARE, TT_RSQUARE))
-                self.advance()
-            elif self.current_char == '{':
-                tokens.append(Token(TT_LCURLY, TT_LCURLY))
-                self.advance()
-            elif self.current_char == '}':
-                tokens.append(Token(TT_RCURLY, TT_RCURLY))
-                self.advance()
+                for token_type, valid_delims in token_map[char]:
+                    if self.current_char == char:
+                        self.advance()
+                        self.process_token(char + char, token_type, valid_delims, errors, tokens)
+                    else:
+                        errors.append(f"Invalid character error at line {self.pos.ln+1}, column {self.pos.col}. Cause: '{char}'")
+
             elif self.current_char == '!':
-                result, error = self.make_not_equals()
-                if error: return [], error
-                tokens.append(result)
-            elif self.current_char == '=':
-                tokens.append(self.make_equals())
+                char = self.current_char
                 self.advance()
-            elif self.current_char == '<':
-                tokens.append(self.make_less_than())
-            elif self.current_char == '>':
-                tokens.append(self.make_greater_than())
-            elif self.current_char == ',':
-                tokens.append(Token(TT_COMMA, TT_COMMA))
-                self.advance()
-            elif self.current_char == ':':
-                tokens.append(Token(TT_COLON, TT_COLON))
-                self.advance()
+                if self.current_char == '=':
+                    self.advance()
+                    self.process_token('!=', TT_NE, delim10, errors, tokens)
+                else:
+                    self.process_token('!', TT_NOT, delim11, errors, tokens)   
             else:
                 #todo mag-eextend lng error
                 # pos_start = self.pos.copy()
@@ -251,71 +376,97 @@ class Lexer:
         
         return tokens, errors
     
-    def make_number(self):
-        num_str = ''
+    def make_number(self, num_str): #todo: number limit
+        negate = False
         dot_count = 0
         int_len = 0
         dec_len = 0
         errors = []
 
-        while self.current_char != None and self.current_char in DIGITS + '.':
+        def add_error(message):
+            errors.append(f"{message} at line {self.pos.ln + 1}, column {self.pos.col - len(num_str) + 1}")
+        
+        if num_str != '':
+            if num_str == '~':
+                negate = True
+            else:
+                dot_count = 1
+                dec_len = 1    
+            
+        while self.current_char is not None and self.current_char in NUM + '.':
             if self.current_char == '.':
-                if dot_count == 1:
+                if dot_count == 1:  
                     num_str += self.current_char
                     self.advance()
                     while self.current_char is not None and self.current_char not in numlit_delim:
                         num_str += self.current_char
                         self.advance()
-                    errors.append(f"Too many decimal points in {num_str} at line {self.pos.ln + 1}, column {self.pos.col - len(num_str) + 1}")
+                    add_error(f"Too many decimal points in {num_str}")
                     return [], errors
                 dot_count += 1
                 num_str += '.'
-            else:
-                # have a number after '.' and should be less than 8
-                if dot_count == 0:
-                    if int_len < 9:
+            else:  
+                if dot_count == 0:  
+                    if int_len < 10:
                         num_str += self.current_char
                         int_len += 1
-                    else:
-                        return Token(int(num_str), TT_INT), errors
-                else:    
+                    else:  
+                        while self.current_char is not None and self.current_char not in numlit_delim:
+                            num_str += self.current_char
+                            self.advance()
+                        add_error(f"Maximum number of whole numbers reached in {num_str}")
+                        return [], errors
+                else:  
                     if dec_len < 7:
                         num_str += self.current_char
                         dec_len += 1
-                    else:
-                        return Token(float(num_str), TT_FLOAT), errors
-
+                    else:  
+                        while self.current_char is not None and self.current_char not in numlit_delim:
+                            num_str += self.current_char
+                            self.advance()
+                        add_error(f"Maximum number of decimal numbers reached in {num_str}")
+                        return [], errors
             self.advance()
-        
+
         if dot_count > 0 and num_str.endswith('.'):
-            errors.append(f"Invalid number '{num_str}' at line {self.pos.ln + 1}, column {self.pos.col - len(num_str) + 1}. Trailing decimal point without digits.")
-            return [], errors 
-
-        token_type = TT_FLOAT if dot_count > 0 else TT_INT
-        value = float(num_str) if dot_count > 0 else int(num_str)
-
-        return Token(value, token_type), errors
+            add_error(f"Invalid number '{num_str}'. Trailing decimal point without digits")
+            return [], errors
         
-    def make_identifier(self):
-        id_str = ''
+        if not negate:
+            token_type = TT_XP if dot_count > 0 else TT_HP
+        else:
+            if num_str == '~0':
+                add_error(f"Invalid number '{num_str}'. Zero can't be negative")
+                return [], errors
+            token_type = TT_NXP if dot_count > 0 else TT_NHP
 
-        while self.current_char != None and self.current_char in LETTERS_DIGITS + '_':
-            id_str += self.current_char
-            self.advance()
+        return Token(num_str, token_type), errors
+
+    def make_identifier(self): # todo
+        id_str = ''
+        id_len = 0
+
+        while self.current_char != None and self.current_char in ALPHANUM + '_':
+            if id_len < 15:
+                id_str += self.current_char
+                id_len += 1
+                self.advance()
+            else:
+                return Token(id_str, id_str)
 
         if id_str in KEYWORDS:
             return Token(id_str, id_str)
         else:
             return Token(id_str, self.identifiers(id_str))
-        
+
     def identifiers(self, id_str):
         if id_str not in self.identifier_map:
-            self.identifier_map[id_str] = f'id{self.current_id}'
+            self.identifier_map[id_str] = f'identifier_{self.current_id}'
             self.current_id += 1
 
         return self.identifier_map[id_str]
     
-    def make_string(self):
+    def make_string(self): # todo
         string = ''
         escape_character = False
         self.advance()
@@ -336,49 +487,9 @@ class Lexer:
                     string += self.current_char
             self.advance()
 
+        string = '"' + string + '"'
         self.advance()
-        return Token(string, TT_STRING)
-        
-    def make_not_equals(self):
-        pos_start = self.pos.copy()
-        self.advance()
-
-        if self.current_char == '=':
-            self.advance()
-            return Token(TT_NE, TT_NE), None
-
-        # self.advance()
-        # return None, ExpectedCharError(pos_start, self.pos, "'=' (after '!')")
-
-    def make_equals(self):
-        #tok_type = TT_EQ
-        self.advance()
-
-        if self.current_char == '=':
-            self.advance()
-            tok_type = TT_EE
-
-        return Token(tok_type, tok_type)
-
-    def make_less_than(self):
-        tok_type = TT_LT
-        self.advance()
-
-        if self.current_char == '=':
-            self.advance()
-            tok_type = TT_LTE
-
-        return Token(tok_type, tok_type)
-
-    def make_greater_than(self):
-        tok_type = TT_GT
-        self.advance()
-
-        if self.current_char == '=':
-            self.advance()
-            tok_type = TT_GTE
-
-        return Token(tok_type, tok_type)
+        return Token(string, TT_COMMS)
     
     def make_newLine(self):
         tok_type = TT_NEWLINE

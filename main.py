@@ -45,7 +45,7 @@ class App(ctk.CTk):
         self.list_frame = ctk.CTkFrame(self.info_frame)
         self.list_frame.pack(side="top", fill="both", expand=True) 
 
-        # vertical frames for lexeme and token list
+        # vertical frames for lexeme and token list 
         self.lexeme_frame = ctk.CTkFrame(self.list_frame)
         self.lexeme_frame.pack(side="left", padx=10, fill="both", expand=True)
 
@@ -62,6 +62,8 @@ class App(ctk.CTk):
         self.token_listbox = tk.Listbox(self.token_frame, font=("Arial", 10), width=20)
         self.token_listbox.pack(side="top", padx=10, fill="both", expand=True)
 
+        # todo: make lexeme and tokens combined table/list 
+        
         # tokenize button
         self.tokenize_button = ctk.CTkButton(self.info_frame, text="Tokenize", command=self.process_text)
         self.tokenize_button.pack(side="bottom", pady=10)
@@ -74,15 +76,21 @@ class App(ctk.CTk):
 
         self.error_field.config(state=tk.DISABLED)
 
-    def open_file(self):
+    def open_file(self): # TODO: warningan yung user na i-save muna ang file bago mag-open ng bago kung hindi pa nasasave
         self.file_path = filedialog.askopenfilename(filetypes=[("Ludus Files", "*.lds")])
         if self.file_path:
             with open(self.file_path, 'r') as file:
                 content = file.read()
+                self.lexeme_listbox.delete(0, tk.END)
+                self.token_listbox.delete(0, tk.END)
+                self.error_field.config(state=tk.NORMAL) 
+                self.error_field.delete(1.0, tk.END)      
+                self.error_field.config(state=tk.DISABLED)
+                self.code_editor.delete(1.0, tk.END)
                 self.code_editor.delete(1.0, tk.END)
                 self.code_editor.insert(tk.END, content)
                 
-    def save_file(self):
+    def save_file(self): 
         if self.file_path:
             content = self.code_editor.get(1.0, tk.END)   
             with open(self.file_path, 'w') as file:
@@ -100,7 +108,7 @@ class App(ctk.CTk):
                 file.write(content)  
                 messagebox.showinfo("File Saved", f"Saved as: {self.file_path}")
 
-    def close_file(self):
+    def close_file(self): # TODO: warningan yung user na i-save muna ang file kung hindi pa nasasave
         self.lexeme_listbox.delete(0, tk.END)
         self.token_listbox.delete(0, tk.END)
         self.error_field.config(state=tk.NORMAL) 
@@ -108,14 +116,13 @@ class App(ctk.CTk):
         self.error_field.config(state=tk.DISABLED)
         self.code_editor.delete(1.0, tk.END)
         self.file_path = None
-        messagebox.showinfo("File Closed", "The file has been closed.")
 
-    def exit_app(self):
+    def exit_app(self): # TODO: warningan yung user na i-save muna ang file kung hindi pa nasasave
         self.quit()
 
     def process_text(self):
         input_text = self.code_editor.get("0.0", tk.END).strip()  
-        tokens, error = lexer.run('<stdin>', input_text)
+        tokens, error = lexer.run(self.file_path, input_text)
 
         self.error_field.config(state=tk.NORMAL) 
         self.error_field.delete(1.0, tk.END)      
@@ -137,38 +144,3 @@ class App(ctk.CTk):
 
 app = App()
 app.mainloop()
-
-# def execute_run(filename):
-#     try:
-#         with open(filename, 'r') as file:
-#             text = file.read()
-#         result, error = lantits.run(filename, text)
-        
-#         if error:
-#             print(error.as_string())
-            
-#     except FileNotFoundError:
-#         print(f"Error: The file '{filename}' was not found.")
-
-# # The main loop where the user can either run files or enter commands interactively
-# if __name__ == "__main__":
-#     while True:
-#         text = input('lantits -> ')
-
-#         # Allow the user to exit the REPL
-#         if text.strip().lower() == 'exit':
-#             break
-
-#         # Check if the user wants to load and execute a file
-#         if text.startswith('run(') and text.endswith(')'):
-#             # Extract the filename from the input: execute_run('filename')
-#             filename = text[len('run('):-1].strip().strip("'\"")
-#             execute_run(filename)
-#         else:
-#             # Otherwise, process the input interactively
-#             result, error = lantits.run('<stdin>', text)
-
-#             if error:
-#                 print(error.as_string())
-#             else:
-#                 print(result)
