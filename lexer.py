@@ -14,28 +14,30 @@ arith_op   = '+-*/%^'
 relat_op   = '<>=!'
 whitespace = '# \n'
 
-id_delim       = arith_op + relat_op + whitespace + '.,:[{}()'
-numlit_delim   = arith_op + relat_op + whitespace + '){}:],'
-commslit_delim = whitespace + ':,={[)'
-flag_delim     = whitespace + ',:])'
+id_delim       = arith_op + relat_op + whitespace + '.:[]{}()'
+numlit_delim   = arith_op + relat_op + whitespace + ',){}:]'
+commslit_delim = whitespace + ',:={])'
+flag_delim     = whitespace + arith_op + ',:])=!'
+nl_delim       = ALPHANUM + '_{#`'
 
-lparen_delim   = ALPHANUM + '_ )"+-!~'
+lparen_delim   = ALPHANUM + '_ .)"+-!~['
 rparen_delim   = whitespace + arith_op + relat_op + '{})],.'
-lcurly_delim   = whitespace + ALPHANUM + '_{(~+-'
-rcurly_delim   = whitespace + ASCII_PRINTABLE
-lbracket_delim = ALPHANUM + '_ ]'
+lcurly_delim   = whitespace + ALPHANUM + '_{(~+-!'
+rcurly_delim   = whitespace 
+lbracket_delim = ALPHANUM + '_ .]+-("~'
 rbracket_delim = whitespace + arith_op + relat_op + ',[:).}'
-comma_delim    = ALPHANUM + ' _'
+comma_delim    = ALPHANUM + whitespace + '_['
 period_delim   = ALPHA + '_'  
 
 delim1 = whitespace + ','
 delim2  = ' {'
-delim6  = ALPHANUM + '_( '
-delim7  = whitespace + ALPHANUM + '_}()'
-delim9  = ALPHANUM + ' _"~+-(!'
-delim10 = ALPHANUM + ' _("'
-delim11 = ALPHA + '_('
-delim12 = ALPHANUM + '_(.'
+delim3  = ALPHANUM + '_ ("'
+delim4  = ALPHANUM + '_ .('
+delim5  = whitespace + ALPHANUM + '_}()]'
+delim6  = ALPHANUM + ' _."~+-(!['
+delim7 = ALPHANUM + ' _.("!~+-'
+delim8 = ALPHA + '_('
+delim9 = ALPHANUM + '_(.'
 
 ### TOKENS ###
 
@@ -261,8 +263,8 @@ class Lexer:
                 self.process_token(result.lexeme, result.token, commslit_delim, errors, tokens)
             elif self.current_char in '+-':
                 token_map = {
-                    '+': [(TT_PLUS_EQ, '=', delim6), (TT_INC, '+', delim7), (TT_PLUS, None, delim6)],
-                    '-': [(TT_MINUS_EQ, '=', delim6), (TT_DEC, '-', delim7), (TT_MINUS, None, delim6)],
+                    '+': [(TT_PLUS_EQ, '=', delim4), (TT_INC, '+', delim5), (TT_PLUS, None, delim3)],
+                    '-': [(TT_MINUS_EQ, '=', delim4), (TT_DEC, '-', delim5), (TT_MINUS, None, delim4)],
                 }
                 char = self.current_char
                 self.advance()
@@ -286,11 +288,11 @@ class Lexer:
                 self.advance()
                 for token_type, next_char in token_map[char]:
                     if next_char is None:  
-                        self.process_token(char, token_type, delim6, errors, tokens)
+                        self.process_token(char, token_type, delim4, errors, tokens)
                         break
                     elif self.current_char == '=':  
                         self.advance()
-                        self.process_token(char + next_char, token_type, delim6, errors, tokens)
+                        self.process_token(char + next_char, token_type, delim4, errors, tokens)
                         break
             elif self.current_char == '~':
                 num_str = '~'
@@ -304,11 +306,11 @@ class Lexer:
 
                     self.process_token(result.lexeme, result.token, numlit_delim, errors, tokens)
                 else: 
-                    self.process_token('~', TT_NEG, delim12, errors, tokens)
+                    self.process_token('~', TT_NEG, delim9, errors, tokens)
             elif self.current_char in '^:()[]{},':
                 token_map = {
-                    '^': [(TT_POW, delim6)],
-                    ':': [(TT_COLON, delim9)],
+                    '^': [(TT_POW, delim4)],
+                    ':': [(TT_COLON, delim6)],
                     '(': [(TT_LPAREN, lparen_delim)],
                     ')': [(TT_RPAREN, rparen_delim)],
                     '[': [(TT_LSQUARE, lbracket_delim)],
@@ -353,7 +355,7 @@ class Lexer:
                     self.process_token('.', TT_PERIOD, period_delim, errors, tokens)
             elif self.current_char in '=&|':
                 token_map = {
-                    '=': [(TT_EE, delim6)],
+                    '=': [(TT_EE, delim7)],
                     '&': [(TT_AND, ' ')],
                     '|': [(TT_OR, ' ')],
                 }
@@ -370,9 +372,9 @@ class Lexer:
                 self.advance()
                 if self.current_char == '=':
                     self.advance()
-                    self.process_token('!=', TT_NE, delim10, errors, tokens)
+                    self.process_token('!=', TT_NE, delim7, errors, tokens)
                 else:
-                    self.process_token('!', TT_NOT, delim11, errors, tokens)   
+                    self.process_token('!', TT_NOT, delim8, errors, tokens)   
             elif self.current_char == '#':
                 comments = '#'
                 self.advance()
@@ -477,9 +479,9 @@ class Lexer:
         if not negate:
             token_type = TT_XP if dot_count > 0 else TT_HP
         else:
-            if num_str == '~0':
-                add_error(f"Invalid number '{num_str}'. Zero can't be negative")
-                return [], errors
+            # if num_str == '~0':
+            #     add_error(f"Invalid number '{num_str}'. Zero can't be negative")
+            #     return [], errors
             token_type = TT_NXP if dot_count > 0 else TT_NHP
 
         return Token(num_str, token_type), errors
@@ -502,7 +504,7 @@ class Lexer:
                 while self.current_char is not None and self.current_char not in id_delim:
                         id_str += self.current_char
                         self.advance()
-                add_error(f"Maximum number characters reached in {id_str}")
+                add_error(f"Maximum number characters reached in '{id_str}'")
                 return [], errors, None
             
         if id_str in KEYWORDS_DELIMS:
