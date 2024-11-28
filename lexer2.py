@@ -39,10 +39,6 @@ delim7 = ALPHANUM + ' _.("!~+-'
 delim8 = ALPHA + '_('
 delim9 = ALPHANUM + '_(.'
 
-delim10 = delim4 + '-' #not final, wip
-
-valid_lhs = ALPHANUM + '_)]'
-
 ### TOKENS ###
 
 # literals:
@@ -52,16 +48,18 @@ TT_XP         = 'xp_ltr'
 TT_NXP        = 'nxp_ltr'
 TT_COMMS      = 'comms_ltr'
 
-# negate:
-TT_NEG        = '-'
+# unary operators:
+TT_INC        = 'increment'
+TT_DEC        = 'decrement'
+TT_NEG        = 'negate'
 
 # arithmetic operators:
-TT_PLUS       = '+'
-TT_MINUS      = '-'
-TT_MUL        = '*'
-TT_DIV        = '/'
-TT_MOD        = '%'
-TT_POW        = '^'
+TT_PLUS       = 'plus'
+TT_MINUS      = 'minus'
+TT_MUL        = 'multiply'
+TT_DIV        = 'divide'
+TT_MOD        = 'modulus'
+TT_POW        = 'power'
 
 # relational operators:
 TT_EE         = 'equals equals'
@@ -95,13 +93,74 @@ TT_COMMA	  = 'comma'
 TT_PERIOD	  = 'period'
 
 # others:
+TT_KEYWORDS   = 'keyword'
+
 TT_COMMENTS1  = 'single-line comment'
 TT_COMMENTS2  = 'multi-line comment'
+
 TT_NEWLINE	  = 'newline'
 
-TT_XP_FORMATTING = 'xp formatting' #ttanggalin <- todo
+TT_XP_FORMATTING = 'xp formatting'
 
-### POSITION ###
+### RESERVED WORDS + THEIR  DELIMS ###
+
+KEYWORDS_DELIMS = {
+    # terminator:
+    'gameOver'  : whitespace,
+    # data types:
+    'xp'        : ' ',
+    'hp'        : ' ',
+    'comms'     : ' ',
+    'flag'      : ' ',
+    # bool:
+    'true'      : flag_delim,
+    'false'     : flag_delim,
+    # struct words:
+    'build'     : ' ',
+    'access'    : ' ',
+    # logical:
+    'AND'       : ' ',
+    'OR'        : ' ',
+    # constants declaration:
+    'immo'      : ' ',
+    # conditional:
+    'if'        : ' ',
+    'elif'      : ' ',
+    'else'      : delim2,
+    'flank'     : ' ',
+    'choice'    : ' ',
+    'backup'    : ':',
+    # looping:
+    'for'       : ' ',
+    'while'     : ' ',
+    'grind'     : delim2,
+    # loop control:
+    'checkpoint': whitespace,
+    'resume'    : whitespace,
+    # return:
+    'recall'    : ' ',
+    # others:
+    'dead'      : delim1,
+    'generate'  : ' ',
+    'play'      : '(',
+    # built-in functions:
+    'load'      : '(',
+    'loadNum'   : '(',
+    'shoot'     : '(',
+    'shootNxt'  : '(',
+    'rounds'    : '(',
+    'wipe'      : '(',
+    'join'      : '(',
+    'drop'      : '(',
+    'seek'      : '(',
+    'levelUp'   : '(',
+    'levelDown' : '(',
+    'toHp'      : '(',
+    'toXp'      : '(',
+    'toComms'   : '(',
+}
+
+# position
 
 class Position:
     def __init__(self, idx, ln, col, fn, ftxt):
@@ -143,11 +202,9 @@ class Lexer:
         self.identifier_map = {}
         self.current_id = 1
         self.current_char = None
-        self.prev_char = None
         self.advance()
     
     def advance(self):
-        self.prev_char = self.current_char
         self.pos.advance(self.current_char)
         self.current_char = self.text[self.pos.idx] if self.pos.idx < len(self.text) else None
     
@@ -185,93 +242,17 @@ class Lexer:
                    continue  
                 
                 self.process_token(result.lexeme, result.token, numlit_delim, errors, tokens)
-            elif self.current_char in ALPHA:
-                char_str = ''
-                if self.current_char == 'A':
-                    char_str += 'A'
-                    self.advance()
-                    if self.current_char == 'N':
-                        char_str += 'N'
-                        self.advance()
-                        if self.current_char == 'D':
-                            char_str += 'D'
-                            self.advance()
-                            self.tokenize_keyword(char_str, ' ', errors, tokens)
-                        else:
-                            self.tokenize_id(char_str, id_delim, errors, tokens)
-                    else:
-                        self.tokenize_id(char_str, id_delim, errors, tokens)        
-                elif self.current_char == 'O':
-                    char_str += 'O'
-                    self.advance()
-                    if self.current_char == 'R':
-                        char_str += 'R'
-                        self.advance()
-                        self.tokenize_keyword(char_str, ' ', errors, tokens)
-                    else:
-                         self.tokenize_id(char_str, id_delim, errors, tokens)      
-                elif self.current_char == 'a':
-                    char_str += 'a'
-                    self.advance()
-                    if self.current_char == 'c':
-                        char_str += 'N'
-                        self.advance()
-                        if self.current_char == 'c':
-                            char_str += 'D'
-                            self.advance()
-                            if self.current_char == 'e':
-                                char_str += 'e'
-                                self.advance()
-                                if self.current_char == 's':
-                                    char_str += 's'
-                                    self.advance()
-                                    if self.current_char == 's':
-                                        char_str += 's'
-                                        self.advance()
-                                        self.tokenize_keyword(char_str, ' ', errors, tokens)
-                                    else:
-                                        self.tokenize_id(char_str, id_delim, errors, tokens)
-                                else:
-                                    self.tokenize_id(char_str, id_delim, errors, tokens)
-                            else:
-                                self.tokenize_id(char_str, id_delim, errors, tokens)
-                        else:
-                            self.tokenize_id(char_str, id_delim, errors, tokens)
-                    else:
-                        self.tokenize_id(char_str, id_delim, errors, tokens)  
-                elif self.current_char == 'b':
-                    char_str += 'A' 
-                elif self.current_char == 'c':
-                    char_str += 'A' 
-                elif self.current_char == 'd':
-                    char_str += 'A' 
-                elif self.current_char == 'e':
-                    char_str += 'A'
-                elif self.current_char == 'f':
-                    char_str += 'A' 
-                elif self.current_char == 'g':
-                    char_str += 'A' 
-                elif self.current_char == 'h':
-                    char_str += 'A' 
-                elif self.current_char == 'i':
-                    char_str += 'A' 
-                elif self.current_char == 'j':
-                    char_str += 'A' 
-                elif self.current_char == 'l':
-                    char_str += 'A' 
-                elif self.current_char == 'p':
-                    char_str += 'A' 
-                elif self.current_char == 'r':
-                    char_str += 'A' 
-                elif self.current_char == 's':
-                    char_str += 'A' 
-                elif self.current_char == 't':
-                    char_str += 'A' 
-                elif self.current_char == 'w':
-                    char_str += 'A' 
-                elif self.current_char == 'x':
-                    char_str += 'A' 
+            elif self.current_char in ALPHA or self.current_char == '_':
+                result, error, is_keywords = self.make_identifier()
 
+                if error:
+                   errors.extend(error)
+                   continue
+
+                if not is_keywords:   
+                    self.process_token(result.lexeme, result.token, id_delim, errors, tokens)
+                else:
+                    self.process_token(result.lexeme, result.token, KEYWORDS_DELIMS[result.lexeme], errors, tokens)
             elif self.current_char == '"':
                 result, error = self.make_string()
 
@@ -280,36 +261,52 @@ class Lexer:
                    continue
 
                 self.process_token(result.lexeme, result.token, commslit_delim, errors, tokens)
-            elif self.current_char in '+':
+            elif self.current_char in '+-':
+                token_map = {
+                    '+': [(TT_PLUS_EQ, '=', delim4), (TT_INC, '+', delim5), (TT_PLUS, None, delim3)],
+                    '-': [(TT_MINUS_EQ, '=', delim4), (TT_DEC, '-', delim5), (TT_MINUS, None, delim4)],
+                }
+                char = self.current_char
                 self.advance()
-                if self.current_char == '=':
-                    self.process_token('+=', TT_PLUS_EQ, delim4, errors, tokens)
-                else:
-                    self.process_token('+', TT_PLUS, delim3, errors, tokens)
-            elif self.current_char in '-':
-                lhs = self.prev_char
+                for token_type, next_char, valid_delims in token_map[char]:
+                    if next_char is None:  
+                        self.process_token(char, token_type, valid_delims, errors, tokens)
+                        break
+                    elif self.current_char == next_char:  
+                        self.advance()
+                        self.process_token(char + next_char, token_type, valid_delims, errors, tokens)
+                        break
+            elif self.current_char in '*/%<>':
+                token_map = {
+                    '*': [(TT_MUL_EQ, '='), (TT_MUL, None)],
+                    '/': [(TT_DIV_EQ, '='), (TT_DIV, None)],
+                    '%': [(TT_MOD_EQ, '='), (TT_MOD, None)],
+                    '<': [(TT_LT, '='), (TT_LTE, None)],
+                    '>': [(TT_GT, '='), (TT_GTE, None)],
+                }
+                char = self.current_char
                 self.advance()
-                if self.current_char == '=':
-                    self.process_token('-=', TT_MINUS_EQ, delim4, errors, tokens)
-                else:
-                    #check lhs if id, number, )
-                    if lhs in valid_lhs:
-                        self.process_token('-', TT_MINUS, delim10, errors, tokens)
-                    else:
-                        if self.current_char in NUM:
-                            result, error = self.make_number('-')
+                for token_type, next_char in token_map[char]:
+                    if next_char is None:  
+                        self.process_token(char, token_type, delim4, errors, tokens)
+                        break
+                    elif self.current_char == '=':  
+                        self.advance()
+                        self.process_token(char + next_char, token_type, delim4, errors, tokens)
+                        break
+            elif self.current_char == '~':
+                num_str = '~'
+                self.advance()
+                if self.current_char in NUM + '.':
+                    result, error = self.make_number(num_str)
 
-                            if error:
-                                errors.extend(error)
-                                continue  
+                    if error:
+                        errors.extend(error)
+                        continue  
 
-                            self.process_token(result.lexeme, result.token, numlit_delim, errors, tokens)
-                        else:
-                            self.process_token('-', TT_NEG, delim4, errors, tokens)
-                
-            elif self.current_char in '*/%<>': #delim4
-                self.advance()
-            
+                    self.process_token(result.lexeme, result.token, numlit_delim, errors, tokens)
+                else: 
+                    self.process_token('~', TT_NEG, delim9, errors, tokens)
             elif self.current_char in '^:()[]{},':
                 token_map = {
                     '^': [(TT_POW, delim4)],
@@ -434,7 +431,7 @@ class Lexer:
             errors.append(f"{message} at line {self.pos.ln + 1}, column {self.pos.col - len(num_str) + 1}")
         
         if num_str != '':
-            if num_str == '-':
+            if num_str == '~':
                 negate = True
             else:
                 dot_count = 1
@@ -489,9 +486,11 @@ class Lexer:
 
         return Token(num_str, token_type), errors
 
-    def make_identifier(self, id_str): # todo
-        id_len = len(id_str)
+    def make_identifier(self): # todo
+        id_str = ''
+        id_len = 0
         errors = []
+        is_keywords = False
 
         def add_error(message):
             errors.append(f"{message} at line {self.pos.ln + 1}, column {self.pos.col - len(id_str) + 1}")
@@ -506,9 +505,13 @@ class Lexer:
                         id_str += self.current_char
                         self.advance()
                 add_error(f"Maximum number characters reached in '{id_str}'")
-                return [], errors
+                return [], errors, None
             
-        return Token(id_str, self.identifiers(id_str)), errors
+        if id_str in KEYWORDS_DELIMS:
+            is_keywords = True
+            return Token(id_str, TT_KEYWORDS), errors, is_keywords
+        else:
+            return Token(id_str, self.identifiers(id_str)), errors, is_keywords
 
     def identifiers(self, id_str):
         if id_str not in self.identifier_map:
@@ -516,22 +519,6 @@ class Lexer:
             self.current_id += 1
 
         return self.identifier_map[id_str]
-
-    def tokenize_id(self, char_str, id_delim, errors, tokens):
-        result, error = self.make_identifier(char_str)
-
-        if error:
-            errors.extend(error)
-        else:
-            self.process_token(result.lexeme, result.token, id_delim, errors, tokens)
-
-    def tokenize_keyword(self, char_str, valid_delim, errors,tokens):
-        if self.current_char is None: 
-            self.process_token(char_str, char_str, valid_delim, errors, tokens)
-        elif self.current_char in ALPHANUM or self.current_char == '_':
-            self.tokenize_id(char_str, id_delim, errors, tokens)
-        else:
-            self.process_token(char_str, char_str, valid_delim, errors, tokens)
 
     def make_string(self): 
         string = ''  
@@ -571,7 +558,7 @@ class Lexer:
 
 ### RUN ###
 
-def run(fn, text):
+def run2(fn, text):
     lexer = Lexer(fn, text)
     tokens, error = lexer.make_tokens()
 
