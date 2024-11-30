@@ -214,10 +214,10 @@ class Lexer:
                     char_str += 'a'
                     self.advance()
                     if self.current_char == 'c':
-                        char_str += 'N'
+                        char_str += 'c'
                         self.advance()
                         if self.current_char == 'c':
-                            char_str += 'D'
+                            char_str += 'c'
                             self.advance()
                             if self.current_char == 'e':
                                 char_str += 'e'
@@ -240,15 +240,203 @@ class Lexer:
                     else:
                         self.tokenize_id(char_str, id_delim, errors, tokens)  
                 elif self.current_char == 'b':
-                    char_str += 'A' 
+                    char_str += 'b'
+                    self.advance()
+                    if self.current_char == 'a':
+                        char_str += 'a'
+                        self.advance()
+                        if self.current_char == 'c':
+                            char_str += 'c'
+                            self.advance()
+                            if self.current_char == 'k':
+                                char_str += 'k'
+                                self.advance()
+                                if self.current_char == 'u':
+                                    char_str += 'u'
+                                    self.advance()
+                                    if self.current_char == 'p':
+                                        char_str += 'p'
+                                        self.advance()
+                                        self.tokenize_keyword(char_str, ':', errors, tokens)
+                                    else:
+                                        self.tokenize_id(char_str, id_delim, errors, tokens)
+                                else:
+                                    self.tokenize_id(char_str, id_delim, errors, tokens)
+                            else:
+                                self.tokenize_id(char_str, id_delim, errors, tokens)
+                        else:
+                            self.tokenize_id(char_str, id_delim, errors, tokens)
+                    elif self.current_char == 'u':
+                    char_str += 'u'
+                    self.advance()
+                        if self.current_char == 'i':
+                            char_str += 'i'
+                            self.advance()
+                            if self.current_char == 'l':
+                                char_str += 'l'
+                                self.advance()
+                                if self.current_char == 'd':
+                                    char_str += 'u'
+                                    self.advance()
+                                    self.tokenize_keyword(char_str, ' ', errors, tokens)
+                                else:
+                                    self.tokenize_id(char_str, id_delim, errors, tokens)
+                            else:
+                                self.tokenize_id(char_str, id_delim, errors, tokens)
+                        else:
+                            self.tokenize_id(char_str, id_delim, errors, tokens)
+                    else:
+                        self.tokenize_id(char_str, id_delim, errors, tokens)
                 elif self.current_char == 'c':
-                    char_str += 'A' 
+                    char_str += 'c'
+                    self.advance()
+                    if self.current_char == 'h':
+                        char_str += 'h'
+                        self.advance()
+                        if self.current_char == 'e':
+                            char_str += 'e'
+                            self.advance()
+                            if self.current_char == 'c':
+                                char_str += 'c'
+                                self.advance()
+                                if self.current_char == 'k':
+                                    char_str += 'k'
+                                    self.advance()
+                                    if self.current_char == 'p':
+                                        char_str += 'p'
+                                        self.advance()
+                                        if self.current_char == 'o':
+                                            char_str += 'o'
+                                            self.advance()
+                                            if self.current_char == 'i':
+                                                char_str += 'i'
+                                                self.advance()
+                                                if self.current_char == 'n':
+                                                    char_str += 'n'
+                                                    self.advance()
+                                                    if self.current_char == 't':
+                                                        char_str += 't'
+                                                        self.advance()
+                                                        self.tokenize_keyword(char_str, 'whitespace', errors, tokens)
+                                                    else:
+                                                        self.tokenize_id(char_str, id_delim, errors, tokens)
+                                                else:
+                                                    self.tokenize_id(char_str, id_delim, errors, tokens)
+                                            else:
+                                                self.tokenize_id(char_str, id_delim, errors, tokens)
+                                        else:
+                                            self.tokenize_id(char_str, id_delim, errors, tokens)
+                                    else:
+                                        self.tokenize_id(char_str, id_delim, errors, tokens)
+                                else:
+                                    self.tokenize_id(char_str, id_delim, errors, tokens)
+                            else:
+                                self.tokenize_id(char_str, id_delim, errors, tokens)
+                        elif self.current_char == 'o':
+                            char_str += 'o'
+                            self.advance()
+                            if self.current_char == 'i':
+                                char_str += 'i'
+                                self.advance()
+                                if self.current_char == 'c':
+                                    char_str += 'c'
+                                    self.advance()
+                                    if self.current_char == 'e':
+                                        char_str += 'e'
+                                        self.advance()
+                                        self.tokenize_keyword(char_str, ' ', errors, tokens)
+                                    else:
+                                        self.tokenize_id(char_str, id_delim, errors, tokens)
+                                else:
+                                    self.tokenize_id(char_str, id_delim, errors, tokens)
+                            else:
+                                self.tokenize_id(char_str, id_delim, errors, tokens)
+                        else:
+                            self.tokenize_id(char_str, id_delim, errors, tokens)
+                    elif self.current_char == 'o':
+                            char_str += 'o'
+                            self.advance()
+                            if self.current_char == 'm':
+                                char_str += 'm'
+                                self.advance()
+                                if self.current_char == 'm':
+                                    char_str += 'm'
+                                    self.advance()
+                                    if self.current_char == 's':
+                                        char_str += 's'
+                                        self.advance()
+                                        self.tokenize_keyword(char_str, ' ', errors, tokens)
+                                    else:
+                                        self.tokenize_id(char_str, id_delim, errors, tokens)
+                                else:
+                                    self.tokenize_id(char_str, id_delim, errors, tokens)
+                            else:
+                                self.tokenize_id(char_str, id_delim, errors, tokens)
+                        else:
+                            self.tokenize_id(char_str, id_delim, errors, tokens)    
                 elif self.current_char == 'd':
-                    char_str += 'A' 
+                    char_str += 'd'
+                    self.advance()
+                    if self.current_char == 'e':
+                        char_str += 'e'
+                        self.advance()
+                        if self.current_char == 'a':
+                            char_str += 'a'
+                            self.advance()
+                            if self.current_char == 'd':
+                                char_str += 'd'
+                                self.advance()
+                                self.tokenize_keyword(char_str, 'delim1', errors, tokens)
+                            else:
+                                self.tokenize_id(char_str, id_delim, errors, tokens)
+                        else:
+                            self.tokenize_id(char_str, id_delim, errors, tokens)
+                    elif self.current_char == 'r':
+                        char_str += 'r'
+                        self.advance()
+                        if self.current_char == 'o':
+                            char_str += 'o'
+                            self.advance()
+                            if self.current_char == 'p':
+                                char_str += 'p'
+                                self.advance()
+                                self.tokenize_keyword(char_str, '(', errors, tokens)
+                            else:
+                                self.tokenize_id(char_str, id_delim, errors, tokens)
+                        else:
+                            self.tokenize_id(char_str, id_delim, errors, tokens)
+                    else:
+                        self.tokenize_id(char_str, id_delim, errors, tokens)
                 elif self.current_char == 'e':
-                    char_str += 'A'
+                    char_str += 'e'
+                    self.advance()
+                    if self.current_char == 'l':
+                        char_str += 'l'
+                        self.advance()
+                        if self.current_char == 'i':
+                            char_str += 'i'
+                            self.advance()
+                            if self.current_char == 'f':
+                                char_str += 'f'
+                                self.advance()
+                                self.tokenize_keyword(char_str, ' ', errors, tokens)
+                            else:
+                                self.tokenize_id(char_str, id_delim, errors, tokens)
+                    else:
+                        self.tokenize_id(char_str, id_delim, errors, tokens)
+                        elif self.current_char == 's':
+                            char_str += 's'
+                            self.advance()
+                            if self.current_char == 'e':
+                                char_str += 'e'
+                                self.advance()
+                                self.tokenize_keyword(char_str, 'delim2', errors, tokens)
+                             else:
+                                self.tokenize_id(char_str, id_delim, errors, tokens)
+                        else:
+                            self.tokenize_id(char_str, id_delim, errors, tokens)
                 elif self.current_char == 'f':
-                    char_str += 'A' 
+                    char_str += 'f' 
                 elif self.current_char == 'g':
                     char_str += 'A' 
                 elif self.current_char == 'h':
