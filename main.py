@@ -51,17 +51,17 @@ class App(ctk.CTk):
         # textbox
         self.editor_frame = ctk.CTkFrame(self.main_frame)
         self.editor_frame.pack(side="top", fill="both", expand=True)
-        
-        self.line_numbers = tk.Label(self.editor_frame, width=4, padx=4, anchor="nw", background="gray12", foreground="#fdca01", font=("Consolas", 12))
-        self.line_numbers.pack(side="left", fill="y")
 
         self.editor_xscrollbar = tk.Scrollbar(self.editor_frame, orient="horizontal", command=self.editor_x_scroll)
         self.editor_xscrollbar.pack(side="bottom", fill="x")
 
         self.editor_yscrollbar = tk.Scrollbar(self.editor_frame, orient="vertical", command=self.editor_y_scroll)
         self.editor_yscrollbar.pack(side="right", fill="y")
+        
+        self.line_numbers = tk.Label(self.editor_frame, width=4, padx=4, anchor="nw", background="gray12", foreground="#fdca01", font=("Consolas", 12))
+        self.line_numbers.pack(side="left", fill="y")
 
-        self.code_editor = tk.Text(self.editor_frame, wrap=tk.NONE, font=("Consolas", 12))
+        self.code_editor = tk.Text(self.editor_frame, wrap=tk.NONE, font=("Consolas", 12), undo=True)
         self.code_editor.pack(side="left", fill="both", expand=True)
 
         self.code_editor.config(xscrollcommand=self.editor_xscrollbar.set)
@@ -73,18 +73,18 @@ class App(ctk.CTk):
         self.code_editor.bind("<Configure>", self.update_line_numbers)
 
         # terminal
-        self.terminal_frame = ctk.CTkFrame(self.main_frame)
-        self.terminal_frame.pack(side="bottom", fill="x", expand=False)
+        # self.terminal_frame = ctk.CTkFrame(self.main_frame)
+        # self.terminal_frame.pack(side="bottom", fill="x", expand=False)
 
-        self.terminal_label = ctk.CTkLabel(self.terminal_frame, text="Terminal", anchor="w", fg_color="gray12", text_color="white", font=("Arial", 14, "bold"))
-        self.terminal_label.pack(fill="x")
+        # self.terminal_label = ctk.CTkLabel(self.terminal_frame, text="Terminal", anchor="w", fg_color="gray12", text_color="white", font=("Arial", 14, "bold"))
+        # self.terminal_label.pack(fill="x")
 
-        # make scrollbar sync with the text after line 10
-        self.terminal_xscrollbar = tk.Scrollbar(self.terminal_frame, orient="vertical", command=self.terminal_x_scroll)
-        self.terminal_xscrollbar.pack(side="right", fill="y")
+        # # make scrollbar sync with the text after line 10
+        # self.terminal_xscrollbar = tk.Scrollbar(self.terminal_frame, orient="vertical", command=self.terminal_x_scroll)
+        # self.terminal_xscrollbar.pack(side="right", fill="y")
 
-        self.terminal = tk.Text(self.terminal_frame, wrap="word", bg="gray12", fg="white", insertbackground="white", height=12, font=("Consolas", 12))
-        self.terminal.pack(fill="both", expand=True)
+        # self.terminal = tk.Text(self.terminal_frame, wrap="word", bg="gray12", fg="white", insertbackground="white", height=12, font=("Consolas", 12))
+        # self.terminal.pack(fill="both", expand=True)
 
         # lexeme, token, and error frame
         self.info_frame = ctk.CTkFrame(self)
@@ -101,27 +101,49 @@ class App(ctk.CTk):
         self.token_frame = ctk.CTkFrame(self.list_frame)
         self.token_frame.pack(side="left", padx=10, fill="both", expand=True)
 
+        self.list_scrollbar = tk.Scrollbar(self.list_frame, orient="vertical")
+        self.list_scrollbar.pack(side="right", fill="y")
+
         self.lexeme_label = ctk.CTkLabel(self.lexeme_frame, text="Lexemes", font=("Arial", 14, "bold"))
         self.lexeme_label.pack(side="top", padx=10)
-        self.lexeme_listbox = tk.Listbox(self.lexeme_frame, font=("Arial", 10), width=25)
+        self.lexeme_listbox = tk.Listbox(self.lexeme_frame, font=("Arial", 10), width=25, yscrollcommand=self.list_scrollbar.set)
         self.lexeme_listbox.pack(side="top", padx=10, fill="both", expand=True)
 
         self.token_label = ctk.CTkLabel(self.token_frame, text="Tokens", font=("Arial", 14, "bold"))
         self.token_label.pack(side="top", padx=10)
-        self.token_listbox = tk.Listbox(self.token_frame, font=("Arial", 10), width=25)
+        self.token_listbox = tk.Listbox(self.token_frame, font=("Arial", 10), width=25, yscrollcommand=self.list_scrollbar.set)
         self.token_listbox.pack(side="top", padx=10, fill="both", expand=True)
+        
+        self.list_scrollbar.config(command=self.sync_scroll)
+        # self.disable_independent_scrolling(self.lexeme_listbox)
+        # self.disable_independent_scrolling(self.token_listbox)
 
         # tokenize button
         self.tokenize_button = ctk.CTkButton(self.info_frame, text="Tokenize", font=("Arial", 13, "bold"), command=self.process_text)
         self.tokenize_button.pack(side="bottom", pady=10)
         
-        self.error_field = tk.Text(self.info_frame, height=15, font=("Arial", 10), bg="lightgray", fg="red", width=50)
+        self.error_field = tk.Text(self.info_frame, height=15, font=("Arial", 11), bg="lightgray", fg="red", width=50)
         self.error_field.pack(side="bottom",padx=5, pady=5, fill="x")
 
         self.error_label = ctk.CTkLabel(self.info_frame, text="Errors", font=("Arial", 14, "bold"))
         self.error_label.pack(side="bottom", pady=5)
 
         self.error_field.config(state=tk.DISABLED)
+    
+    def sync_scroll(self, *args):
+        self.lexeme_listbox.yview(*args)
+        self.token_listbox.yview(*args)
+
+    # def disable_independent_scrolling(self, listbox):
+    #     # Override the yview and yview_scroll to prevent independent scrolling
+    #     listbox.yview = lambda *args: None
+    #     listbox.yview_scroll = lambda *args: None
+
+    #     # Prevent mouse wheel events from affecting the listbox
+    #     def prevent_mouse_wheel(event):
+    #         return "break"  # Stops the event propagation
+
+    #     # listbox.bind("<MouseWheel>", prevent_mouse_wheel)
 
     # File handling methods
     def open_file(self): # TODO: warningan yung user na i-save muna ang file bago mag-open ng bago kung hindi pa nasasave
@@ -168,7 +190,7 @@ class App(ctk.CTk):
     def exit_app(self): # TODO: warningan yung user na i-save muna ang file kung hindi pa nasasave
         self.quit()
 
-    # Settings functions
+    # Settings function
     def change_theme(self):
         theme_value = self.theme.get()
         if theme_value == 1:
@@ -214,41 +236,14 @@ class App(ctk.CTk):
         for token in tokens:
             self.lexeme_listbox.insert(tk.END, token.lexeme)
             self.token_listbox.insert(tk.END, token.token)
+        
+        for item in range(self.lexeme_listbox.size()):
+            color = "#f0f0f0" if item % 2 == 0 else "#ffffff"
+            self.lexeme_listbox.itemconfig(item, {'bg': color})
+        
+        for item in range(self.token_listbox.size()):
+            color = "#f0f0f0" if item % 2 == 0 else "#ffffff"
+            self.token_listbox.itemconfig(item, {'bg': color})
 
 app = App()
 app.mainloop()
-
-# def execute_run(filename):
-#     try:
-#         with open(filename, 'r') as file:
-#             text = file.read()
-#         result, error = lantits.run(filename, text)
-        
-#         if error:
-#             print(error.as_string())
-            
-#     except FileNotFoundError:
-#         print(f"Error: The file '{filename}' was not found.")
-
-# # The main loop where the user can either run files or enter commands interactively
-# if __name__ == "__main__":
-#     while True:
-#         text = input('lantits -> ')
-
-#         # Allow the user to exit the REPL
-#         if text.strip().lower() == 'exit':
-#             break
-
-#         # Check if the user wants to load and execute a file
-#         if text.startswith('run(') and text.endswith(')'):
-#             # Extract the filename from the input: execute_run('filename')
-#             filename = text[len('run('):-1].strip().strip("'\"")
-#             execute_run(filename)
-#         else:
-#             # Otherwise, process the input interactively
-#             result, error = lantits.run('<stdin>', text)
-
-#             if error:
-#                 print(error.as_string())
-#             else:
-#                 print(result)
