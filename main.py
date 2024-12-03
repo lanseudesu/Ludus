@@ -1,6 +1,7 @@
 import customtkinter as ctk
 import tkinter as tk
 from tkinter import filedialog, messagebox
+from linenums import textlinenum, customtext
 import lexer
 
 ctk.set_appearance_mode("dark")
@@ -11,9 +12,12 @@ class App(ctk.CTk):
         super().__init__()
         self.title("Ludus")
         self.iconbitmap('ludus.ico')
-        self.geometry("1300x800")
+        self.center_window()
 
         self.file_path = None
+        self.is_saved = True
+        self.grid_rowconfigure(0, weight=1)
+        self.grid_columnconfigure(0, weight=1)
         
         # menu bar
         self.menu_bar = tk.Menu(self)
@@ -46,116 +50,115 @@ class App(ctk.CTk):
 
         # text editor and terminal frame
         self.main_frame = ctk.CTkFrame(self)
-        self.main_frame.pack(side="left", fill="both", expand=True, padx=10, pady=10)
+        self.main_frame.grid(row=0, column=0, sticky="nsew", padx=10, pady=10)
 
-        # textbox
-        self.editor_frame = ctk.CTkFrame(self.main_frame)
-        self.editor_frame.pack(side="top", fill="both", expand=True)
+        self.main_frame.grid_rowconfigure(0, weight=1)  
+        self.main_frame.grid_rowconfigure(1, weight=0)  
+        self.main_frame.grid_columnconfigure(0, weight=0, minsize=30) 
+        self.main_frame.grid_columnconfigure(1, weight=1)
 
-        self.editor_xscrollbar = tk.Scrollbar(self.editor_frame, orient="horizontal", command=self.editor_x_scroll)
-        self.editor_xscrollbar.pack(side="bottom", fill="x")
+        # text editor
+        self.code_editor = customtext(self.main_frame)
+        self.vsb = tk.Scrollbar(self.main_frame, orient="vertical", command=self.code_editor.yview)
+        self.code_editor.configure(yscrollcommand=self.vsb.set)
+        self.linenumbers = textlinenum(self.main_frame)
+        self.linenumbers.attach(self.code_editor)
 
-        self.editor_yscrollbar = tk.Scrollbar(self.editor_frame, orient="vertical", command=self.editor_y_scroll)
-        self.editor_yscrollbar.pack(side="right", fill="y")
-        
-        self.line_numbers = tk.Label(self.editor_frame, width=4, padx=4, anchor="nw", background="gray12", foreground="#fdca01", font=("Consolas", 12))
-        self.line_numbers.pack(side="left", fill="y")
+        self.linenumbers.grid(row=0, column=0, sticky="ns") 
+        self.code_editor.grid(row=0, column=1, sticky="nsew") 
+        self.vsb.grid(row=0, column=2, sticky="ns")  
 
-        self.code_editor = tk.Text(self.editor_frame, wrap=tk.NONE, font=("Consolas", 12), undo=True)
-        self.code_editor.pack(side="left", fill="both", expand=True)
+        self.code_editor.bind("<<Change>>", self._on_change)
+        self.code_editor.bind("<Configure>", self._on_change)
+        self.code_editor.bind("<<Modified>>", self.mark_as_unsaved)
 
-        self.code_editor.config(xscrollcommand=self.editor_xscrollbar.set)
-        self.code_editor.config(yscrollcommand=self.editor_yscrollbar.set)
+        # terminal & tokenize button
+        self.terminal_frame = ctk.CTkFrame(self.main_frame)
+        self.terminal_frame.grid(row=1, column=0, columnspan=3, sticky="ew", padx=10, pady=10)  
+        self.terminal_frame.grid_rowconfigure(0, weight=0)  
+        self.terminal_frame.grid_rowconfigure(1, weight=1)  
+        self.terminal_frame.grid_columnconfigure(0, weight=1)  
+        self.terminal_frame.grid_columnconfigure(1, weight=0)  
+        self.terminal_frame.grid_columnconfigure(2, weight=0)
 
-        self.code_editor.bind("<KeyRelease>", self.update_line_numbers)
-        self.code_editor.bind("<MouseWheel>", self.update_line_numbers)
-        self.code_editor.bind("<Button-1>", self.update_line_numbers)
-        self.code_editor.bind("<Configure>", self.update_line_numbers)
+        self.terminal_label = ctk.CTkLabel(self.terminal_frame, text="Terminal", anchor="nw", text_color="white", font=("Consolas", 16, "bold"))
+        self.terminal_label.grid(row=0, column=0, sticky="ew", padx=10)  
 
-        # terminal
-        # self.terminal_frame = ctk.CTkFrame(self.main_frame)
-        # self.terminal_frame.pack(side="bottom", fill="x", expand=False)
+        self.tokenize_button = ctk.CTkButton(self.terminal_frame, text="Tokenize", command=self.process_text, font=("Consolas", 14, "bold"))
+        self.tokenize_button.grid(row=0, column=1, padx=10, pady=5)  
 
-        # self.terminal_label = ctk.CTkLabel(self.terminal_frame, text="Terminal", anchor="w", fg_color="gray12", text_color="white", font=("Arial", 14, "bold"))
-        # self.terminal_label.pack(fill="x")
+        self.terminal_text = tk.Text(self.terminal_frame, wrap="word", bg="gray12", fg="white", insertbackground="white", height=10, font=("Consolas", 12))
+        self.terminal_text.grid(row=1, column=0, columnspan=2, sticky="nsew", padx=10, pady=10)  
 
-        # # make scrollbar sync with the text after line 10
-        # self.terminal_xscrollbar = tk.Scrollbar(self.terminal_frame, orient="vertical", command=self.terminal_x_scroll)
-        # self.terminal_xscrollbar.pack(side="right", fill="y")
+        self.vsb_terminal = tk.Scrollbar(self.terminal_frame, orient="vertical", command=self.terminal_text.yview)
+        self.terminal_text.configure(yscrollcommand=self.vsb_terminal.set)
+        self.vsb_terminal.grid(row=1, column=2, sticky="ns")  
 
-        # self.terminal = tk.Text(self.terminal_frame, wrap="word", bg="gray12", fg="white", insertbackground="white", height=12, font=("Consolas", 12))
-        # self.terminal.pack(fill="both", expand=True)
-
-        # lexeme, token, and error frame
+        # lexeme & token window
         self.info_frame = ctk.CTkFrame(self)
-        self.info_frame.pack(side="right", fill="both", padx=10, pady=10, expand=False)
+        self.info_frame.grid(row=0, column=1, sticky="nsew")
+        self.info_frame.grid_rowconfigure(1, weight=1) # listbox row: flexible
+        self.info_frame.grid_rowconfigure(0, weight=0, minsize=30) # labels row: fixed
+        self.info_frame.grid_columnconfigure(0, weight=1)
+        self.info_frame.grid_columnconfigure(1, weight=1)   
+        self.info_frame.grid_columnconfigure(2, weight=0)   # scrollbar row: fixed
+        self.info_scrollbar = tk.Scrollbar(self.info_frame, orient="vertical")
 
-        # frame for lexeme and token list
-        self.list_frame = ctk.CTkFrame(self.info_frame)
-        self.list_frame.pack(side="top", fill="both", expand=True) 
+        self.lexeme_label = ctk.CTkLabel(self.info_frame, text="Lexemes", font=("Consolas", 14, "bold"))
+        self.token_label = ctk.CTkLabel(self.info_frame, text="Tokens", font=("Consolas", 14, "bold"))
+        self.lexeme_label.grid(row=0, column=0, sticky="ew", pady=(5, 5))  
+        self.token_label.grid(row=0, column=1, sticky="ew", pady=(5, 5))
 
-        # vertical frames for lexeme and token list
-        self.lexeme_frame = ctk.CTkFrame(self.list_frame)
-        self.lexeme_frame.pack(side="left", padx=10, fill="both", expand=True)
+        self.lexeme_listbox = tk.Listbox(self.info_frame, yscrollcommand=self.info_scrollbar.set)
+        self.token_listbox = tk.Listbox(self.info_frame, yscrollcommand=self.info_scrollbar.set)    
+        self.info_scrollbar.config(command=lambda *args: [self.lexeme_listbox.yview(*args), self.token_listbox.yview(*args)])
 
-        self.token_frame = ctk.CTkFrame(self.list_frame)
-        self.token_frame.pack(side="left", padx=10, fill="both", expand=True)
+        self.lexeme_listbox.grid(row=1, column=0, sticky="nsew", pady=(0,5))
+        self.token_listbox.grid(row=1, column=1, sticky="nsew", pady=(0,5))
+        self.info_scrollbar.grid(row=1, column=2, sticky="ns", pady=(0,5))
 
-        self.list_scrollbar = tk.Scrollbar(self.list_frame, orient="vertical")
-        self.list_scrollbar.pack(side="right", fill="y")
+        self.lexeme_listbox.bind("<MouseWheel>", self.sync_mouse_scroll)
+        self.token_listbox.bind("<MouseWheel>", self.sync_mouse_scroll)
 
-        self.lexeme_label = ctk.CTkLabel(self.lexeme_frame, text="Lexemes", font=("Arial", 14, "bold"))
-        self.lexeme_label.pack(side="top", padx=10)
-        self.lexeme_listbox = tk.Listbox(self.lexeme_frame, font=("Arial", 10), width=25, yscrollcommand=self.list_scrollbar.set)
-        self.lexeme_listbox.pack(side="top", padx=10, fill="both", expand=True)
+    def center_window(self):
+        self.update_idletasks()  
+        self.screen_width = self.winfo_screenwidth()
+        self.screen_height = self.winfo_screenheight()
+        self.app_width = 1200
+        self.app_height = 600
+        self.x_width = (self.screen_width // 2) - (self.app_width // 2)
+        self.y_height = (self.screen_height // 2) - (self.app_height // 2)
+        self.geometry(f"{self.app_width}x{self.app_height}+{self.x_width}+{self.y_height}")
 
-        self.token_label = ctk.CTkLabel(self.token_frame, text="Tokens", font=("Arial", 14, "bold"))
-        self.token_label.pack(side="top", padx=10)
-        self.token_listbox = tk.Listbox(self.token_frame, font=("Arial", 10), width=25, yscrollcommand=self.list_scrollbar.set)
-        self.token_listbox.pack(side="top", padx=10, fill="both", expand=True)
-        
-        self.list_scrollbar.config(command=self.sync_scroll)
-        # self.disable_independent_scrolling(self.lexeme_listbox)
-        # self.disable_independent_scrolling(self.token_listbox)
+    # line numbers 
+    def _on_change(self, event):
+        self.linenumbers.redraw()
 
-        # tokenize button
-        self.tokenize_button = ctk.CTkButton(self.info_frame, text="Tokenize", font=("Arial", 13, "bold"), command=self.process_text)
-        self.tokenize_button.pack(side="bottom", pady=10)
-        
-        self.error_field = tk.Text(self.info_frame, height=15, font=("Arial", 11), bg="lightgray", fg="red", width=50)
-        self.error_field.pack(side="bottom",padx=5, pady=5, fill="x")
-
-        self.error_label = ctk.CTkLabel(self.info_frame, text="Errors", font=("Arial", 14, "bold"))
-        self.error_label.pack(side="bottom", pady=5)
-
-        self.error_field.config(state=tk.DISABLED)
-    
     def sync_scroll(self, *args):
+        """Ensure both listboxes scroll together when using the scrollbar."""
         self.lexeme_listbox.yview(*args)
         self.token_listbox.yview(*args)
 
-    # def disable_independent_scrolling(self, listbox):
-    #     # Override the yview and yview_scroll to prevent independent scrolling
-    #     listbox.yview = lambda *args: None
-    #     listbox.yview_scroll = lambda *args: None
-
-    #     # Prevent mouse wheel events from affecting the listbox
-    #     def prevent_mouse_wheel(event):
-    #         return "break"  # Stops the event propagation
-
-    #     # listbox.bind("<MouseWheel>", prevent_mouse_wheel)
-
+    def sync_mouse_scroll(self, event):
+        """Ensure both listboxes scroll together when using the mouse wheel."""
+        delta = int(-1 * (event.delta / 120))  
+        self.lexeme_listbox.yview_scroll(delta, "units")
+        self.token_listbox.yview_scroll(delta, "units")
+        return "break"
+    
     # File handling methods
-    def open_file(self): # TODO: warningan yung user na i-save muna ang file bago mag-open ng bago kung hindi pa nasasave
+    def open_file(self):
+        if not self.check_unsaved_changes():
+            return
         self.file_path = filedialog.askopenfilename(filetypes=[("Ludus Files", "*.lds")])
         if self.file_path:
             with open(self.file_path, 'r') as file:
                 content = file.read()
                 self.lexeme_listbox.delete(0, tk.END)
                 self.token_listbox.delete(0, tk.END)
-                self.error_field.config(state=tk.NORMAL) 
-                self.error_field.delete(1.0, tk.END)      
-                self.error_field.config(state=tk.DISABLED)
+                self.terminal_text.configure(state=tk.NORMAL) 
+                self.terminal_text.delete(1.0, tk.END)      
+                self.terminal_text.configure(state=tk.DISABLED)
                 self.code_editor.delete(1.0, tk.END)
                 self.code_editor.delete(1.0, tk.END)
                 self.code_editor.insert(tk.END, content)
@@ -178,17 +181,37 @@ class App(ctk.CTk):
                 file.write(content)  
                 messagebox.showinfo("File Saved", f"Saved as: {self.file_path}")
 
-    def close_file(self): # TODO: warningan yung user na i-save muna ang file kung hindi pa nasasave
+    def close_file(self): 
+        if not self.check_unsaved_changes():
+            return
         self.lexeme_listbox.delete(0, tk.END)
         self.token_listbox.delete(0, tk.END)
-        self.error_field.config(state=tk.NORMAL) 
-        self.error_field.delete(1.0, tk.END)      
-        self.error_field.config(state=tk.DISABLED)
+        self.terminal_text.configure(state=tk.NORMAL) 
+        self.terminal_text.delete(1.0, tk.END)      
+        self.terminal_text.configure(state=tk.DISABLED)
         self.code_editor.delete(1.0, tk.END)
         self.file_path = None
 
-    def exit_app(self): # TODO: warningan yung user na i-save muna ang file kung hindi pa nasasave
+    def exit_app(self): 
+        if not self.check_unsaved_changes():
+            return
         self.quit()
+
+    def check_unsaved_changes(self):
+        if not self.is_saved:
+            response = messagebox.askyesnocancel(
+                "Unsaved Changes",
+                "You have unsaved changes. Do you want to save before proceeding?",
+            )
+            if response:  
+                self.save_file()
+                return True  
+            elif response is None:  
+                return False  
+        return True
+
+    def mark_as_unsaved(self, event=None):
+        self.is_saved = False
 
     # Settings function
     def change_theme(self):
@@ -197,38 +220,21 @@ class App(ctk.CTk):
             ctk.set_appearance_mode("light") 
         elif theme_value == 2:
             ctk.set_appearance_mode("dark")
-    
-    # Textbox functions
-    def update_line_numbers(self, event=None):
-        first_visible_line = int(self.code_editor.index("@0,0").split(".")[0])
-        last_visible_line = int(self.code_editor.index("@0,%d" % self.code_editor.winfo_height()).split(".")[0])
-        line_numbers_string = "\n".join(str(i) for i in range(first_visible_line, last_visible_line + 1))
-        self.line_numbers.config(text=line_numbers_string)
-
-    def editor_x_scroll(self, *args):
-        self.code_editor.xview(*args)
-    
-    def editor_y_scroll(self, *args):
-        self.code_editor.yview(*args)
-        self.update_line_numbers()
-
-    def terminal_x_scroll(self, *args):
-        self.terminal.yview(*args)
 
     # Tokenize button function
     def process_text(self):
         input_text = self.code_editor.get("0.0", tk.END).strip()  
         tokens, error = lexer.run(self.file_path, input_text)
 
-        self.error_field.config(state=tk.NORMAL) 
-        self.error_field.delete(1.0, tk.END)      
-        self.error_field.config(state=tk.DISABLED)
+        self.terminal_text.config(state=tk.NORMAL) 
+        self.terminal_text.delete(1.0, tk.END)      
+        self.terminal_text.config(state=tk.DISABLED)
 
         if error:  
-            self.error_field.config(state=tk.NORMAL)
+            self.terminal_text.config(state=tk.NORMAL)
             for errors in error:
-                self.error_field.insert(tk.END, errors + '\n')  
-            self.error_field.config(state=tk.DISABLED)
+                self.terminal_text.insert(tk.END, errors + '\n')  
+            self.terminal_text.config(state=tk.DISABLED)
             
         self.lexeme_listbox.delete(0, tk.END)
         self.token_listbox.delete(0, tk.END)
@@ -245,5 +251,6 @@ class App(ctk.CTk):
             color = "#f0f0f0" if item % 2 == 0 else "#ffffff"
             self.token_listbox.itemconfig(item, {'bg': color})
 
-app = App()
-app.mainloop()
+if __name__ == "__main__":
+    app = App()
+    app.mainloop()
