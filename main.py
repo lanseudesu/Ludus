@@ -1,6 +1,7 @@
 import customtkinter as ctk
 import tkinter as tk
 from tkinter import filedialog, messagebox
+from linenums import textlinenum, customtext
 import lexer
 
 ctk.set_appearance_mode("dark")
@@ -16,6 +17,9 @@ class App(ctk.CTk):
         self.center_window()
 
         self.file_path = None
+        self.is_saved = True
+        self.grid_rowconfigure(0, weight=1)
+        self.grid_columnconfigure(0, weight=1)
         
         # menu bar
         self.menu_bar = tk.Menu(self)
@@ -93,6 +97,10 @@ class App(ctk.CTk):
 
         self.terminal = tk.Text(self.terminal_frame, wrap="word", bg="gray12", fg="white", font=("Consolas", 12),height=12, yscrollcommand=self.terminal_yscrollbar.set)
         self.terminal.grid(row=1, column=0, sticky="nsew")
+
+        # tokenize button
+        self.tokenize_button = ctk.CTkButton(self.terminal_frame, text="Tokenize", font=("Arial", 13, "bold"), command=self.process_text)
+        self.tokenize_button.grid(row=1, column=1, padx=5, pady=5, sticky="n")
 
         # tokenize button
         self.tokenize_button = ctk.CTkButton(self.terminal_frame, text="Tokenize", font=("Arial", 13, "bold"), command=self.process_text)
@@ -204,7 +212,7 @@ class App(ctk.CTk):
         if not self.is_saved:
             response = messagebox.askyesnocancel(
                 "Unsaved Changes",
-                "You have unsaved changes. Do you want to save before proceeding?"
+                "You have unsaved changes. Do you want to save before proceeding?",
             )
             if response:  
                 self.save_file()
@@ -280,6 +288,7 @@ class App(ctk.CTk):
         for item in range(self.token_listbox.size()):
             color = "#f0f0f0" if item % 2 == 0 else "#ffffff"
             self.token_listbox.itemconfig(item, {'bg': color})
+
 
 app = App()
 app.mainloop()
