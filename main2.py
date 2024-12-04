@@ -50,13 +50,12 @@ class App(ctk.CTk):
         self.main_frame = ctk.CTkFrame(self)
         self.main_frame.pack(side="left", fill="both", expand=True, padx=10, pady=10)
 
-        self.main_frame.grid_rowconfigure(0, weight=1)  # Editor gets all remaining space
-        self.main_frame.grid_rowconfigure(1, weight=0)  # Terminal has fixed height
-        self.main_frame.grid_columnconfigure(0, weight=1)  # Fill horizontally
-
-        # code editor
+        # textbox
         self.editor_frame = ctk.CTkFrame(self.main_frame)
-        self.editor_frame.grid(row=0, column=0, sticky="nsew")  # Fills available space
+        self.editor_frame.pack(side="top", fill="both", expand=True)
+        
+        self.line_numbers = tk.Label(self.editor_frame, width=4, padx=4, anchor="nw", background="gray12", foreground="#fdca01", font=("Consolas", 12))
+        self.line_numbers.pack(side="left", fill="y")
 
         self.editor_xscrollbar = tk.Scrollbar(self.editor_frame, orient="horizontal", command=self.editor_x_scroll)
         self.editor_xscrollbar.pack(side="bottom", fill="x")
@@ -64,11 +63,9 @@ class App(ctk.CTk):
         self.editor_yscrollbar = tk.Scrollbar(self.editor_frame, orient="vertical", command=self.editor_y_scroll)
         self.editor_yscrollbar.pack(side="right", fill="y")
 
-        self.line_numbers = tk.Label(self.editor_frame, width=4, padx=4, anchor="nw", background="gray12", foreground="#fdca01", font=("Consolas", 12))
-        self.line_numbers.pack(side="left", fill="y")
-
-        self.code_editor = tk.Text(self.editor_frame, wrap=tk.NONE, font=("Consolas", 12), undo=True)
+        self.code_editor = tk.Text(self.editor_frame, wrap=tk.NONE, font=("Consolas", 12))
         self.code_editor.pack(side="left", fill="both", expand=True)
+
         self.code_editor.config(xscrollcommand=self.editor_xscrollbar.set)
         self.code_editor.config(yscrollcommand=self.editor_yscrollbar.set)
 
