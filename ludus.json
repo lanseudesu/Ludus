@@ -16,7 +16,7 @@
     "border_width": 0,
     "fg_color": [
       "gray86",
-      "gray17"
+      "gray10"
     ],
     "top_fg_color": [
       "gray81",
@@ -53,7 +53,10 @@
   },
   "CTkLabel": {
     "corner_radius": 0,
-    "fg_color": "transparent",
+    "fg_color": [
+      "#1D1E1E",
+      "gray10"
+    ],
     "text_color": [
       "gray10",
       "#DCE4EE"
