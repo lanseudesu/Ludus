@@ -149,7 +149,6 @@ class App(ctk.CTk):
         self.list_scrollbar.config(command=lambda *args: [self.lexeme_listbox.yview(*args), self.token_listbox.yview(*args)])
 
     
-    # General
     def center_window(self):
         self.update_idletasks()  
         self.screen_width = self.winfo_screenwidth()
