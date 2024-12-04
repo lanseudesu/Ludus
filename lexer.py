@@ -151,13 +151,13 @@ class Lexer:
         self.current_char = self.text[self.pos.idx] if self.pos.idx < len(self.text) else None
     
     def invalid_delim_error(self, lexeme):
-        error_msg = f"Invalid delimiter for '{lexeme}'. Cause: '{self.current_char}'"
+        error_msg = f"Invalid delimiter for ' {lexeme} '. Cause: ' {self.current_char} '"
         return f"{error_msg} at line {self.pos.ln + 1}, column {self.pos.col + 1}"
     
     def process_token(self, lexeme, token, valid_delims, errors, tokens):
         if (self.current_char == '\n' and '\n' not in valid_delims) or (self.current_char is None and '\n' not in valid_delims):
-            error_msg = f"Invalid delimiter for '{lexeme}'. Cause: '\\n'"
-            error_msg = f"{error_msg} at line {self.pos.ln + 1}, column {self.pos.col + 1}"
+            error_msg = f"Invalid delimiter for ' {lexeme} '. Cause: ' \\n '"
+            error_msg = f"{error_msg} at line {self.pos.ln + 1}, column {self.pos.col + 1}."
             self.advance()
             errors.append(error_msg)
         elif self.current_char is not None and self.current_char not in valid_delims:
@@ -705,10 +705,12 @@ class Lexer:
                                             self.tokenize_keyword(char_str, '(', errors, tokens)
                                         else:
                                             self.tokenize_id(char_str, id_delim, errors, tokens)
-                                elif self.current_char == '(':
-                                    self.tokenize_keyword(char_str, '(', errors, tokens) 
-                                else:
+                                    else:
+                                        self.tokenize_id(char_str, id_delim, errors, tokens)
+                                elif self.current_char in ALPHANUM or self.current_char == '_':
                                     self.tokenize_id(char_str, id_delim, errors, tokens)
+                                else:
+                                    self.tokenize_keyword(char_str, '(', errors, tokens) 
                             else:
                                 self.tokenize_id(char_str, id_delim, errors, tokens)    
                         else:
@@ -1092,7 +1094,7 @@ class Lexer:
                         self.advance()
                         self.process_token(char + char, token_type, valid_delims, errors, tokens)
                     else:
-                        errors.append(f"Invalid character error at line {self.pos.ln+1}, column {self.pos.col}. Cause: '{char}'")
+                        errors.append(f"Invalid character error at line {self.pos.ln+1}, column {self.pos.col}. Cause: ' {char} '")
             elif self.current_char == '!':
                 char = self.current_char
                 self.advance()
@@ -1141,7 +1143,7 @@ class Lexer:
                         comment += self.current_char
                         self.advance()
             else:
-                errors.append(f"Unknown character '{self.current_char}' at line {self.pos.ln + 1}, column {self.pos.col + 1}")
+                errors.append(f"Unknown character ' {self.current_char} ' at line {self.pos.ln + 1}, column {self.pos.col + 1}")
                 self.advance()
         
         return tokens, errors
@@ -1273,9 +1275,14 @@ class Lexer:
 
         while self.current_char is not None:
             if escape_character:
-                resolved_char = escape_characters.get(self.current_char, self.current_char)
-                string += resolved_char 
-                escape_character = False  
+                if self.current_char in 'nt{}"\\':
+                    resolved_char = escape_characters.get(self.current_char, self.current_char)
+                    string += resolved_char 
+                    escape_character = False    
+                else:
+                    string += '\\' + self.current_char    
+                    escape_character = False                   
+                
             else:
                 if self.current_char == '\\':  
                     escape_character = True
