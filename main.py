@@ -54,13 +54,14 @@ class App(ctk.CTk):
         self.main_frame = ctk.CTkFrame(self)
         self.main_frame.pack(side="left", fill="both", expand=True, padx=10, pady=10)
 
-        self.main_frame.grid_rowconfigure(0, weight=1)
-        self.main_frame.grid_rowconfigure(1, weight=0)
+        self.main_frame.grid_rowconfigure(0, weight=1) # editor
+        self.main_frame.grid_rowconfigure(1, weight=0) # terminal
         self.main_frame.grid_columnconfigure(0, weight=1)
+        self.main_frame.grid_columnconfigure(1, weight=0)
 
         # code editor
         self.editor_frame = ctk.CTkFrame(self.main_frame)
-        self.editor_frame.grid(row=0, column=0, sticky="nsew")
+        self.editor_frame.grid(row=0, column=0, sticky="nsew", columnspan=2)
 
         self.editor_xscrollbar = tk.Scrollbar(self.editor_frame, orient="horizontal", command=self.editor_x_scroll)
         self.editor_xscrollbar.pack(side="bottom", fill="x")
@@ -68,7 +69,7 @@ class App(ctk.CTk):
         self.editor_yscrollbar = tk.Scrollbar(self.editor_frame, orient="vertical", command=self.editor_y_scroll)
         self.editor_yscrollbar.pack(side="right", fill="y")
 
-        self.line_numbers = tk.Label(self.editor_frame, width=4, padx=4, anchor="nw", background="gray12", foreground="#fdca01", font=("Consolas", 12))
+        self.line_numbers = tk.Label(self.editor_frame, width=4, padx=4, anchor="nw", background="gray10", foreground="#fdca01", font=("Consolas", 12))
         self.line_numbers.pack(side="left", fill="y")
 
         self.code_editor = tk.Text(self.editor_frame, wrap=tk.NONE, font=("Consolas", 12), undo=True)
@@ -88,33 +89,39 @@ class App(ctk.CTk):
 
         self.terminal_frame.grid_columnconfigure(0, weight=1)
         self.terminal_frame.grid_columnconfigure(1, weight=0)
+        self.terminal_frame.grid_rowconfigure([0, 1, 2], weight=1)
 
         self.terminal_yscrollbar = tk.Scrollbar(self.terminal_frame, orient="vertical", command=self.terminal_y_scroll)
-        self.terminal_yscrollbar.grid(row=1, column=2, sticky="ns")
+        self.terminal_yscrollbar.grid(row=1, column=1, sticky="ns")
 
-        self.terminal_label = ctk.CTkLabel(self.terminal_frame, text="Terminal", anchor="w", fg_color="gray12", text_color="white", font=("Arial", 14, "bold"))
+        self.terminal_label = ctk.CTkLabel(self.terminal_frame, text="Terminal", anchor="w", fg_color="gray10", text_color="white", font=("Arial", 14, "bold"))
         self.terminal_label.grid(row=0, column=0, columnspan=2, sticky="ew")
 
-        self.terminal = tk.Text(self.terminal_frame, wrap="word", bg="gray12", fg="white", font=("Consolas", 12),height=12, yscrollcommand=self.terminal_yscrollbar.set)
+        self.terminal = tk.Text(self.terminal_frame, wrap="word", bg="gray10", fg="white", font=("Consolas", 12),height=12, yscrollcommand=self.terminal_yscrollbar.set)
         self.terminal.grid(row=1, column=0, sticky="nsew")
 
-        # tokenize button
-        self.tokenize_button = ctk.CTkButton(self.terminal_frame, text="Tokenize", font=("Arial", 13, "bold"), command=self.process_text)
-        self.tokenize_button.grid(row=1, column=1, padx=5, pady=5, sticky="n")
+        # button frame
+        self.button_frame = ctk.CTkFrame(self.main_frame, fg_color="gray10")
+        self.button_frame.grid(row=1, column=1)
 
-        # tokenize button
-        self.tokenize_button = ctk.CTkButton(self.terminal_frame, text="Tokenize", font=("Arial", 13, "bold"), command=self.process_text)
-        self.tokenize_button.grid(row=1, column=1, padx=5, pady=5, sticky="n")
+        self.tokenize_button = ctk.CTkButton(self.button_frame, text="Tokenize", font=("Arial", 13, "bold"), command=self.process_text)
+        self.tokenize_button.grid(row=0, column=1, padx=3, pady=5, sticky="ew")
+
+        # self.future_button1 = ctk.CTkButton(self.button_frame, text="Button1", font=("Arial", 13, "bold"))
+        # self.future_button1.grid(row=1, column=1, padx=3, pady=5, sticky="ew")
+
+        # self.future_button2 = ctk.CTkButton(self.button_frame, text="Button2", font=("Arial", 13, "bold"))
+        # self.future_button2.grid(row=2, column=1, padx=3, pady=5, sticky="ew")
 
         # lexeme, token, and error frame
         self.info_frame = ctk.CTkFrame(self)
         self.info_frame.pack(side="right", fill="both", padx=10, pady=10, expand=False)
 
-        self.info_label = ctk.CTkLabel(self.info_frame, text="Lexeme Table", font=("Arial", 14, "bold"))
-        self.info_label.pack(side="top", fill="both") 
+        # self.info_label = ctk.CTkLabel(self.info_frame, text="Lexer Table", font=("Arial", 14, "bold"))
+        # self.info_label.pack(side="top", fill="both") 
 
         # frame for lexeme and token list
-        self.list_frame = ctk.CTkFrame(self.info_frame)
+        self.list_frame = ctk.CTkFrame(self.info_frame, fg_color="gray10")
         self.list_frame.pack(side="top", fill="both", expand=True) 
 
         # vertical frames for lexeme and token list
