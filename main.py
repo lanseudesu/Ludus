@@ -89,8 +89,9 @@ class App(ctk.CTk):
         self.code_editor.configure(xscrollcommand=self.update_horizontal_scrollbar)
         self.code_editor.configure(yscrollcommand=self.update_vertical_scrollbar)
 
-        self.code_editor.bind("<KeyRelease>", self.highlight_syntax)
+        self.code_editor.bind("<KeyRelease>", self.handle_return)
         self.code_editor.bind("<Return>", self.update_line_numbers)
+        self.code_editor.bind("<BackSpace>", self.update_line_numbers)
         self.code_editor.bind("<MouseWheel>", self.editor_y_scrollwheel)
         self.code_editor.bind("<Button-1>", self.sync_editor_linenumbers)
         self.code_editor.bind("<Key-{>", self.handle_braces)
@@ -120,9 +121,6 @@ class App(ctk.CTk):
         self.lexeme_label.grid(row=0, column=0, padx=10, pady=(0,5), sticky="n")
         self.lexeme_textbox = ctk.CTkTextbox(self.lexeme_frame, wrap="none", font=("Consolas", 15), width=200, height=300)
         self.lexeme_textbox.grid(row=1, column=0, padx=0, pady=0, sticky="nsew")
-
-        self.lexeme_textbox.xview_moveto(0)  # Ensures the horizontal scroll works
-        self.lexeme_textbox.configure(yscrollcommand=None)
 
         self.token_label = ctk.CTkLabel(self.token_frame, text="Tokens", font=("Consolas", 15, "bold"))
         self.token_label.grid(row=0, column=0, padx=10, pady=(0,5), sticky="n")
@@ -269,13 +267,16 @@ class App(ctk.CTk):
         return "break"
 
     def sync_editor_linenumbers(self, event=None):
-        self.line_numbers.yview_moveto(self.code_editor.yview()[0])
-    
-    def highlight_syntax(self, event=None):
-        if event.keysym == "Return":
+        self.line_numbers.yview_moveto(self.code_editor.yview()[1])
+
+    def handle_return(self, event=None):
+        if event.keysym == "Return" or event.keysym == "BackSpace":
             return
         
-        self.line_numbers.yview_moveto(self.code_editor.yview()[0])
+        self.highlight_syntax()
+    
+    def highlight_syntax(self, event=None):
+        self.line_numbers.yview_moveto(self.code_editor.yview()[1])
         
         text = self.code_editor.get("1.0", "end").strip()  # Get input text
         if not text:
@@ -406,6 +407,8 @@ class App(ctk.CTk):
                 self.code_editor.delete(1.0, tk.END)
                 self.code_editor.delete(1.0, tk.END)
                 self.code_editor.insert(tk.END, content)
+                self.update_line_numbers()
+                self.highlight_syntax()
                 
     def save_file(self): 
         if self.file_path:
@@ -447,6 +450,7 @@ class App(ctk.CTk):
     
     # Textbox functions
     def update_line_numbers(self, event=None):
+        
         # Count the number of lines in the code editor
         content = self.code_editor.get("1.0", "end-1c")  # Get all text excluding the final newline
         num_lines = content.count('\n') + 2  # Count newlines and add 1 for the last line
@@ -461,10 +465,8 @@ class App(ctk.CTk):
         # Align the text to the right
         self.line_numbers.tag_config("right", justify="right")
         self.line_numbers.tag_add("right", "1.0", "end")
+        self.line_numbers.yview_moveto(self.code_editor.yview()[1])
 
-        self.line_numbers.yview_moveto(self.code_editor.yview()[0])
-        # Refresh the widget
-        self.line_numbers.update_idletasks()
 
     def editor_x_scroll(self, *args):
         self.code_editor.xview(*args)
@@ -496,7 +498,6 @@ class App(ctk.CTk):
         
         self.editor_yscrollbar.set(*args)
         
-
     # Tokenize button function
     def process_text(self):
         input_text = self.code_editor.get("0.0", "end").strip()  

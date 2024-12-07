@@ -28,7 +28,7 @@ lbracket_delim = ALPHANUM + '_ .]+-("~'
 rbracket_delim = whitespace + arith_op + relat_op + ',[:).}'
 comma_delim    = ALPHANUM + whitespace + '_['
 period_delim   = ALPHA + '_'  
-nl_delim       = whitespace + ALPHA + '_{`'
+nl_delim       = whitespace + ALPHA + '_{}`'
 space_delim    = whitespace + ALPHANUM + arith_op + relat_op + '_,.&|!:()[]{"`'
 
 delim1 = whitespace + ',:'
