@@ -28,13 +28,15 @@ lbracket_delim = ALPHANUM + '_ .]+-("~'
 rbracket_delim = whitespace + arith_op + relat_op + ',[:).}'
 comma_delim    = ALPHANUM + whitespace + '_['
 period_delim   = ALPHA + '_'  
+nl_delim       = whitespace + ALPHA + '_{`'
+space_delim    = whitespace + ALPHANUM + arith_op + relat_op + '_,.&|!:()[]{"`'
 
 delim1 = whitespace + ','
 delim2  = ' {'
 delim3  = ALPHANUM + '_ ("'
 delim4  = ALPHANUM + '_ .('
 delim5  = whitespace + ALPHANUM + '_}()]'
-delim6  = ALPHANUM + ' _."~+-(!['
+delim6  = whitespace + ALPHANUM + '_."~+-(!['
 delim7 = ALPHANUM + ' _.("!~+-'
 delim8 = ALPHA + '_('
 delim9 = ALPHANUM + '_(.'
@@ -98,6 +100,7 @@ TT_PERIOD	  = '.'
 TT_COMMENTS1  = 'single-line comment'
 TT_COMMENTS2  = 'multi-line comment'
 TT_NEWLINE	  = 'newline'
+TT_SPACE	  = 'space'
 TT_XP_FORMATTING = 'xp formatting'
 
 ### POSITION ###
@@ -171,11 +174,14 @@ class Lexer:
         errors = []
     
         while self.current_char is not None:
-            if self.current_char in ' \t':
-                self.advance()
-            elif self.current_char == '\n': 
-                tokens.append(Token('\\n', TT_NEWLINE))
-                self.advance()
+            if self.current_char == '\n': 
+                while self.current_char == '\n':
+                    self.advance()
+                self.process_token('\\n', TT_NEWLINE, nl_delim, errors, tokens)
+            elif self.current_char == ' ': 
+                while self.current_char == ' ':
+                    self.advance()  
+                self.process_token(' ', TT_SPACE, space_delim, errors, tokens)
             elif self.current_char in NUM:
                 result, error = self.make_number('')
 
@@ -1237,7 +1243,7 @@ class Lexer:
 
     def identifiers(self, id_str):
         if id_str not in self.identifier_map:
-            self.identifier_map[id_str] = f'identifier_{self.current_id}'
+            self.identifier_map[id_str] = f'id{self.current_id}'
             self.current_id += 1
 
         return self.identifier_map[id_str]
