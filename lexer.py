@@ -31,7 +31,7 @@ period_delim   = ALPHA + '_'
 nl_delim       = whitespace + ALPHA + '_{`'
 space_delim    = whitespace + ALPHANUM + arith_op + relat_op + '_,.&|!:()[]{"`'
 
-delim1 = whitespace + ','
+delim1 = whitespace + ',:'
 delim2  = ' {'
 delim3  = ALPHANUM + '_ ("'
 delim4  = ALPHANUM + '_ .('
@@ -53,6 +53,7 @@ TT_NHP        = 'nhp_ltr'
 TT_XP         = 'xp_ltr'
 TT_NXP        = 'nxp_ltr'
 TT_COMMS      = 'comms_ltr'
+TT_FLAG       = 'flag_ltr'
 
 # negate:
 TT_NEG        = '-'
@@ -453,12 +454,15 @@ class Lexer:
                                 char_str += 's'
                                 self.advance()
                                 if self.current_char == 'e':
-                                    char_str += 'e'
+                                    char_str += 'e' 
                                     self.advance()
-                                    self.tokenize_keyword(char_str, flag_delim, errors, tokens)
-                                else:
+                                    if self.current_char in ALPHANUM or self.current_char == '_':
+                                        self.tokenize_id(char_str, id_delim, errors, tokens)
+                                    else:
+                                        self.process_token(TT_FLAG, TT_FLAG, flag_delim, errors, tokens)
+                                else: 
                                     self.tokenize_id(char_str, id_delim, errors, tokens)
-                            else:
+                            else: 
                                 self.tokenize_id(char_str, id_delim, errors, tokens)
                         else:
                             self.tokenize_id(char_str, id_delim, errors, tokens)
@@ -858,10 +862,10 @@ class Lexer:
                                                 self.tokenize_id(char_str, id_delim, errors, tokens)
                                         else:
                                             self.tokenize_id(char_str, id_delim, errors, tokens)
-                                    elif self.current_char == '(':
-                                        self.tokenize_keyword(char_str, '(', errors, tokens)
-                                    else:
+                                    elif self.current_char in ALPHANUM or self.current_char == '_':
                                         self.tokenize_id(char_str, id_delim, errors, tokens)
+                                    else:
+                                        self.tokenize_keyword(char_str, '(', errors, tokens)
                                 else:
                                     self.tokenize_id(char_str, id_delim, errors, tokens)
                             else:
@@ -929,7 +933,10 @@ class Lexer:
                             if self.current_char == 'e':
                                 char_str += 'e' 
                                 self.advance()
-                                self.tokenize_keyword(char_str, flag_delim, errors, tokens)
+                                if self.current_char in ALPHANUM or self.current_char == '_':
+                                    self.tokenize_id(char_str, id_delim, errors, tokens)
+                                else:
+                                    self.process_token(TT_FLAG, TT_FLAG, flag_delim, errors, tokens)
                             else: 
                                 self.tokenize_id(char_str, id_delim, errors, tokens)
                         else: 

@@ -4,6 +4,8 @@ from tkinter import filedialog, messagebox
 import lexer
 import re
 
+# TODO: REFACTOR CODE 
+
 ctk.set_appearance_mode("dark")
 ctk.set_default_color_theme("ludus.json")
 
@@ -71,7 +73,7 @@ class App(ctk.CTk):
         # Create the label inside the frame
         self.line_numbers = ctk.CTkTextbox(self.editor_frame, font=("Consolas", 15), width=40, wrap="none", text_color="#fdca01",activate_scrollbars=False)
         self.line_numbers.grid(row=0, column=0, sticky="ns",pady=5, padx=(5,0))
-        self.line_numbers.configure(state="disabled") 
+        #self.line_numbers.configure(state="disabled") 
 
         # horizontal scrollbar
         self.editor_xscrollbar = ctk.CTkScrollbar(self.editor_frame, orientation="horizontal")
@@ -88,9 +90,9 @@ class App(ctk.CTk):
         self.code_editor.configure(yscrollcommand=self.update_vertical_scrollbar)
 
         self.code_editor.bind("<KeyRelease>", self.highlight_syntax)
-        self.code_editor.bind("<MouseWheel>", self.update_line_numbers)
-        self.code_editor.bind("<Button-1>", self.update_line_numbers)
-        self.code_editor.bind("<Configure>", self.update_line_numbers)
+        self.code_editor.bind("<Return>", self.update_line_numbers)
+        self.code_editor.bind("<MouseWheel>", self.editor_y_scrollwheel)
+        self.code_editor.bind("<Button-1>", self.sync_editor_linenumbers)
         self.code_editor.bind("<Key-{>", self.handle_braces)
         self.code_editor.bind("<Key-(>", self.handle_parentheses)
         self.code_editor.bind("<Key-[>", self.handle_brackets)
@@ -118,6 +120,9 @@ class App(ctk.CTk):
         self.lexeme_label.grid(row=0, column=0, padx=10, pady=(0,5), sticky="n")
         self.lexeme_textbox = ctk.CTkTextbox(self.lexeme_frame, wrap="none", font=("Consolas", 15), width=200, height=300)
         self.lexeme_textbox.grid(row=1, column=0, padx=0, pady=0, sticky="nsew")
+
+        self.lexeme_textbox.xview_moveto(0)  # Ensures the horizontal scroll works
+        self.lexeme_textbox.configure(yscrollcommand=None)
 
         self.token_label = ctk.CTkLabel(self.token_frame, text="Tokens", font=("Consolas", 15, "bold"))
         self.token_label.grid(row=0, column=0, padx=10, pady=(0,5), sticky="n")
@@ -175,6 +180,20 @@ class App(ctk.CTk):
         self.editor_frame.grid_rowconfigure(0, weight=1)  # Code editor
         self.editor_frame.grid_columnconfigure(1, weight=1)  # Code editor horizontal expansion
         self.editor_frame.grid_columnconfigure(0, weight=0)
+
+        self.line_numbers.insert("1.0", "1")
+        self.line_numbers.tag_config("right", justify="right")
+        self.line_numbers.tag_add("right", "1.0", "end")
+
+    def editor_y_scrollwheel(self, event):
+        # Calculate scroll direction
+        if event.num == 4 or event.delta > 0:  # Scroll up
+            self.code_editor.yview_scroll(-1, "units")
+            self.line_numbers.yview_scroll(-1, "units")
+        elif event.num == 5 or event.delta < 0:  # Scroll down
+            self.code_editor.yview_scroll(1, "units")
+            self.line_numbers.yview_scroll(1, "units")
+        return "break"
 
     def handle_parentheses(self, event):
         # Get the current cursor position
@@ -249,8 +268,15 @@ class App(ctk.CTk):
         # Prevent the default `{` character from being inserted
         return "break"
 
+    def sync_editor_linenumbers(self, event=None):
+        self.line_numbers.yview_moveto(self.code_editor.yview()[0])
+    
     def highlight_syntax(self, event=None):
-        self.update_line_numbers()
+        if event.keysym == "Return":
+            return
+        
+        self.line_numbers.yview_moveto(self.code_editor.yview()[0])
+        
         text = self.code_editor.get("1.0", "end").strip()  # Get input text
         if not text:
             return
@@ -420,24 +446,24 @@ class App(ctk.CTk):
             ctk.set_appearance_mode("dark")
     
     # Textbox functions
-    def update_line_numbers(self, event=None): #TODO HAYS
-        # Get the first and last visible lines based on the editor height
-        first_visible_line = int(self.code_editor.index("@0,0").split(".")[0])
-        last_visible_line = int(self.code_editor.index("@0,%d" % self.code_editor.winfo_height()).split(".")[0])
-        
+    def update_line_numbers(self, event=None):
+        # Count the number of lines in the code editor
+        content = self.code_editor.get("1.0", "end-1c")  # Get all text excluding the final newline
+        num_lines = content.count('\n') + 2  # Count newlines and add 1 for the last line
+
         # Create a string of line numbers to display
-        line_numbers_string = "\n".join(str(i) for i in range(first_visible_line, last_visible_line + 1))
+        line_numbers_string = "\n".join(str(i) for i in range(1, num_lines + 1))
 
-        self.line_numbers.configure(state="normal") 
-        
-        # Update the textbox with the line numbers
-        self.line_numbers.delete(1.0, "end")  # Clear existing text
-        self.line_numbers.insert("end", line_numbers_string)  # Insert the new line numbers
+        # Update the line_numbers widget with the new line numbers
+        self.line_numbers.delete("1.0", "end")  # Clear existing text
+        self.line_numbers.insert("1.0", line_numbers_string)  # Insert the new line numbers
 
+        # Align the text to the right
         self.line_numbers.tag_config("right", justify="right")
         self.line_numbers.tag_add("right", "1.0", "end")
-        self.line_numbers.configure(state="disabled") 
 
+        self.line_numbers.yview_moveto(self.code_editor.yview()[0])
+        # Refresh the widget
         self.line_numbers.update_idletasks()
 
     def editor_x_scroll(self, *args):
@@ -446,42 +472,30 @@ class App(ctk.CTk):
     def editor_y_scroll(self, *args):
         self.code_editor.yview(*args)
         self.line_numbers.yview(*args)
-        self.update_line_numbers()
+        #self.update_line_numbers()
 
     def update_horizontal_scrollbar(self, *args):
+        editor_scroll_needed = self.code_editor.xview()[0] > 0.0 or self.code_editor.xview()[1] < 1.0
+        linenumbers_scroll_needed = self.line_numbers.xview()[0] > 0.0 or self.line_numbers.xview()[1] < 1.0
+        
+        if editor_scroll_needed or linenumbers_scroll_needed:
+            self.editor_xscrollbar.grid()
+        else:
+            self.editor_xscrollbar.grid_remove()
+        
         self.editor_xscrollbar.set(*args)
-        self.check_scrollbar_visibility()
 
     def update_vertical_scrollbar(self, *args):
+        editor_scroll_needed = self.code_editor.yview()[0] > 0.0 or self.code_editor.yview()[1] < 1.0
+        linenumbers_scroll_needed = self.line_numbers.yview()[0] > 0.0 or self.line_numbers.yview()[1] < 1.0
+        
+        if editor_scroll_needed or linenumbers_scroll_needed:
+            self.editor_yscrollbar.grid()
+        else:
+            self.editor_yscrollbar.grid_remove()
+        
         self.editor_yscrollbar.set(*args)
-        self.check_scrollbar_visibility()
-
-    def check_scrollbar_visibility(self, event=None):
-        # Track visibility state
-        if not hasattr(self, "x_scrollbar_visible"):
-            self.x_scrollbar_visible = False
-        if not hasattr(self, "y_scrollbar_visible"):
-            self.y_scrollbar_visible = False
-
-        # Check horizontal scrollbar
-        if self.code_editor.xview()[0] > 0 or self.code_editor.xview()[1] < 1:
-            if not self.x_scrollbar_visible:
-                self.editor_xscrollbar.grid(row=1, column=1, sticky="ew")
-                self.x_scrollbar_visible = True
-        else:
-            if not self.x_scrollbar_visible:  # Do not hide if already shown
-                self.editor_xscrollbar.grid_remove()
-                self.x_scrollbar_visible = False
-
-        # Check vertical scrollbar
-        if self.code_editor.yview()[0] > 0 or self.code_editor.yview()[1] < 1:
-            if not self.y_scrollbar_visible:
-                self.editor_yscrollbar.grid(row=0, column=2, sticky="ns")
-                self.y_scrollbar_visible = True
-        else:
-            if self.y_scrollbar_visible:  # Do not hide if already shown
-                self.editor_yscrollbar.grid_remove()
-                self.y_scrollbar_visible = False
+        
 
     # Tokenize button function
     def process_text(self):
