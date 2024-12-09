@@ -14,34 +14,30 @@ arith_op   = '+-*/%^'
 relat_op   = '<>=!'
 whitespace = '# \n'
 
-id_delim       = arith_op + relat_op + whitespace + ',.:[]{}()'
+id_delim       = whitespace + arith_op + relat_op + ',.:[]{}()'
 numlit_delim   = arith_op + relat_op + whitespace + ',){}:]'
-commslit_delim = whitespace + ',:={])'
-flag_delim     = whitespace + arith_op + ',:])=!'
-nl_delim       = ALPHANUM + '_{#`'
+commslit_delim = whitespace + ',:={])+!'
+flag_delim     = whitespace + relat_op + arith_op + ',:])'
 
-lparen_delim   = ALPHANUM + '_ .)"+-!~['
+lparen_delim   = ALPHANUM + '_ .)"-!['
 rparen_delim   = whitespace + arith_op + relat_op + '{})],.'
-lcurly_delim   = whitespace + ALPHANUM + '_{(~+-!'
+lcurly_delim   = whitespace + ALPHANUM + '_{(-!'
 rcurly_delim   = whitespace 
-lbracket_delim = ALPHANUM + '_ .]+-("~'
-rbracket_delim = whitespace + arith_op + relat_op + ',[:).}'
-comma_delim    = ALPHANUM + whitespace + '_['
+lbracket_delim = ALPHANUM + '_ .]-("'
+rbracket_delim = whitespace + arith_op + relat_op + ',.[:)}'
+comma_delim    = ALPHANUM + whitespace + '_["-('
 period_delim   = ALPHA + '_'  
+
 nl_delim       = whitespace + ALPHA + '_{}`'
 space_delim    = whitespace + ALPHANUM + arith_op + relat_op + '_,.&|!:()[]{}"`'
 
 delim1 = whitespace + ',:'
 delim2  = ' {'
-delim3  = ALPHANUM + '_ ("'
-delim4  = ALPHANUM + '_ .('
-delim5  = whitespace + ALPHANUM + '_}()]'
-delim6  = whitespace + ALPHANUM + '_."~+-(!['
-delim7 = ALPHANUM + ' _.("!~+-'
-delim8 = ALPHA + '_('
-delim9 = ALPHANUM + '_(.'
-
-delim10 = delim4 + '-' #not final, wip
+delim3  = ALPHANUM + '_ ."-!('
+delim4  = ALPHANUM + '_ .-!('
+delim5  = whitespace + ALPHANUM + '_."-(!['
+delim6  = ALPHA + '_('
+delim7 = ' })'
 
 valid_lhs = ALPHANUM + '_)]'
 
@@ -1006,7 +1002,7 @@ class Lexer:
             elif self.current_char == '+':
                 self.advance()
                 if self.current_char == '=':
-                    self.process_token('+=', TT_PLUS_EQ, delim4, errors, tokens)
+                    self.process_token('+=', TT_PLUS_EQ, delim3, errors, tokens)
                 else:
                     self.process_token('+', TT_PLUS, delim3, errors, tokens)
             elif self.current_char == '-':
@@ -1017,7 +1013,7 @@ class Lexer:
                 else:
                     #check lhs if id, number, )
                     if lhs in valid_lhs:
-                        self.process_token('-', TT_MINUS, delim10, errors, tokens)
+                        self.process_token('-', TT_MINUS, delim4, errors, tokens)
                     else:
                         if self.current_char in NUM or self.current_char == '.':
                             result, error = self.make_number('-')
@@ -1051,7 +1047,7 @@ class Lexer:
             elif self.current_char in '^:()[]{},':
                 token_map = {
                     '^': [(TT_POW, delim4)],
-                    ':': [(TT_COLON, delim6)],
+                    ':': [(TT_COLON, delim5)],
                     '(': [(TT_LPAREN, lparen_delim)],
                     ')': [(TT_RPAREN, rparen_delim)],
                     '[': [(TT_LSQUARE, lbracket_delim)],
@@ -1113,9 +1109,9 @@ class Lexer:
                 self.advance()
                 if self.current_char == '=':
                     self.advance()
-                    self.process_token('!=', TT_NE, delim7, errors, tokens)
+                    self.process_token('!=', TT_NE, delim3, errors, tokens)
                 else:
-                    self.process_token('!', TT_NOT, delim8, errors, tokens)   
+                    self.process_token('!', TT_NOT, delim6, errors, tokens)   
             elif self.current_char == '#':
                 comments = '#'
                 self.advance()
