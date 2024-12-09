@@ -13,7 +13,8 @@ keywords = [
     "gameOver", "build", "access", "AND", "OR", "immo", "if", "elif", "else", "flank",
     "choice", "backup", "for", "while", "grind", "checkpoint", "resume", "recall",
     "generate", "play", "shoot", "shootNxt", "load", "loadNum", "rounds", "wipe",
-    "join", "drop", "seek", "levelUp", "levelDown", "toHp", "toXp", "toComms"
+    "join", "drop", "seek", "levelUp", "levelDown", "toHp", "toXp", "toComms", "hp", "xp", "comms",
+    "flag"
 ]
 
 NUM = '0123456789'
@@ -29,6 +30,7 @@ class App(ctk.CTk):
         self.geometry("1300x800")
 
         self.file_path = None
+        self.count_add = 0
         
         # menu bar
         self.menu_bar = tk.Menu(self, background="#333", foreground="black")
@@ -90,8 +92,8 @@ class App(ctk.CTk):
         self.code_editor.configure(yscrollcommand=self.update_vertical_scrollbar)
 
         self.code_editor.bind("<KeyRelease>", self.handle_return)
-        self.code_editor.bind("<Return>", self.update_line_numbers)
-        self.code_editor.bind("<BackSpace>", self.update_line_numbers)
+        self.code_editor.bind("<Return>", self.handle_newline)
+        self.code_editor.bind("<BackSpace>", self.handle_newline)
         self.code_editor.bind("<MouseWheel>", self.editor_y_scrollwheel)
         self.code_editor.bind("<Button-1>", self.sync_editor_linenumbers)
         self.code_editor.bind("<Key-{>", self.handle_braces)
@@ -268,6 +270,14 @@ class App(ctk.CTk):
 
     def sync_editor_linenumbers(self, event=None):
         self.line_numbers.yview_moveto(self.code_editor.yview()[1])
+
+    def handle_newline(self,event=None):
+        if event.keysym == "Return":
+            self.count_add = 2
+        elif event.keysym == "BackSpace":
+            self.count_add = 0
+        
+        self.update_line_numbers()
 
     def handle_return(self, event=None):
         if event.keysym == "Return" or event.keysym == "BackSpace":
@@ -453,7 +463,7 @@ class App(ctk.CTk):
         
         # Count the number of lines in the code editor
         content = self.code_editor.get("1.0", "end-1c")  # Get all text excluding the final newline
-        num_lines = content.count('\n') + 2  # Count newlines and add 1 for the last line
+        num_lines = content.count('\n') + self.count_add  # Count newlines and add 1 for the last line
 
         # Create a string of line numbers to display
         line_numbers_string = "\n".join(str(i) for i in range(1, num_lines + 1))

@@ -29,7 +29,7 @@ rbracket_delim = whitespace + arith_op + relat_op + ',[:).}'
 comma_delim    = ALPHANUM + whitespace + '_['
 period_delim   = ALPHA + '_'  
 nl_delim       = whitespace + ALPHA + '_{}`'
-space_delim    = whitespace + ALPHANUM + arith_op + relat_op + '_,.&|!:()[]{"`'
+space_delim    = whitespace + ALPHANUM + arith_op + relat_op + '_,.&|!:()[]{}"`'
 
 delim1 = whitespace + ',:'
 delim2  = ' {'
@@ -1019,7 +1019,7 @@ class Lexer:
                     if lhs in valid_lhs:
                         self.process_token('-', TT_MINUS, delim10, errors, tokens)
                     else:
-                        if self.current_char in NUM:
+                        if self.current_char in NUM or self.current_char == '.':
                             result, error = self.make_number('-')
 
                             if error:
@@ -1125,6 +1125,10 @@ class Lexer:
                         break
                     comments += self.current_char
                     self.advance()
+                    
+                if self.current_char is None:
+                    self.process_token(comments, TT_COMMENTS1, '\n', errors, tokens)
+
             elif self.current_char == '`':
                 backtick_count = 0
                 while self.current_char == '`' and backtick_count < 3:
