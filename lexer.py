@@ -2,17 +2,18 @@ import string
 
 ### CONSTANTS ###
 
-NUM             = '0123456789'
+DIGITS          = '123456789'
+NUM             = '0' + DIGITS
 ALPHA           = string.ascii_letters
 ALPHANUM        = ALPHA + NUM
 ASCII_PRINTABLE = ''.join(chr(i) for i in range(32, 127))
 NUM_TO_6        = '0123456' 
 
-### DELIMITERS ###
-
 arith_op   = '+-*/%^'
 relat_op   = '<>=!'
 whitespace = '# \n'
+
+### DELIMITERS ###
 
 id_delim       = whitespace + arith_op + relat_op + ',.:[]{}()'
 numlit_delim   = arith_op + relat_op + whitespace + ',){}:]'
@@ -164,7 +165,10 @@ class Lexer:
             errors.append(self.invalid_delim_error(lexeme))
             self.advance()
         else:
-            tokens.append(Token(lexeme, token)) 
+            if token == TT_COMMENTS2 or token == TT_COMMENTS1:
+                pass
+            else:
+                tokens.append(Token(lexeme, token)) 
 
     def make_tokens(self):
         tokens = []
@@ -1012,7 +1016,7 @@ class Lexer:
                     self.process_token('-=', TT_MINUS_EQ, delim4, errors, tokens)
                 else:
                     #check lhs if id, number, )
-                    if lhs in valid_lhs:
+                    if lhs is not None and lhs in valid_lhs:
                         self.process_token('-', TT_MINUS, delim4, errors, tokens)
                     else:
                         if self.current_char in NUM or self.current_char == '.':
@@ -1167,6 +1171,8 @@ class Lexer:
         int_len = 0
         dec_len = 0
         errors = []
+        zero_int = False
+        reserved_dec = ''
 
         def add_error(message):
             errors.append(f"{message} at line {self.pos.ln + 1}, column {self.pos.col - len(num_str) + 1}")
@@ -1174,7 +1180,9 @@ class Lexer:
         if num_str != '':
             if num_str == '-':
                 negate = True
+                num_str = ''
             else:
+                num_str = '0' + num_str
                 dot_count = 1
                 dec_len = 1    
             
@@ -1186,45 +1194,86 @@ class Lexer:
                     while self.current_char is not None and self.current_char not in numlit_delim:
                         num_str += self.current_char
                         self.advance()
+                    if negate: num_str = '-' + num_str
                     add_error(f"Too many decimal points in {num_str}")
                     return [], errors
-                dot_count += 1
-                num_str += '.'
+                if self.prev_char == '-':
+                    dot_count += 1
+                    num_str += '0.'
+                else:        
+                    dot_count += 1
+                    num_str += '.'
             else:  
                 if dot_count == 0:  
                     if int_len < 10:
-                        num_str += self.current_char
-                        int_len += 1
+                        if self.current_char in DIGITS and not zero_int:
+                            if num_str == '0':
+                                num_str = self.current_char
+                                int_len = 1
+                                zero_int = True
+                            else:
+                                num_str += self.current_char
+                                int_len += 1
+                                zero_int = True
+                        elif self.current_char == '0' and not zero_int:
+                            num_str = '0'
+                            int_len = 1
+                        elif zero_int:
+                            num_str += self.current_char
+                            int_len += 1
                     else:  
                         while self.current_char is not None and self.current_char not in numlit_delim:
                             num_str += self.current_char
                             self.advance()
+                        if negate: num_str = '-' + num_str
                         add_error(f"Maximum number of whole numbers reached in {num_str}")
                         return [], errors
                 else:  
                     if dec_len < 7:
-                        num_str += self.current_char
-                        dec_len += 1
+                        if self.current_char == '0' and self.prev_char in NUM:
+                            reserved_dec += '0'
+                        elif self.current_char == '0' and self.prev_char == '.':
+                            num_str += '0'
+                            dec_len = 1
+                        elif self.current_char in DIGITS and self.prev_char == '0':
+                            num_str += reserved_dec + self.current_char
+                            dec_len += 1 + len(reserved_dec)
+                            print(dec_len)
+                            if dec_len > 7: 
+                                self.advance()
+                                while self.current_char is not None and self.current_char not in numlit_delim:
+                                    num_str += self.current_char
+                                    self.advance()
+                                if negate: num_str = '-' + num_str
+                                add_error(f"Maximum number of decimal numbers reached in {num_str}")
+                                return [], errors
+                            else:
+                                reserved_dec = ''
+                        else:
+                            num_str += self.current_char
+                            dec_len += 1
                     else:  
                         while self.current_char is not None and self.current_char not in numlit_delim:
                             num_str += self.current_char
                             self.advance()
+                        if negate: num_str = '-' + num_str
                         add_error(f"Maximum number of decimal numbers reached in {num_str}")
                         return [], errors
             self.advance()
 
         if dot_count > 0 and num_str.endswith('.'):
+            if negate: num_str = '-' + num_str
             add_error(f"Invalid number '{num_str}'. Trailing decimal point without digits")
             return [], errors
         
         if not negate:
             token_type = TT_XP if dot_count > 0 else TT_HP
         else:
-            # if num_str == '~0':
-            #     add_error(f"Invalid number '{num_str}'. Zero can't be negative")
-            #     return [], errors
+            num_str = '-' + num_str
+            if num_str == '-0':
+                return Token('0', TT_HP), errors
             token_type = TT_NXP if dot_count > 0 else TT_NHP
-
+            
         return Token(num_str, token_type), errors
 
     def make_identifier(self, id_str): # todo
