@@ -20,7 +20,7 @@ numlit_delim   = arith_op + relat_op + whitespace + ',){}:]'
 commslit_delim = whitespace + ',:={])+!'
 flag_delim     = whitespace + relat_op + arith_op + ',:])'
 
-lparen_delim   = ALPHANUM + '_ .)"-!['
+lparen_delim   = ALPHANUM + '_ .()"-!['
 rparen_delim   = whitespace + arith_op + relat_op + '{})],.'
 lcurly_delim   = whitespace + ALPHANUM + '_{(-!'
 rcurly_delim   = whitespace 
@@ -29,7 +29,7 @@ rbracket_delim = whitespace + arith_op + relat_op + ',.[:)}'
 comma_delim    = ALPHANUM + whitespace + '_["-('
 period_delim   = ALPHA + '_'  
 
-nl_delim       = whitespace + ALPHA + '_{}`'
+nl_delim       = whitespace + ALPHA + '_{}`\t'
 space_delim    = whitespace + ALPHANUM + arith_op + relat_op + '_,.&|!:()[]{}"`'
 
 delim1 = whitespace + ',:'
@@ -175,7 +175,9 @@ class Lexer:
         errors = []
     
         while self.current_char is not None:
-            if self.current_char == '\n': 
+            if self.current_char == '\t':
+                self.advance()
+            elif self.current_char == '\n': 
                 while self.current_char == '\n':
                     self.advance()
                 self.process_token('\\n', TT_NEWLINE, nl_delim, errors, tokens)
@@ -1006,6 +1008,7 @@ class Lexer:
             elif self.current_char == '+':
                 self.advance()
                 if self.current_char == '=':
+                    self.advance()
                     self.process_token('+=', TT_PLUS_EQ, delim3, errors, tokens)
                 else:
                     self.process_token('+', TT_PLUS, delim3, errors, tokens)
@@ -1013,6 +1016,7 @@ class Lexer:
                 lhs = self.prev_char
                 self.advance()
                 if self.current_char == '=':
+                    self.advance()
                     self.process_token('-=', TT_MINUS_EQ, delim4, errors, tokens)
                 else:
                     #check lhs if id, number, )
@@ -1035,8 +1039,8 @@ class Lexer:
                     '*': [(TT_MUL_EQ, '='), (TT_MUL, None)],
                     '/': [(TT_DIV_EQ, '='), (TT_DIV, None)],
                     '%': [(TT_MOD_EQ, '='), (TT_MOD, None)],
-                    '<': [(TT_LT, '='), (TT_LTE, None)],
-                    '>': [(TT_GT, '='), (TT_GTE, None)],
+                    '<': [(TT_LTE, '='), (TT_LT, None)],
+                    '>': [(TT_GTE, '='), (TT_GT, None)],
                 }
                 char = self.current_char
                 self.advance()
@@ -1238,7 +1242,6 @@ class Lexer:
                         elif self.current_char in DIGITS and self.prev_char == '0':
                             num_str += reserved_dec + self.current_char
                             dec_len += 1 + len(reserved_dec)
-                            print(dec_len)
                             if dec_len > 7: 
                                 self.advance()
                                 while self.current_char is not None and self.current_char not in numlit_delim:
