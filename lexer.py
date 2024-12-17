@@ -151,18 +151,22 @@ class Lexer:
         self.pos.advance(self.current_char)
         self.current_char = self.text[self.pos.idx] if self.pos.idx < len(self.text) else None
     
-    def invalid_delim_error(self, lexeme):
+    def invalid_delim_error(self, lexeme, valid_delims):
         error_msg = f"Invalid delimiter for ' {lexeme} '. Cause: ' {self.current_char} '"
-        return f"{error_msg} at line {self.pos.ln + 1}, column {self.pos.col + 1}"
+        return f"{error_msg} at line {self.pos.ln + 1}, column {self.pos.col + 1}.\nExpected delimiters are: {valid_delims}"
     
     def process_token(self, lexeme, token, valid_delims, errors, tokens):
         if (self.current_char == '\n' and '\n' not in valid_delims) or (self.current_char is None and '\n' not in valid_delims):
+            valid_delims = valid_delims.replace("\n", "\\n") 
+            valid_delims = valid_delims.replace("\t", "\\t")  
             error_msg = f"Invalid delimiter for ' {lexeme} '. Cause: ' \\n '"
-            error_msg = f"{error_msg} at line {self.pos.ln + 1}, column {self.pos.col + 1}."
+            error_msg = f"{error_msg} at line {self.pos.ln + 1}, column {self.pos.col + 1}.\nExpected delimiters are: {valid_delims}"
             self.advance()
             errors.append(error_msg)
         elif self.current_char is not None and self.current_char not in valid_delims:
-            errors.append(self.invalid_delim_error(lexeme))
+            valid_delims = valid_delims.replace("\n", "\\n") 
+            valid_delims = valid_delims.replace("\t", "\\t")  
+            errors.append(self.invalid_delim_error(lexeme, valid_delims))
             self.advance()
         else:
             if token == TT_COMMENTS2 or token == TT_COMMENTS1:
