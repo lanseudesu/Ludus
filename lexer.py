@@ -155,12 +155,22 @@ class Lexer:
         error_msg = f"Invalid delimiter for ' {lexeme} '. Cause: ' {self.current_char} '"
         return f"{error_msg} at line {self.pos.ln + 1}, column {self.pos.col + 1}.\nExpected delimiters are: {valid_delims}"
     
-    def process_token(self, lexeme, token, valid_delims, errors, tokens):
+    def process_token(self, cur_ln, cur_col, lexeme, token, valid_delims, errors, tokens):
         if (self.current_char == '\n' and '\n' not in valid_delims) or (self.current_char is None and '\n' not in valid_delims):
             valid_delims = valid_delims.replace("\n", "\\n") 
             valid_delims = valid_delims.replace("\t", "\\t")  
+            # if any(char in ALPHANUM for char in valid_delims):  # Check if any character is in ALPHANUM
+            #     valid_delims = ''.join(char for char in valid_delims if char not in ALPHANUM)
+            #     valid_delims = ", ".join(valid_delims)
+            #     valid_delims += ", letters, numbers"
+            # elif any(char in ALPHA for char in valid_delims):  # Check if any character is in ALPHANUM
+            #     valid_delims = ''.join(char for char in valid_delims if char not in ALPHA)
+            #     valid_delims = ", ".join(valid_delims)
+            #     valid_delims += ", letters"
+            # else:
+            #     valid_delims = ", ".join(valid_delims)
             error_msg = f"Invalid delimiter for ' {lexeme} '. Cause: ' \\n '"
-            error_msg = f"{error_msg} at line {self.pos.ln + 1}, column {self.pos.col + 1}.\nExpected delimiters are: {valid_delims}"
+            error_msg = f"{error_msg} at line {self.pos.ln + 1}, column {self.pos.col + 1}.\nExpected delimiters are: {valid_delims}\n"
             self.advance()
             errors.append(error_msg)
         elif self.current_char is not None and self.current_char not in valid_delims:
@@ -172,31 +182,35 @@ class Lexer:
             if token == TT_COMMENTS2 or token == TT_COMMENTS1:
                 pass
             else:
-                tokens.append(Token(lexeme, token)) 
+                tokens.append(Token(f'{cur_ln}.{cur_col}: {lexeme}', f'{cur_ln}.{cur_col}: {token}',)) 
 
     def make_tokens(self):
         tokens = []
         errors = []
     
         while self.current_char is not None:
+            cur_ln = self.pos.ln + 1
+            cur_col = self.pos.col + 1
+
             if self.current_char == '\t':
                 self.advance()
             elif self.current_char == '\n': 
                 while self.current_char == '\n':
                     self.advance()
-                self.process_token('\\n', TT_NEWLINE, nl_delim, errors, tokens)
-            elif self.current_char == ' ': 
+                self.process_token(cur_ln, cur_col, '\\n', TT_NEWLINE, nl_delim, errors, tokens)
+
+            elif self.current_char == ' ':
                 while self.current_char == ' ':
                     self.advance()  
-                self.process_token(' ', TT_SPACE, space_delim, errors, tokens)
+                self.process_token(cur_ln, cur_col, ' ', TT_SPACE, space_delim, errors, tokens)
             elif self.current_char in NUM:
                 result, error = self.make_number('')
 
                 if error:
                    errors.extend(error)
                    continue  
-                
-                self.process_token(result.lexeme, result.token, numlit_delim, errors, tokens)
+
+                self.process_token(cur_ln, cur_col, result.lexeme, result.token, numlit_delim, errors, tokens)
             elif self.current_char in ALPHA:
                 char_str = ''
                 if self.current_char == 'A':
@@ -208,20 +222,20 @@ class Lexer:
                         if self.current_char == 'D':
                             char_str += 'D'
                             self.advance()
-                            self.tokenize_keyword(char_str, ' ', errors, tokens)
+                            self.tokenize_keyword(cur_ln, cur_col, char_str, ' ', errors, tokens)
                         else:
-                            self.tokenize_id(char_str, id_delim, errors, tokens)
+                            self.tokenize_id(cur_ln, cur_col, char_str, id_delim, errors, tokens)
                     else:
-                        self.tokenize_id(char_str, id_delim, errors, tokens)        
+                        self.tokenize_id(cur_ln, cur_col, char_str, id_delim, errors, tokens)        
                 elif self.current_char == 'O':
                     char_str += 'O'
                     self.advance()
                     if self.current_char == 'R':
                         char_str += 'R'
                         self.advance()
-                        self.tokenize_keyword(char_str, ' ', errors, tokens)
+                        self.tokenize_keyword(cur_ln, cur_col, char_str, ' ', errors, tokens)
                     else:
-                         self.tokenize_id(char_str, id_delim, errors, tokens)      
+                         self.tokenize_id(cur_ln, cur_col, char_str, id_delim, errors, tokens)      
                 elif self.current_char == 'a':
                     char_str += 'a'
                     self.advance()
@@ -240,17 +254,17 @@ class Lexer:
                                     if self.current_char == 's':
                                         char_str += 's'
                                         self.advance()
-                                        self.tokenize_keyword(char_str, ' ', errors, tokens)
+                                        self.tokenize_keyword(cur_ln, cur_col, char_str, ' ', errors, tokens)
                                     else:
-                                        self.tokenize_id(char_str, id_delim, errors, tokens)
+                                        self.tokenize_id(cur_ln, cur_col, char_str, id_delim, errors, tokens)
                                 else:
-                                    self.tokenize_id(char_str, id_delim, errors, tokens)
+                                    self.tokenize_id(cur_ln, cur_col, char_str, id_delim, errors, tokens)
                             else:
-                                self.tokenize_id(char_str, id_delim, errors, tokens)
+                                self.tokenize_id(cur_ln, cur_col, char_str, id_delim, errors, tokens)
                         else:
-                            self.tokenize_id(char_str, id_delim, errors, tokens)
+                            self.tokenize_id(cur_ln, cur_col, char_str, id_delim, errors, tokens)
                     else:
-                        self.tokenize_id(char_str, id_delim, errors, tokens)  
+                        self.tokenize_id(cur_ln, cur_col, char_str, id_delim, errors, tokens)  
                 elif self.current_char == 'b':
                     char_str += 'b'
                     self.advance()
@@ -269,15 +283,15 @@ class Lexer:
                                     if self.current_char == 'p':
                                         char_str += 'p'
                                         self.advance()
-                                        self.tokenize_keyword(char_str, ':', errors, tokens)
+                                        self.tokenize_keyword(cur_ln, cur_col, char_str, ':', errors, tokens)
                                     else:
-                                        self.tokenize_id(char_str, id_delim, errors, tokens)
+                                        self.tokenize_id(cur_ln, cur_col, char_str, id_delim, errors, tokens)
                                 else:
-                                    self.tokenize_id(char_str, id_delim, errors, tokens)
+                                    self.tokenize_id(cur_ln, cur_col, char_str, id_delim, errors, tokens)
                             else:
-                                self.tokenize_id(char_str, id_delim, errors, tokens)
+                                self.tokenize_id(cur_ln, cur_col, char_str, id_delim, errors, tokens)
                         else:
-                            self.tokenize_id(char_str, id_delim, errors, tokens)
+                            self.tokenize_id(cur_ln, cur_col, char_str, id_delim, errors, tokens)
                     elif self.current_char == 'u':
                         char_str += 'u'
                         self.advance()
@@ -290,15 +304,15 @@ class Lexer:
                                 if self.current_char == 'd':
                                     char_str += 'd'
                                     self.advance()
-                                    self.tokenize_keyword(char_str, ' ', errors, tokens)
+                                    self.tokenize_keyword(cur_ln, cur_col, char_str, ' ', errors, tokens)
                                 else:
-                                    self.tokenize_id(char_str, id_delim, errors, tokens)
+                                    self.tokenize_id(cur_ln, cur_col, char_str, id_delim, errors, tokens)
                             else:
-                                self.tokenize_id(char_str, id_delim, errors, tokens)
+                                self.tokenize_id(cur_ln, cur_col, char_str, id_delim, errors, tokens)
                         else:
-                            self.tokenize_id(char_str, id_delim, errors, tokens)
+                            self.tokenize_id(cur_ln, cur_col, char_str, id_delim, errors, tokens)
                     else:
-                        self.tokenize_id(char_str, id_delim, errors, tokens)
+                        self.tokenize_id(cur_ln, cur_col, char_str, id_delim, errors, tokens)
                 elif self.current_char == 'c':
                     char_str += 'c'
                     self.advance()
@@ -329,21 +343,21 @@ class Lexer:
                                                     if self.current_char == 't':
                                                         char_str += 't'
                                                         self.advance()
-                                                        self.tokenize_keyword(char_str, whitespace, errors, tokens)
+                                                        self.tokenize_keyword(cur_ln, cur_col, char_str, whitespace, errors, tokens)
                                                     else:
-                                                        self.tokenize_id(char_str, id_delim, errors, tokens)
+                                                        self.tokenize_id(cur_ln, cur_col, char_str, id_delim, errors, tokens)
                                                 else:
-                                                    self.tokenize_id(char_str, id_delim, errors, tokens)
+                                                    self.tokenize_id(cur_ln, cur_col, char_str, id_delim, errors, tokens)
                                             else:
-                                                self.tokenize_id(char_str, id_delim, errors, tokens)
+                                                self.tokenize_id(cur_ln, cur_col, char_str, id_delim, errors, tokens)
                                         else:
-                                            self.tokenize_id(char_str, id_delim, errors, tokens)
+                                            self.tokenize_id(cur_ln, cur_col, char_str, id_delim, errors, tokens)
                                     else:
-                                        self.tokenize_id(char_str, id_delim, errors, tokens)
+                                        self.tokenize_id(cur_ln, cur_col, char_str, id_delim, errors, tokens)
                                 else:
-                                    self.tokenize_id(char_str, id_delim, errors, tokens)
+                                    self.tokenize_id(cur_ln, cur_col, char_str, id_delim, errors, tokens)
                             else:
-                                self.tokenize_id(char_str, id_delim, errors, tokens)
+                                self.tokenize_id(cur_ln, cur_col, char_str, id_delim, errors, tokens)
                         elif self.current_char == 'o':
                             char_str += 'o'
                             self.advance()
@@ -356,15 +370,15 @@ class Lexer:
                                     if self.current_char == 'e':
                                         char_str += 'e'
                                         self.advance()
-                                        self.tokenize_keyword(char_str, ' ', errors, tokens)
+                                        self.tokenize_keyword(cur_ln, cur_col, char_str, ' ', errors, tokens)
                                     else:
-                                        self.tokenize_id(char_str, id_delim, errors, tokens)
+                                        self.tokenize_id(cur_ln, cur_col, char_str, id_delim, errors, tokens)
                                 else:
-                                    self.tokenize_id(char_str, id_delim, errors, tokens)
+                                    self.tokenize_id(cur_ln, cur_col, char_str, id_delim, errors, tokens)
                             else:
-                                self.tokenize_id(char_str, id_delim, errors, tokens)
+                                self.tokenize_id(cur_ln, cur_col, char_str, id_delim, errors, tokens)
                         else:
-                            self.tokenize_id(char_str, id_delim, errors, tokens)
+                            self.tokenize_id(cur_ln, cur_col, char_str, id_delim, errors, tokens)
                     elif self.current_char == 'o':
                         char_str += 'o'
                         self.advance()
@@ -377,15 +391,15 @@ class Lexer:
                                 if self.current_char == 's':
                                     char_str += 's'
                                     self.advance()
-                                    self.tokenize_keyword(char_str, ' ', errors, tokens)
+                                    self.tokenize_keyword(cur_ln, cur_col, char_str, ' ', errors, tokens)
                                 else:
-                                    self.tokenize_id(char_str, id_delim, errors, tokens)
+                                    self.tokenize_id(cur_ln, cur_col, char_str, id_delim, errors, tokens)
                             else:
-                                self.tokenize_id(char_str, id_delim, errors, tokens)
+                                self.tokenize_id(cur_ln, cur_col, char_str, id_delim, errors, tokens)
                         else:
-                            self.tokenize_id(char_str, id_delim, errors, tokens)
+                            self.tokenize_id(cur_ln, cur_col, char_str, id_delim, errors, tokens)
                     else:
-                            self.tokenize_id(char_str, id_delim, errors, tokens)    
+                            self.tokenize_id(cur_ln, cur_col, char_str, id_delim, errors, tokens)    
                 elif self.current_char == 'd':
                     char_str += 'd'
                     self.advance()
@@ -398,11 +412,11 @@ class Lexer:
                             if self.current_char == 'd':
                                 char_str += 'd'
                                 self.advance()
-                                self.tokenize_keyword(char_str, delim1, errors, tokens)
+                                self.tokenize_keyword(cur_ln, cur_col, char_str, delim1, errors, tokens)
                             else:
-                                self.tokenize_id(char_str, id_delim, errors, tokens)
+                                self.tokenize_id(cur_ln, cur_col, char_str, id_delim, errors, tokens)
                         else:
-                            self.tokenize_id(char_str, id_delim, errors, tokens)
+                            self.tokenize_id(cur_ln, cur_col, char_str, id_delim, errors, tokens)
                     elif self.current_char == 'r':
                         char_str += 'r'
                         self.advance()
@@ -412,13 +426,13 @@ class Lexer:
                             if self.current_char == 'p':
                                 char_str += 'p'
                                 self.advance()
-                                self.tokenize_keyword(char_str, '(', errors, tokens)
+                                self.tokenize_keyword(cur_ln, cur_col, char_str, '(', errors, tokens)
                             else:
-                                self.tokenize_id(char_str, id_delim, errors, tokens)
+                                self.tokenize_id(cur_ln, cur_col, char_str, id_delim, errors, tokens)
                         else:
-                            self.tokenize_id(char_str, id_delim, errors, tokens)
+                            self.tokenize_id(cur_ln, cur_col, char_str, id_delim, errors, tokens)
                     else:
-                        self.tokenize_id(char_str, id_delim, errors, tokens)
+                        self.tokenize_id(cur_ln, cur_col, char_str, id_delim, errors, tokens)
                 elif self.current_char == 'e':
                     char_str += 'e'
                     self.advance()
@@ -431,22 +445,22 @@ class Lexer:
                             if self.current_char == 'f':
                                 char_str += 'f'
                                 self.advance()
-                                self.tokenize_keyword(char_str, ' ', errors, tokens)
+                                self.tokenize_keyword(cur_ln, cur_col, char_str, ' ', errors, tokens)
                             else:
-                                self.tokenize_id(char_str, id_delim, errors, tokens)
+                                self.tokenize_id(cur_ln, cur_col, char_str, id_delim, errors, tokens)
                         elif self.current_char == 's':
                             char_str += 's'
                             self.advance()
                             if self.current_char == 'e':
                                 char_str += 'e'
                                 self.advance()
-                                self.tokenize_keyword(char_str, delim2, errors, tokens)
+                                self.tokenize_keyword(cur_ln, cur_col, char_str, delim2, errors, tokens)
                             else:
-                                self.tokenize_id(char_str, id_delim, errors, tokens)
+                                self.tokenize_id(cur_ln, cur_col, char_str, id_delim, errors, tokens)
                         else:
-                            self.tokenize_id(char_str, id_delim, errors, tokens)
+                            self.tokenize_id(cur_ln, cur_col, char_str, id_delim, errors, tokens)
                     else:
-                        self.tokenize_id(char_str, id_delim, errors, tokens)
+                        self.tokenize_id(cur_ln, cur_col, char_str, id_delim, errors, tokens)
                 elif self.current_char == 'f':
                     char_str += 'f'
                     self.advance()
@@ -463,15 +477,16 @@ class Lexer:
                                     char_str += 'e' 
                                     self.advance()
                                     if self.current_char in ALPHANUM or self.current_char == '_':
-                                        self.tokenize_id(char_str, id_delim, errors, tokens)
+                                        self.tokenize_id(cur_ln, cur_col, char_str, id_delim, errors, tokens)
                                     else:
-                                        self.process_token(TT_FLAG, TT_FLAG, flag_delim, errors, tokens)
+                                        self.process_token(cur_ln, cur_col, TT_FLAG, TT_FLAG, flag_delim, errors, tokens)
+                                        
                                 else: 
-                                    self.tokenize_id(char_str, id_delim, errors, tokens)
+                                    self.tokenize_id(cur_ln, cur_col, char_str, id_delim, errors, tokens)
                             else: 
-                                self.tokenize_id(char_str, id_delim, errors, tokens)
+                                self.tokenize_id(cur_ln, cur_col, char_str, id_delim, errors, tokens)
                         else:
-                            self.tokenize_id(char_str, id_delim, errors, tokens)
+                            self.tokenize_id(cur_ln, cur_col, char_str, id_delim, errors, tokens)
                     elif self.current_char == 'l':
                         char_str += 'l'
                         self.advance()
@@ -481,31 +496,31 @@ class Lexer:
                             if self.current_char == 'g':
                                 char_str += 'g'
                                 self.advance()
-                                self.tokenize_keyword(char_str, ' ', errors, tokens)
+                                self.tokenize_keyword(cur_ln, cur_col, char_str, ' ', errors, tokens)
                             elif self.current_char == 'n':
                                 char_str += 'n'
                                 self.advance()
                                 if self.current_char == 'k':
                                     char_str += 'k'
                                     self.advance()
-                                    self.tokenize_keyword(char_str, ' ', errors, tokens)
+                                    self.tokenize_keyword(cur_ln, cur_col, char_str, ' ', errors, tokens)
                                 else:
-                                    self.tokenize_id(char_str, id_delim, errors, tokens)
+                                    self.tokenize_id(cur_ln, cur_col, char_str, id_delim, errors, tokens)
                             else:
-                                self.tokenize_id(char_str, id_delim, errors, tokens)
+                                self.tokenize_id(cur_ln, cur_col, char_str, id_delim, errors, tokens)
                         else:
-                            self.tokenize_id(char_str, id_delim, errors, tokens)
+                            self.tokenize_id(cur_ln, cur_col, char_str, id_delim, errors, tokens)
                     elif self.current_char == 'o':
                         char_str += 'o'
                         self.advance()
                         if self.current_char == 'r':
                             char_str += 'r'
                             self.advance()
-                            self.tokenize_keyword(char_str, ' ', errors, tokens)
+                            self.tokenize_keyword(cur_ln, cur_col, char_str, ' ', errors, tokens)
                         else:
-                            self.tokenize_id(char_str, id_delim, errors, tokens)
+                            self.tokenize_id(cur_ln, cur_col, char_str, id_delim, errors, tokens)
                     else:
-                        self.tokenize_id(char_str, id_delim, errors, tokens)  
+                        self.tokenize_id(cur_ln, cur_col, char_str, id_delim, errors, tokens)  
                 elif self.current_char == 'g':
                     char_str += 'g'
                     self.advance()
@@ -530,19 +545,19 @@ class Lexer:
                                             if self.current_char == 'r':
                                                 char_str += 'r'
                                                 self.advance()
-                                                self.tokenize_keyword(char_str, whitespace, errors, tokens)
+                                                self.tokenize_keyword(cur_ln, cur_col, char_str, whitespace, errors, tokens)
                                             else:
-                                                self.tokenize_id(char_str, id_delim, errors, tokens)
+                                                self.tokenize_id(cur_ln, cur_col, char_str, id_delim, errors, tokens)
                                         else:
-                                            self.tokenize_id(char_str, id_delim, errors, tokens)
+                                            self.tokenize_id(cur_ln, cur_col, char_str, id_delim, errors, tokens)
                                     else:
-                                        self.tokenize_id(char_str, id_delim, errors, tokens)
+                                        self.tokenize_id(cur_ln, cur_col, char_str, id_delim, errors, tokens)
                                 else:
-                                    self.tokenize_id(char_str, id_delim, errors, tokens)
+                                    self.tokenize_id(cur_ln, cur_col, char_str, id_delim, errors, tokens)
                             else:
-                                self.tokenize_id(char_str, id_delim, errors, tokens)
+                                self.tokenize_id(cur_ln, cur_col, char_str, id_delim, errors, tokens)
                         else:
-                            self.tokenize_id(char_str, id_delim, errors, tokens)
+                            self.tokenize_id(cur_ln, cur_col, char_str, id_delim, errors, tokens)
                     elif self.current_char == 'e':
                         char_str += 'e'
                         self.advance()
@@ -564,19 +579,19 @@ class Lexer:
                                             if self.current_char == 'e':
                                                 char_str += 'e'
                                                 self.advance()
-                                                self.tokenize_keyword(char_str, ' ', errors, tokens)
+                                                self.tokenize_keyword(cur_ln, cur_col, char_str, ' ', errors, tokens)
                                             else:
-                                                self.tokenize_id(char_str, id_delim, errors, tokens)
+                                                self.tokenize_id(cur_ln, cur_col, char_str, id_delim, errors, tokens)
                                         else:
-                                            self.tokenize_id(char_str, id_delim, errors, tokens)
+                                            self.tokenize_id(cur_ln, cur_col, char_str, id_delim, errors, tokens)
                                     else:
-                                        self.tokenize_id(char_str, id_delim, errors, tokens)
+                                        self.tokenize_id(cur_ln, cur_col, char_str, id_delim, errors, tokens)
                                 else:
-                                    self.tokenize_id(char_str, id_delim, errors, tokens)
+                                    self.tokenize_id(cur_ln, cur_col, char_str, id_delim, errors, tokens)
                             else:
-                                self.tokenize_id(char_str, id_delim, errors, tokens)
+                                self.tokenize_id(cur_ln, cur_col, char_str, id_delim, errors, tokens)
                         else:
-                            self.tokenize_id(char_str, id_delim, errors, tokens)
+                            self.tokenize_id(cur_ln, cur_col, char_str, id_delim, errors, tokens)
                     elif self.current_char == 'r':
                         char_str += 'r'
                         self.advance()
@@ -589,31 +604,31 @@ class Lexer:
                                 if self.current_char == 'd':
                                     char_str += 'd'
                                     self.advance()
-                                    self.tokenize_keyword(char_str, delim2, errors, tokens)
+                                    self.tokenize_keyword(cur_ln, cur_col, char_str, delim2, errors, tokens)
                                 else:
-                                    self.tokenize_id(char_str, id_delim, errors, tokens)
+                                    self.tokenize_id(cur_ln, cur_col, char_str, id_delim, errors, tokens)
                             else:
-                                self.tokenize_id(char_str, id_delim, errors, tokens)
+                                self.tokenize_id(cur_ln, cur_col, char_str, id_delim, errors, tokens)
                         else:
-                            self.tokenize_id(char_str, id_delim, errors, tokens)
+                            self.tokenize_id(cur_ln, cur_col, char_str, id_delim, errors, tokens)
                     else:
-                            self.tokenize_id(char_str, id_delim, errors, tokens)
+                            self.tokenize_id(cur_ln, cur_col, char_str, id_delim, errors, tokens)
                 elif self.current_char == 'h':
                     char_str += 'h' 
                     self.advance()
                     if self.current_char == 'p':
                         char_str += 'p'
                         self.advance()
-                        self.tokenize_keyword(char_str, ' ', errors, tokens)
+                        self.tokenize_keyword(cur_ln, cur_col, char_str, ' ', errors, tokens)
                     else:
-                        self.tokenize_id(char_str, id_delim, errors, tokens)
+                        self.tokenize_id(cur_ln, cur_col, char_str, id_delim, errors, tokens)
                 elif self.current_char == 'i':
                     char_str += 'i' 
                     self.advance()
                     if self.current_char == 'f':
                         char_str += 'f'
                         self.advance()
-                        self.tokenize_keyword(char_str, ' ', errors, tokens)
+                        self.tokenize_keyword(cur_ln, cur_col, char_str, ' ', errors, tokens)
                     elif self.current_char == 'm':
                         char_str += 'm'
                         self.advance()
@@ -623,13 +638,13 @@ class Lexer:
                             if self.current_char == 'o':
                                 char_str += 'o'
                                 self.advance()
-                                self.tokenize_keyword(char_str, ' ', errors, tokens)
+                                self.tokenize_keyword(cur_ln, cur_col, char_str, ' ', errors, tokens)
                             else:
-                                self.tokenize_id(char_str, id_delim, errors, tokens)
+                                self.tokenize_id(cur_ln, cur_col, char_str, id_delim, errors, tokens)
                         else:
-                            self.tokenize_id(char_str, id_delim, errors, tokens)
+                            self.tokenize_id(cur_ln, cur_col, char_str, id_delim, errors, tokens)
                     else:
-                        self.tokenize_id(char_str, id_delim, errors, tokens)
+                        self.tokenize_id(cur_ln, cur_col, char_str, id_delim, errors, tokens)
                 elif self.current_char == 'j':
                     char_str += 'j' 
                     self.advance()
@@ -642,13 +657,13 @@ class Lexer:
                             if self.current_char == 'n':
                                 char_str += 'n' 
                                 self.advance()
-                                self.tokenize_keyword(char_str, '(', errors, tokens)
+                                self.tokenize_keyword(cur_ln, cur_col, char_str, '(', errors, tokens)
                             else:
-                                self.tokenize_id(char_str, id_delim, errors, tokens)
+                                self.tokenize_id(cur_ln, cur_col, char_str, id_delim, errors, tokens)
                         else:
-                            self.tokenize_id(char_str, id_delim, errors, tokens)
+                            self.tokenize_id(cur_ln, cur_col, char_str, id_delim, errors, tokens)
                     else:
-                        self.tokenize_id(char_str, id_delim, errors, tokens)
+                        self.tokenize_id(cur_ln, cur_col, char_str, id_delim, errors, tokens)
                 elif self.current_char == 'l':
                     char_str += 'l' 
                     self.advance()
@@ -676,30 +691,30 @@ class Lexer:
                                                 if self.current_char == 'n':
                                                     char_str += 'n' 
                                                     self.advance()
-                                                    self.tokenize_keyword(char_str, '(', errors, tokens)
+                                                    self.tokenize_keyword(cur_ln, cur_col, char_str, '(', errors, tokens)
                                                 else:
-                                                    self.tokenize_id(char_str, id_delim, errors, tokens)
+                                                    self.tokenize_id(cur_ln, cur_col, char_str, id_delim, errors, tokens)
                                             else:
-                                                self.tokenize_id(char_str, id_delim, errors, tokens)
+                                                self.tokenize_id(cur_ln, cur_col, char_str, id_delim, errors, tokens)
                                         else:
-                                            self.tokenize_id(char_str, id_delim, errors, tokens)
+                                            self.tokenize_id(cur_ln, cur_col, char_str, id_delim, errors, tokens)
                                     elif self.current_char == 'U':
                                         char_str += 'U' 
                                         self.advance()
                                         if self.current_char == 'p':
                                             char_str += 'p' 
                                             self.advance()
-                                            self.tokenize_keyword(char_str, '(', errors, tokens)
+                                            self.tokenize_keyword(cur_ln, cur_col, char_str, '(', errors, tokens)
                                         else:
-                                            self.tokenize_id(char_str, id_delim, errors, tokens)
+                                            self.tokenize_id(cur_ln, cur_col, char_str, id_delim, errors, tokens)
                                     else:
-                                        self.tokenize_id(char_str, id_delim, errors, tokens)
+                                        self.tokenize_id(cur_ln, cur_col, char_str, id_delim, errors, tokens)
                                 else:
-                                    self.tokenize_id(char_str, id_delim, errors, tokens)
+                                    self.tokenize_id(cur_ln, cur_col, char_str, id_delim, errors, tokens)
                             else:
-                                self.tokenize_id(char_str, id_delim, errors, tokens)
+                                self.tokenize_id(cur_ln, cur_col, char_str, id_delim, errors, tokens)
                         else:
-                            self.tokenize_id(char_str, id_delim, errors, tokens)
+                            self.tokenize_id(cur_ln, cur_col, char_str, id_delim, errors, tokens)
                     elif self.current_char == 'o':
                         char_str += 'o'
                         self.advance()
@@ -718,21 +733,21 @@ class Lexer:
                                         if self.current_char == 'm':
                                             char_str += 'm'
                                             self.advance()
-                                            self.tokenize_keyword(char_str, '(', errors, tokens)
+                                            self.tokenize_keyword(cur_ln, cur_col, char_str, '(', errors, tokens)
                                         else:
-                                            self.tokenize_id(char_str, id_delim, errors, tokens)
+                                            self.tokenize_id(cur_ln, cur_col, char_str, id_delim, errors, tokens)
                                     else:
-                                        self.tokenize_id(char_str, id_delim, errors, tokens)
+                                        self.tokenize_id(cur_ln, cur_col, char_str, id_delim, errors, tokens)
                                 elif self.current_char in ALPHANUM or self.current_char == '_':
-                                    self.tokenize_id(char_str, id_delim, errors, tokens)
+                                    self.tokenize_id(cur_ln, cur_col, char_str, id_delim, errors, tokens)
                                 else:
-                                    self.tokenize_keyword(char_str, '(', errors, tokens) 
+                                    self.tokenize_keyword(cur_ln, cur_col, char_str, '(', errors, tokens) 
                             else:
-                                self.tokenize_id(char_str, id_delim, errors, tokens)    
+                                self.tokenize_id(cur_ln, cur_col, char_str, id_delim, errors, tokens)    
                         else:
-                            self.tokenize_id(char_str, id_delim, errors, tokens)   
+                            self.tokenize_id(cur_ln, cur_col, char_str, id_delim, errors, tokens)   
                     else:
-                        self.tokenize_id(char_str, id_delim, errors, tokens) 
+                        self.tokenize_id(cur_ln, cur_col, char_str, id_delim, errors, tokens) 
       
                 elif self.current_char == 'p':
                     char_str += 'p'
@@ -746,13 +761,13 @@ class Lexer:
                             if self.current_char == 'y':
                                 char_str += 'y'
                                 self.advance()
-                                self.tokenize_keyword(char_str, '(', errors, tokens)
+                                self.tokenize_keyword(cur_ln, cur_col, char_str, '(', errors, tokens)
                             else:
-                                self.tokenize_id(char_str, id_delim, errors, tokens)
+                                self.tokenize_id(cur_ln, cur_col, char_str, id_delim, errors, tokens)
                         else:
-                            self.tokenize_id(char_str, id_delim, errors, tokens)
+                            self.tokenize_id(cur_ln, cur_col, char_str, id_delim, errors, tokens)
                     else:
-                        self.tokenize_id(char_str, id_delim, errors, tokens)
+                        self.tokenize_id(cur_ln, cur_col, char_str, id_delim, errors, tokens)
                 elif self.current_char == 'r':
                     char_str += 'r' 
                     self.advance()
@@ -771,13 +786,13 @@ class Lexer:
                                     if self.current_char == 'l':
                                         char_str += 'l' 
                                         self.advance()
-                                        self.tokenize_keyword(char_str, ' ', errors, tokens)
+                                        self.tokenize_keyword(cur_ln, cur_col, char_str, ' ', errors, tokens)
                                     else:
-                                        self.tokenize_id(char_str, id_delim, errors, tokens)
+                                        self.tokenize_id(cur_ln, cur_col, char_str, id_delim, errors, tokens)
                                 else:
-                                    self.tokenize_id(char_str, id_delim, errors, tokens)
+                                    self.tokenize_id(cur_ln, cur_col, char_str, id_delim, errors, tokens)
                             else:
-                                self.tokenize_id(char_str, id_delim, errors, tokens)
+                                self.tokenize_id(cur_ln, cur_col, char_str, id_delim, errors, tokens)
                         elif self.current_char == 's': 
                             char_str += 's' 
                             self.advance()  
@@ -790,15 +805,15 @@ class Lexer:
                                     if self.current_char == 'e': 
                                         char_str += 'e' 
                                         self.advance()
-                                        self.tokenize_keyword(char_str, whitespace, errors, tokens)
+                                        self.tokenize_keyword(cur_ln, cur_col, char_str, whitespace, errors, tokens)
                                     else:
-                                        self.tokenize_id(char_str, id_delim, errors, tokens)
+                                        self.tokenize_id(cur_ln, cur_col, char_str, id_delim, errors, tokens)
                                 else:
-                                    self.tokenize_id(char_str, id_delim, errors, tokens)
+                                    self.tokenize_id(cur_ln, cur_col, char_str, id_delim, errors, tokens)
                             else:
-                                self.tokenize_id(char_str, id_delim, errors, tokens) 
+                                self.tokenize_id(cur_ln, cur_col, char_str, id_delim, errors, tokens) 
                         else:
-                            self.tokenize_id(char_str, id_delim, errors, tokens)  
+                            self.tokenize_id(cur_ln, cur_col, char_str, id_delim, errors, tokens)  
                     elif self.current_char == 'o':
                         char_str += 'o' 
                         self.advance()
@@ -814,17 +829,17 @@ class Lexer:
                                     if self.current_char == 's': 
                                         char_str += 's' 
                                         self.advance()
-                                        self.tokenize_keyword(char_str, '(', errors, tokens)
+                                        self.tokenize_keyword(cur_ln, cur_col, char_str, '(', errors, tokens)
                                     else:
-                                        self.tokenize_id(char_str, id_delim, errors, tokens)
+                                        self.tokenize_id(cur_ln, cur_col, char_str, id_delim, errors, tokens)
                                 else:
-                                    self.tokenize_id(char_str, id_delim, errors, tokens)
+                                    self.tokenize_id(cur_ln, cur_col, char_str, id_delim, errors, tokens)
                             else:
-                                self.tokenize_id(char_str, id_delim, errors, tokens)
+                                self.tokenize_id(cur_ln, cur_col, char_str, id_delim, errors, tokens)
                         else:
-                            self.tokenize_id(char_str, id_delim, errors, tokens)
+                            self.tokenize_id(cur_ln, cur_col, char_str, id_delim, errors, tokens)
                     else:
-                        self.tokenize_id(char_str, id_delim, errors, tokens)
+                        self.tokenize_id(cur_ln, cur_col, char_str, id_delim, errors, tokens)
                 elif self.current_char == 's':
                     char_str += 's'
                     self.advance()
@@ -837,11 +852,11 @@ class Lexer:
                             if self.current_char == 'k': 
                                 char_str += 'k' 
                                 self.advance()
-                                self.tokenize_keyword(char_str, '(', errors, tokens)
+                                self.tokenize_keyword(cur_ln, cur_col, char_str, '(', errors, tokens)
                             else:
-                                self.tokenize_id(char_str, id_delim, errors, tokens)
+                                self.tokenize_id(cur_ln, cur_col, char_str, id_delim, errors, tokens)
                         else:
-                            self.tokenize_id(char_str, id_delim, errors, tokens)
+                            self.tokenize_id(cur_ln, cur_col, char_str, id_delim, errors, tokens)
                     elif self.current_char == 'h':
                         char_str += 'h'
                         self.advance()
@@ -863,23 +878,23 @@ class Lexer:
                                             if self.current_char == 't': 
                                                 char_str += 't' 
                                                 self.advance()
-                                                self.tokenize_keyword(char_str, '(', errors, tokens)
+                                                self.tokenize_keyword(cur_ln, cur_col, char_str, '(', errors, tokens)
                                             else:
-                                                self.tokenize_id(char_str, id_delim, errors, tokens)
+                                                self.tokenize_id(cur_ln, cur_col, char_str, id_delim, errors, tokens)
                                         else:
-                                            self.tokenize_id(char_str, id_delim, errors, tokens)
+                                            self.tokenize_id(cur_ln, cur_col, char_str, id_delim, errors, tokens)
                                     elif self.current_char in ALPHANUM or self.current_char == '_':
-                                        self.tokenize_id(char_str, id_delim, errors, tokens)
+                                        self.tokenize_id(cur_ln, cur_col, char_str, id_delim, errors, tokens)
                                     else:
-                                        self.tokenize_keyword(char_str, '(', errors, tokens)
+                                        self.tokenize_keyword(cur_ln, cur_col, char_str, '(', errors, tokens)
                                 else:
-                                    self.tokenize_id(char_str, id_delim, errors, tokens)
+                                    self.tokenize_id(cur_ln, cur_col, char_str, id_delim, errors, tokens)
                             else:
-                                self.tokenize_id(char_str, id_delim, errors, tokens)
+                                self.tokenize_id(cur_ln, cur_col, char_str, id_delim, errors, tokens)
                         else:
-                            self.tokenize_id(char_str, id_delim, errors, tokens)
+                            self.tokenize_id(cur_ln, cur_col, char_str, id_delim, errors, tokens)
                     else:
-                            self.tokenize_id(char_str, id_delim, errors, tokens)
+                            self.tokenize_id(cur_ln, cur_col, char_str, id_delim, errors, tokens)
                 elif self.current_char == 't':
                     char_str += 't' 
                     self.advance()
@@ -892,18 +907,18 @@ class Lexer:
                             if self.current_char == 'p': 
                                 char_str += 'p' 
                                 self.advance()
-                                self.tokenize_keyword(char_str, '(', errors, tokens)
+                                self.tokenize_keyword(cur_ln, cur_col, char_str, '(', errors, tokens)
                             else: 
-                                self.tokenize_id(char_str, id_delim, errors, tokens)
+                                self.tokenize_id(cur_ln, cur_col, char_str, id_delim, errors, tokens)
                         elif self.current_char == 'X':
                             char_str += 'X' 
                             self.advance()
                             if self.current_char == 'p':
                                 char_str += 'p' 
                                 self.advance()
-                                self.tokenize_keyword(char_str, '(', errors, tokens)
+                                self.tokenize_keyword(cur_ln, cur_col, char_str, '(', errors, tokens)
                             else: 
-                                self.tokenize_id(char_str, id_delim, errors, tokens)
+                                self.tokenize_id(cur_ln, cur_col, char_str, id_delim, errors, tokens)
                         elif self.current_char == 'C':
                             char_str += 'C' 
                             self.advance()
@@ -919,17 +934,17 @@ class Lexer:
                                         if self.current_char == 's':
                                             char_str += 's' 
                                             self.advance()
-                                            self.tokenize_keyword(char_str, '(', errors, tokens)
+                                            self.tokenize_keyword(cur_ln, cur_col, char_str, '(', errors, tokens)
                                         else: 
-                                            self.tokenize_id(char_str, id_delim, errors, tokens)
+                                            self.tokenize_id(cur_ln, cur_col, char_str, id_delim, errors, tokens)
                                     else: 
-                                        self.tokenize_id(char_str, id_delim, errors, tokens)
+                                        self.tokenize_id(cur_ln, cur_col, char_str, id_delim, errors, tokens)
                                 else: 
-                                    self.tokenize_id(char_str, id_delim, errors, tokens)
+                                    self.tokenize_id(cur_ln, cur_col, char_str, id_delim, errors, tokens)
                             else: 
-                                self.tokenize_id(char_str, id_delim, errors, tokens)
+                                self.tokenize_id(cur_ln, cur_col, char_str, id_delim, errors, tokens)
                         else: 
-                            self.tokenize_id(char_str, id_delim, errors, tokens)
+                            self.tokenize_id(cur_ln, cur_col, char_str, id_delim, errors, tokens)
                     elif self.current_char == 'r':
                         char_str += 'r' 
                         self.advance()
@@ -940,15 +955,15 @@ class Lexer:
                                 char_str += 'e' 
                                 self.advance()
                                 if self.current_char in ALPHANUM or self.current_char == '_':
-                                    self.tokenize_id(char_str, id_delim, errors, tokens)
+                                    self.tokenize_id(cur_ln, cur_col, char_str, id_delim, errors, tokens)
                                 else:
-                                    self.process_token(TT_FLAG, TT_FLAG, flag_delim, errors, tokens)
+                                    self.process_token(cur_ln, cur_col, TT_FLAG, TT_FLAG, flag_delim, errors, tokens)
                             else: 
-                                self.tokenize_id(char_str, id_delim, errors, tokens)
+                                self.tokenize_id(cur_ln, cur_col, char_str, id_delim, errors, tokens)
                         else: 
-                            self.tokenize_id(char_str, id_delim, errors, tokens)
+                            self.tokenize_id(cur_ln, cur_col, char_str, id_delim, errors, tokens)
                     else: 
-                        self.tokenize_id(char_str, id_delim, errors, tokens)
+                        self.tokenize_id(cur_ln, cur_col, char_str, id_delim, errors, tokens)
                 elif self.current_char == 'w':
                     char_str += 'w' 
                     self.advance()
@@ -964,13 +979,13 @@ class Lexer:
                                 if self.current_char == 'e':
                                     char_str += 'e' 
                                     self.advance()
-                                    self.tokenize_keyword(char_str, ' ', errors, tokens)
+                                    self.tokenize_keyword(cur_ln, cur_col, char_str, ' ', errors, tokens)
                                 else: 
-                                    self.tokenize_id(char_str, id_delim, errors, tokens)
+                                    self.tokenize_id(cur_ln, cur_col, char_str, id_delim, errors, tokens)
                             else: 
-                                self.tokenize_id(char_str, id_delim, errors, tokens)
+                                self.tokenize_id(cur_ln, cur_col, char_str, id_delim, errors, tokens)
                         else: 
-                            self.tokenize_id(char_str, id_delim, errors, tokens)
+                            self.tokenize_id(cur_ln, cur_col, char_str, id_delim, errors, tokens)
                     elif self.current_char == 'i':
                         char_str += 'i'  
                         self.advance()
@@ -980,27 +995,27 @@ class Lexer:
                             if self.current_char == 'e':
                                 char_str += 'e' 
                                 self.advance()
-                                self.tokenize_keyword(char_str, '(', errors, tokens)
+                                self.tokenize_keyword(cur_ln, cur_col, char_str, '(', errors, tokens)
                             else: 
-                                self.tokenize_id(char_str, id_delim, errors, tokens)
+                                self.tokenize_id(cur_ln, cur_col, char_str, id_delim, errors, tokens)
                         else: 
-                            self.tokenize_id(char_str, id_delim, errors, tokens)
+                            self.tokenize_id(cur_ln, cur_col, char_str, id_delim, errors, tokens)
                     else: 
-                            self.tokenize_id(char_str, id_delim, errors, tokens)
+                            self.tokenize_id(cur_ln, cur_col, char_str, id_delim, errors, tokens)
                 elif self.current_char == 'x':
                     char_str += 'x' 
                     self.advance()
                     if self.current_char == 'p':
                         char_str += 'p' 
                         self.advance()
-                        self.tokenize_keyword(char_str, ' ', errors, tokens)
+                        self.tokenize_keyword(cur_ln, cur_col, char_str, ' ', errors, tokens)
                     else:
-                        self.tokenize_id(char_str, id_delim, errors, tokens)
+                        self.tokenize_id(cur_ln, cur_col, char_str, id_delim, errors, tokens)
                 else:
-                    self.tokenize_id(char_str, id_delim, errors, tokens)    
+                    self.tokenize_id(cur_ln, cur_col, char_str, id_delim, errors, tokens)    
             elif self.current_char == '_':
                 char_str = ''
-                self.tokenize_id(char_str, id_delim, errors, tokens)
+                self.tokenize_id(cur_ln, cur_col, char_str, id_delim, errors, tokens)
             elif self.current_char == '"':
                 result, error = self.make_string()
 
@@ -1008,24 +1023,24 @@ class Lexer:
                    errors.extend(error)
                    continue
 
-                self.process_token(result.lexeme, result.token, commslit_delim, errors, tokens)
+                self.process_token(cur_ln, cur_col, result.lexeme, result.token, commslit_delim, errors, tokens)
             elif self.current_char == '+':
                 self.advance()
                 if self.current_char == '=':
                     self.advance()
-                    self.process_token('+=', TT_PLUS_EQ, delim3, errors, tokens)
+                    self.process_token(cur_ln, cur_col, '+=', TT_PLUS_EQ, delim3, errors, tokens)
                 else:
-                    self.process_token('+', TT_PLUS, delim3, errors, tokens)
+                    self.process_token(cur_ln, cur_col, '+', TT_PLUS, delim3, errors, tokens)
             elif self.current_char == '-':
                 lhs = self.prev_char
                 self.advance()
                 if self.current_char == '=':
                     self.advance()
-                    self.process_token('-=', TT_MINUS_EQ, delim4, errors, tokens)
+                    self.process_token(cur_ln, cur_col, '-=', TT_MINUS_EQ, delim4, errors, tokens)
                 else:
                     #check lhs if id, number, )
                     if lhs is not None and lhs in valid_lhs:
-                        self.process_token('-', TT_MINUS, delim4, errors, tokens)
+                        self.process_token(cur_ln, cur_col, '-', TT_MINUS, delim4, errors, tokens)
                     else:
                         if self.current_char in NUM or self.current_char == '.':
                             result, error = self.make_number('-')
@@ -1034,9 +1049,9 @@ class Lexer:
                                 errors.extend(error)
                                 continue  
 
-                            self.process_token(result.lexeme, result.token, numlit_delim, errors, tokens)
+                            self.process_token(cur_ln, cur_col, result.lexeme, result.token, numlit_delim, errors, tokens)
                         else:
-                            self.process_token('-', TT_NEG, delim4, errors, tokens)
+                            self.process_token(cur_ln, cur_col, '-', TT_NEG, delim4, errors, tokens)
                 
             elif self.current_char in '*/%<>': 
                 token_map = {
@@ -1050,11 +1065,11 @@ class Lexer:
                 self.advance()
                 for token_type, next_char in token_map[char]:
                     if next_char is None:  
-                        self.process_token(char, token_type, delim4, errors, tokens)
+                        self.process_token(cur_ln, cur_col, char, token_type, delim4, errors, tokens)
                         break
                     elif self.current_char == '=':  
                         self.advance()
-                        self.process_token(char + next_char, token_type, delim4, errors, tokens)
+                        self.process_token(cur_ln, cur_col, char + next_char, token_type, delim4, errors, tokens)
                         break
             elif self.current_char in '^:()[]{},':
                 token_map = {
@@ -1071,7 +1086,7 @@ class Lexer:
                 char = self.current_char
                 self.advance()
                 for token_type, valid_delims in token_map[char]:
-                    self.process_token(char, token_type, valid_delims, errors, tokens)
+                    self.process_token(cur_ln, cur_col, char, token_type, valid_delims, errors, tokens)
                     break 
             elif self.current_char == '.':
                 self.advance()
@@ -1082,7 +1097,7 @@ class Lexer:
                     if self.current_char is not None and self.current_char == 'f':
                         result = '.' + result + 'f'
                         self.advance()
-                        self.process_token(result, TT_XP_FORMATTING, ')', errors, tokens)
+                        self.process_token(cur_ln, cur_col, result, TT_XP_FORMATTING, ')', errors, tokens)
                     else:
                         result, error = self.make_number('.' + result)
 
@@ -1090,7 +1105,7 @@ class Lexer:
                             errors.extend(error)
                             continue  
 
-                        self.process_token(result.lexeme, result.token, numlit_delim, errors, tokens)        
+                        self.process_token(cur_ln, cur_col, result.lexeme, result.token, numlit_delim, errors, tokens) 
                 elif self.current_char is not None and self.current_char in NUM:
                     result, error = self.make_number('.')
 
@@ -1098,10 +1113,10 @@ class Lexer:
                         errors.extend(error)
                         continue  
 
-                    self.process_token(result.lexeme, result.token, numlit_delim, errors, tokens)
+                    self.process_token(cur_ln, cur_col, result.lexeme, result.token, numlit_delim, errors, tokens)    
 
                 else:
-                    self.process_token('.', TT_PERIOD, period_delim, errors, tokens)
+                    self.process_token(cur_ln, cur_col, '.', TT_PERIOD, period_delim, errors, tokens)  
             elif self.current_char in '=&|':
                 token_map = {
                     '=': [(TT_EE, delim7)],
@@ -1113,7 +1128,7 @@ class Lexer:
                 for token_type, valid_delims in token_map[char]:
                     if self.current_char == char:
                         self.advance()
-                        self.process_token(char + char, token_type, valid_delims, errors, tokens)
+                        self.process_token(cur_ln, cur_col, char + char, token_type, valid_delims, errors, tokens)     
                     else:
                         errors.append(f"Invalid character error at line {self.pos.ln+1}, column {self.pos.col}. Cause: ' {char} '")
             elif self.current_char == '!':
@@ -1121,21 +1136,22 @@ class Lexer:
                 self.advance()
                 if self.current_char == '=':
                     self.advance()
-                    self.process_token('!=', TT_NE, delim3, errors, tokens)
+                    self.process_token(cur_ln, cur_col, '!=', TT_NE, delim3, errors, tokens)   
                 else:
-                    self.process_token('!', TT_NOT, delim6, errors, tokens)   
+                    self.process_token(cur_ln, cur_col, '!', TT_NOT, delim6, errors, tokens)   
             elif self.current_char == '#':
                 comments = '#'
                 self.advance()
                 while self.current_char is not None:
                     if self.current_char == '\n':
-                        self.process_token(comments, TT_COMMENTS1, '\n', errors, tokens)
+                        self.process_token(cur_ln, cur_col, comments, TT_COMMENTS1, '\n', errors, tokens) 
                         break
                     comments += self.current_char
                     self.advance()
                     
                 if self.current_char is None:
-                    self.process_token(comments, TT_COMMENTS1, '\n', errors, tokens)
+                    self.process_token(cur_ln, cur_col, comments, TT_COMMENTS1, '\n', errors, tokens)
+                    
 
             elif self.current_char == '`':
                 backtick_count = 0
@@ -1160,7 +1176,7 @@ class Lexer:
                             self.advance()
 
                         if close_count == 3:  
-                            self.process_token(comment.strip(), TT_COMMENTS2, whitespace, errors, tokens)
+                            self.process_token(cur_ln, cur_col, comment.strip(), TT_COMMENTS2, whitespace, errors, tokens)
                             break
                         else:  
                             comment += '`' * close_count
@@ -1311,21 +1327,21 @@ class Lexer:
 
         return self.identifier_map[id_str]
 
-    def tokenize_id(self, char_str, id_delim, errors, tokens):
+    def tokenize_id(self, cur_ln, cur_col, char_str, id_delim, errors, tokens):
         result, error = self.make_identifier(char_str)
 
         if error:
             errors.extend(error)
         else:
-            self.process_token(result.lexeme, result.token, id_delim, errors, tokens)
+            self.process_token(cur_ln, cur_col, result.lexeme, result.token, id_delim, errors, tokens)
 
-    def tokenize_keyword(self, char_str, valid_delim, errors,tokens):
+    def tokenize_keyword(self, cur_ln, cur_col, char_str, valid_delim, errors,tokens):
         if self.current_char is None: 
-            self.process_token(char_str, char_str, valid_delim, errors, tokens)
+            self.process_token(cur_ln, cur_col, char_str, char_str, valid_delim, errors, tokens)
         elif self.current_char in ALPHANUM or self.current_char == '_':
-            self.tokenize_id(char_str, id_delim, errors, tokens)
+            self.tokenize_id(cur_ln, cur_col, char_str, id_delim, errors, tokens)
         else:
-            self.process_token(char_str, char_str, valid_delim, errors, tokens)
+            self.process_token(cur_ln, cur_col, char_str, char_str, valid_delim, errors, tokens)
 
     def make_string(self): 
         string = ''  

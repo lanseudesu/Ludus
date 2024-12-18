@@ -97,7 +97,6 @@ class App(ctk.CTk):
         # code editor bindings
         self.code_editor.bind("<KeyRelease>", self.handle_return)
         self.code_editor.bind("<Return>", self.handle_newline)
-        self.code_editor.bind("<BackSpace>", self.handle_newline)
         self.code_editor.bind("<MouseWheel>", self.editor_y_scrollwheel)
         self.code_editor.bind("<Button-1>", self.sync_editor_linenumbers)
         self.code_editor.bind("<Key-{>", self.handle_braces)
@@ -129,12 +128,12 @@ class App(ctk.CTk):
         # lexeme and token label and textbox
         self.lexeme_label = ctk.CTkLabel(self.lexeme_frame, text="Lexemes", font=("Consolas", 15, "bold"))
         self.lexeme_label.grid(row=0, column=0, padx=10, pady=(0,5), sticky="n")
-        self.lexeme_textbox = ctk.CTkTextbox(self.lexeme_frame, wrap="none", font=("Consolas", 15), width=200, height=300)
+        self.lexeme_textbox = ctk.CTkTextbox(self.lexeme_frame, wrap="none", font=("Consolas", 15), width=200, height=300, )
         self.lexeme_textbox.grid(row=1, column=0, padx=0, pady=0, sticky="nsew")
 
         self.token_label = ctk.CTkLabel(self.token_frame, text="Tokens", font=("Consolas", 15, "bold"))
         self.token_label.grid(row=0, column=0, padx=10, pady=(0,5), sticky="n")
-        self.token_textbox = ctk.CTkTextbox(self.token_frame, font=("Consolas", 15), width=200, height=300, activate_scrollbars=False)
+        self.token_textbox = ctk.CTkTextbox(self.token_frame, font=("Consolas", 15), width=200, height=300)
         self.token_textbox.grid(row=1, column=0, padx=0, pady=0, sticky="nsew")
 
         self.lexeme_textbox.configure(state="disabled")
@@ -200,14 +199,18 @@ class App(ctk.CTk):
         if self.file_path:
             with open(self.file_path, 'r') as file:
                 content = file.read()
-                self.lexeme_textbox.delete(0, tk.END)
-                self.token_textbox.delete(0, tk.END)
-                self.error_field.configure(state=tk.NORMAL) 
-                self.error_field.delete(1.0, tk.END)      
-                self.error_field.configure(state=tk.DISABLED)
-                self.code_editor.delete(1.0, tk.END)
-                self.code_editor.delete(1.0, tk.END)
-                self.code_editor.insert(tk.END, content)
+                self.lexeme_textbox.configure(state="normal")
+                self.token_textbox.configure(state="normal")
+
+                self.lexeme_textbox.delete("0.0", "end")
+                self.token_textbox.delete("0.0", "end")
+
+                self.error_field.configure(state="normal") 
+                self.error_field.delete("0.0", "end")      
+                self.error_field.configure(state="disabled")
+
+                self.code_editor.delete("0.0", "end")
+                self.code_editor.insert("end", content)
                 self.update_line_numbers()
                 self.highlight_syntax()
                 
@@ -355,19 +358,18 @@ class App(ctk.CTk):
     def handle_newline(self,event=None):
         if event.keysym == "Return":
             self.count_add = 2
-        elif event.keysym == "BackSpace":
-            self.count_add = 0
         
         self.update_line_numbers()
 
     def handle_return(self, event=None):
-        if event.keysym == "Return" or event.keysym == "BackSpace":
+        if event.keysym == "Return":
             return
         
         self.highlight_syntax()
     
     def highlight_syntax(self, event=None):
-        self.line_numbers.yview_moveto(self.code_editor.yview()[1])
+        self.count_add = 1
+        self.update_line_numbers()
         
         text = self.code_editor.get("1.0", "end").strip()  
         if not text:
@@ -502,9 +504,31 @@ class App(ctk.CTk):
             if newlines_count > 0:
                 for _ in range(newlines_count):  
                     self.token_textbox.insert("end", "\n") 
-              
+
+        lexeme_text = self.lexeme_textbox.get("1.0", "end-1c")  
+        token_text = self.token_textbox.get("1.0", "end-1c")  
+
+        lexeme_matches = re.finditer(r'^[^:]*:', lexeme_text, re.MULTILINE)
+        for match in lexeme_matches:
+            start_index = self.index_to_tk(match.start(), lexeme_text)
+            end_index = self.index_to_tk(match.end(), lexeme_text)
+            self.lexeme_textbox.tag_add("highlight", start_index, end_index)
+
+        token_matches = re.finditer(r'^[^:]*:', token_text, re.MULTILINE)
+        for match in token_matches:
+            start_index = self.index_to_tk(match.start(), token_text)
+            end_index = self.index_to_tk(match.end(), token_text)
+            self.token_textbox.tag_add("highlight", start_index, end_index)
+                
+        self.lexeme_textbox.tag_config("highlight", foreground="#fdca01")
+        self.token_textbox.tag_config("highlight", foreground="#fdca01")
+
         self.lexeme_textbox.configure(state="disabled")
         self.token_textbox.configure(state="disabled")
 
+    def index_to_tk(self, abs_index, text):
+        line = text.count('\n', 0, abs_index) + 1
+        column = abs_index - text.rfind('\n', 0, abs_index) - 1
+        return f"{line}.{column}"
 app = App()
 app.mainloop()
