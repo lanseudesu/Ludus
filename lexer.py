@@ -153,23 +153,16 @@ class Lexer:
     
     def invalid_delim_error(self, lexeme, valid_delims):
         error_msg = f"Invalid delimiter for ' {lexeme} '. Cause: ' {self.current_char} '"
+        valid_delims = valid_delims.replace(' ', 'space')
+
         return f"{error_msg} at line {self.pos.ln + 1}, column {self.pos.col + 1}.\nExpected delimiters are: {valid_delims}"
     
     def process_token(self, cur_ln, cur_col, lexeme, token, valid_delims, errors, tokens):
         if (self.current_char == '\n' and '\n' not in valid_delims) or (self.current_char is None and '\n' not in valid_delims):
             valid_delims = valid_delims.replace("\n", "\\n") 
             valid_delims = valid_delims.replace("\t", "\\t")  
-            # if any(char in ALPHANUM for char in valid_delims):  # Check if any character is in ALPHANUM
-            #     valid_delims = ''.join(char for char in valid_delims if char not in ALPHANUM)
-            #     valid_delims = ", ".join(valid_delims)
-            #     valid_delims += ", letters, numbers"
-            # elif any(char in ALPHA for char in valid_delims):  # Check if any character is in ALPHANUM
-            #     valid_delims = ''.join(char for char in valid_delims if char not in ALPHA)
-            #     valid_delims = ", ".join(valid_delims)
-            #     valid_delims += ", letters"
-            # else:
-            #     valid_delims = ", ".join(valid_delims)
             error_msg = f"Invalid delimiter for ' {lexeme} '. Cause: ' \\n '"
+            valid_delims = valid_delims.replace(' ', 'space')
             error_msg = f"{error_msg} at line {self.pos.ln + 1}, column {self.pos.col + 1}.\nExpected delimiters are: {valid_delims}\n"
             self.advance()
             errors.append(error_msg)
