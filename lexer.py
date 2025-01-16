@@ -151,36 +151,30 @@ class Lexer:
         self.pos.advance(self.current_char)
         self.current_char = self.text[self.pos.idx] if self.pos.idx < len(self.text) else None
     
-    def invalid_delim_error(self, lexeme, valid_delims):
-        error_msg = f"Invalid delimiter for ' {lexeme} '. Cause: ' {self.current_char} '"
+    def invalid_delim_error(self, valid_delims, error_msg):
         valid_delims = ",".join(valid_delims)
+        if valid_delims[0] == 'a' and valid_delims[104] == '0':
+            valid_delims = list(valid_delims)
+            valid_delims[0:123] = ['ALPHANUM']
+            valid_delims = ''.join(valid_delims)
+        elif valid_delims[0] == 'a':
+            valid_delims = list(valid_delims)
+            valid_delims[0:103] = ['ALPHA'] 
+            valid_delims = ''.join(valid_delims)
+        valid_delims = valid_delims.replace("\n", "\\n") 
+        valid_delims = valid_delims.replace("\t", "\\t")  
         valid_delims = valid_delims.replace(' ', 'space')
-        if 'a,b,c,d,e,f,g,h,i,j,k,l,m,n,o,p,q,r,s,t,u,v,w,x,y,z,A,B,C,D,E,F,G,H,I,J,K,L,M,N,O,P,Q,R,S,T,U,V,W,X,Y,Z,0,1,2,3,4,5,6,7,8,9,' in valid_delims:
-            valid_delims = valid_delims.replace('a,b,c,d,e,f,g,h,i,j,k,l,m,n,o,p,q,r,s,t,u,v,w,x,y,z,A,B,C,D,E,F,G,H,I,J,K,L,M,N,O,P,Q,R,S,T,U,V,W,X,Y,Z,0,1,2,3,4,5,6,7,8,9,', 'ALPHANUM')
-        elif 'a,b,c,d,e,f,g,h,i,j,k,l,m,n,o,p,q,r,s,t,u,v,w,x,y,z,A,B,C,D,E,F,G,H,I,J,K,L,M,N,O,P,Q,R,S,T,U,V,W,X,Y,Z' in valid_delims:
-            valid_delims = valid_delims.replace('a,b,c,d,e,f,g,h,i,j,k,l,m,n,o,p,q,r,s,t,u,v,w,x,y,z,A,B,C,D,E,F,G,H,I,J,K,L,M,N,O,P,Q,R,S,T,U,V,W,X,Y,Z', 'ALPHA')
         return f"{error_msg} at line {self.pos.ln + 1}, column {self.pos.col + 1}.\nExpected delimiters are: {valid_delims}"
     
     def process_token(self, cur_ln, cur_col, lexeme, token, valid_delims, errors, tokens):
         if (self.current_char == '\n' and '\n' not in valid_delims) or (self.current_char is None and '\n' not in valid_delims):
-            valid_delims = valid_delims.replace("\n", "\\n") 
-            valid_delims = valid_delims.replace("\t", "\\t")  
             error_msg = f"Invalid delimiter for ' {lexeme} '. Cause: ' \\n '"
-            valid_delims = ",".join(valid_delims)
-            valid_delims = valid_delims.replace(' ', 'space')
-
-            if 'a,b,c,d,e,f,g,h,i,j,k,l,m,n,o,p,q,r,s,t,u,v,w,x,y,z,A,B,C,D,E,F,G,H,I,J,K,L,M,N,O,P,Q,R,S,T,U,V,W,X,Y,Z,0,1,2,3,4,5,6,7,8,9,' in valid_delims:
-                valid_delims = valid_delims.replace('a,b,c,d,e,f,g,h,i,j,k,l,m,n,o,p,q,r,s,t,u,v,w,x,y,z,A,B,C,D,E,F,G,H,I,J,K,L,M,N,O,P,Q,R,S,T,U,V,W,X,Y,Z,0,1,2,3,4,5,6,7,8,9,', 'ALPHANUM')
-            elif 'a,b,c,d,e,f,g,h,i,j,k,l,m,n,o,p,q,r,s,t,u,v,w,x,y,z,A,B,C,D,E,F,G,H,I,J,K,L,M,N,O,P,Q,R,S,T,U,V,W,X,Y,Z' in valid_delims:
-                valid_delims = valid_delims.replace('a,b,c,d,e,f,g,h,i,j,k,l,m,n,o,p,q,r,s,t,u,v,w,x,y,z,A,B,C,D,E,F,G,H,I,J,K,L,M,N,O,P,Q,R,S,T,U,V,W,X,Y,Z', 'ALPHA')
+            errors.append(self.invalid_delim_error(valid_delims, error_msg))
             
-            error_msg = f"{error_msg} at line {self.pos.ln + 1}, column {self.pos.col + 1}.\nExpected delimiters are: {valid_delims}\n"
             self.advance()
-            errors.append(error_msg)
         elif self.current_char is not None and self.current_char not in valid_delims:
-            valid_delims = valid_delims.replace("\n", "\\n") 
-            valid_delims = valid_delims.replace("\t", "\\t")  
-            errors.append(self.invalid_delim_error(lexeme, valid_delims))
+            error_msg = f"Invalid delimiter for ' {lexeme} '. Cause: ' {self.current_char} '"
+            errors.append(self.invalid_delim_error(valid_delims, error_msg))
             self.advance()
         else:
             if token == TT_COMMENTS2 or token == TT_COMMENTS1:
