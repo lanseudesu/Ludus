@@ -55,7 +55,7 @@ def compute_follow_set(cfg, start_symbol, first_set):
                                 result.add(beta)
 
                         if i + 1 == len(production) or (beta in first_set and "λ" in first_set[beta]):
-                            result.update(follow_of(non_terminal)) # add follow set of lhs to symbol's fs
+                            result.update(follow_of(beta)) # add follow set of lhs to symbol's fs
         
         follow_set[symbol] = result  
         return result
@@ -94,14 +94,17 @@ def compute_predict_set(cfg, first_set, follow_set):
     return predict_set
 
 cfg = {
-    "<program>": [["<stmt_list>"]],
-    "<stmt_list>": [["<stmt>", "<stmt_list>"], ["<stmt>"]],
-    "<stmt>": [["print", "<expr>"], ["if", "<expr>", "<stmt>", "else", "<stmt>"]],
-    "<expr>": [["<term>", "<expr_prime>"]],
-    "<expr_prime>": [["+", "<term>", "<expr_prime>"], ["λ"]],
-    "<term>": [["<factor>", "<term_prime>"]],
-    "<term_prime>": [["*", "<factor>", "<term_prime>"], ["λ"]],
-    "<factor>": [["(", "<expr>", ")"], ["id"]],
+    # "<program>": [["<stmt_list>"]],
+    # "<stmt_list>": [["<stmt>", "<stmt_list>"], ["<stmt>"]],
+    # "<stmt>": [["print", "<expr>"], ["if", "<expr>", "<stmt>", "else", "<stmt>"]],
+    # "<expr>": [["<term>", "<expr_prime>"]],
+    # "<expr_prime>": [["+", "<term>", "<expr_prime>"], ["λ"]],
+    # "<term>": [["<factor>", "<term_prime>"]],
+    # "<term_prime>": [["*", "<factor>", "<term_prime>"], ["λ"]],
+    # "<factor>": [["(", "<expr>", ")"], ["id"]],
+    "<S>": [["a", "<A>", "<B>", "b"]],
+    "<A>": [["c"], ["λ"]],
+    "<B>": [["d"], ["λ"]]
 }
 
 first_set = compute_first_set(cfg)
@@ -109,7 +112,7 @@ print("First Sets:")
 for non_terminal, first in first_set.items():
     print(f"{non_terminal} -> {first}")
 
-follow_set = compute_follow_set(cfg, "<program>", first_set)
+follow_set = compute_follow_set(cfg, "<S>", first_set)
 print("\nFollow Sets:")
 for non_terminal, follow in follow_set.items():
     print(f"{non_terminal} -> {follow}")
@@ -123,3 +126,25 @@ def display_predict_sets(predict_set):
         print(f"{non_terminal} → {{ {production_str} }} :  {predict} ")
 
 display_predict_sets(predict_set)
+
+def gen_parse_table():
+    parse_table = {}
+    for (non_terminal, production), predict in predict_set.items():
+        if non_terminal not in parse_table:
+            parse_table[non_terminal] = {}
+        for terminal in predict:
+            parse_table[non_terminal][terminal] = production
+
+    return parse_table
+        
+parse_table = gen_parse_table()
+
+def display_parse_table(parse_table):
+    print()
+    for non_terminal, rules in parse_table.items():
+        print(f"Non-terminal: {non_terminal}")
+        for terminal, production in rules.items():
+            print(f"  Terminal: {terminal} -> Production: {production}")
+        print()  
+
+display_parse_table(parse_table)
