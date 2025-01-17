@@ -10,4 +10,4 @@ def say_hello_py(name):
     return f"Hello, {name}! - From Python"
 
 # Start the Eel app
-eel.start('index.html', size=(800, 600))
+eel.start('index.html', size=(1300, 800))
