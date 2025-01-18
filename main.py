@@ -1,7 +1,7 @@
 import customtkinter as ctk
 import tkinter as tk
 from tkinter import filedialog, messagebox
-import lexer
+from ludus import lexer
 import re
 
 # TODO: REFACTOR CODE 
@@ -181,7 +181,7 @@ class App(ctk.CTk):
         self.info_frame.grid_rowconfigure(3, weight=1)  # error field 
 
         # lexeme and token list
-        self.list_frame.grid_rowconfigure(0, weight=1)  # Allow the lexeme and token list frames to expand
+        self.list_frame.grid_rowconfigure(0, weight=1)  # allow the lexeme and token list frames to expand
         self.list_frame.grid_columnconfigure(0, weight=0)
 
         self.lexeme_frame.grid_rowconfigure(1, weight=1)

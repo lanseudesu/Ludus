@@ -94,14 +94,6 @@ def compute_predict_set(cfg, first_set, follow_set):
     return predict_set
 
 cfg = {
-    # "<program>": [["<stmt_list>"]],
-    # "<stmt_list>": [["<stmt>", "<stmt_list>"], ["<stmt>"]],
-    # "<stmt>": [["print", "<expr>"], ["if", "<expr>", "<stmt>", "else", "<stmt>"]],
-    # "<expr>": [["<term>", "<expr_prime>"]],
-    # "<expr_prime>": [["+", "<term>", "<expr_prime>"], ["λ"]],
-    # "<term>": [["<factor>", "<term_prime>"]],
-    # "<term_prime>": [["*", "<factor>", "<term_prime>"], ["λ"]],
-    # "<factor>": [["(", "<expr>", ")"], ["id"]],
     "<S>": [["a", "<A>", "<B>", "b"]],
     "<A>": [["c"], ["λ"]],
     "<B>": [["d"], ["λ"]]

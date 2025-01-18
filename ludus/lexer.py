@@ -151,7 +151,7 @@ class Lexer:
         self.pos.advance(self.current_char)
         self.current_char = self.text[self.pos.idx] if self.pos.idx < len(self.text) else None
     
-    def invalid_delim_error(self, valid_delims, error_msg):
+    def invalid_delim_error(self, valid_delims, error_msg): #todo: refactor
         valid_delims = ",".join(valid_delims)
         if valid_delims[0] == 'a' and valid_delims[104] == '0':
             valid_delims = list(valid_delims)

@@ -7,24 +7,44 @@
     <link rel="stylesheet" href="styles.css">
 </head>
 <body>
+    <nav class="navbar">
+        <div class="nav-left">
+            <div class="nav-logo">Ludus</div>
+            <ul class="nav-files">
+                <li><a href="#files" onclick="navigateTo('files')">Files</a></li>
+                <button class="run-button" onclick="sendTextToPython()">
+                    <span class="run-icon">▷</span> <!-- Replace with an icon -->
+                    <span class="run-text">Run</span>
+                </button>
+            </ul>
+        </div>
+        
+        <ul class="nav-links">
+            <li><a href="#contact" onclick="navigateTo('contact')">Code Gen</a></li>
+            <li><a href="#home" onclick="navigateTo('home')">Lexer</a></li>
+            <li><a href="#features" onclick="navigateTo('features')">Syntax</a></li>
+            <li><a href="#about" onclick="navigateTo('about')">Semantic</a></li>
+        </ul>
+    </nav>
     <div class="master-box">
-        <div class="code_editor">
-            <textarea id="codeInput"></textarea>
+        <div class="code-editor-wrapper">
+            <div class="line-numbers" id="lineNumbers"></div>
+            <textarea id="codeInput" class="code-editor" oninput="updateLineNumbers()" onscroll="codeEditorScroll()" onkeyup="updateLineNumbers()"></textarea>
         </div>
         <div class="lexeme_token">
             <div class="lexeme_token2">
                 <div class="lexeme_master">
-                    <h2>LEXEMES</h2>
-                    <textarea id="lexeme"></textarea>
+                    <h2>Lexemes</h2>
+                    <textarea id="lexeme" onscroll="lexemeTokenScroll('lexeme')" readonly></textarea>
                 </div>
                 <div class="token_master">
-                    <h2>TOKENS</h2>
-                    <textarea id="token"></textarea>
+                    <h2>Tokens</h2>
+                    <textarea id="token" onscroll="lexemeTokenScroll('token')" readonly></textarea>
                 </div>
             </div>
             <div class="error_box">
-                <h2>ERRORS</h2>
-                <textarea id="extraTextArea"></textarea>
+                <h2>Errors</h2>
+                <textarea id="error" readonly></textarea>
             </div>
             
         </div>

@@ -3,6 +3,7 @@
 # read the ip buffer
 # check parse table, pop start, push production from parse table (reverse order)
 # whenever ip buffer is matched to the top of the stack, pop the symbol
+# ty neso academy
 
 from cfg import parse_table
 
@@ -34,7 +35,7 @@ def parser(parse_table, start_symbol, input_buffer):
             raise SyntaxError(f"Unexpected token '{current_input}' at {pointer}")
 
     if pointer == len(input_buffer) - 1:
-        print("Input is successfully parsed!")
+        print("slmt neso academy!")
     else:
         raise SyntaxError("Input not fully consumed.")
     
