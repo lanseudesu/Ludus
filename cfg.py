@@ -108,6 +108,7 @@ cfg = {
     "try": [["z", "x", "y"]],
     "uhm": [["timothee", "chalamet"]]
     ssas
+    sjdjdj
 }
 
 first_set = compute_first_set(cfg)
