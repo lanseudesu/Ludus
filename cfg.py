@@ -107,6 +107,7 @@ cfg = {
     "<B>": [["d"], ["λ"]],
     "try": [["z", "x", "y"]],
     "uhm": [["timothee", "chalamet"]]
+    ssas
 }
 
 first_set = compute_first_set(cfg)
