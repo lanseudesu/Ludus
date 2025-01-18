@@ -13,7 +13,7 @@
             <ul class="nav-files">
                 <li><a href="#files" onclick="navigateTo('files')">Files</a></li>
                 <button class="run-button" onclick="sendTextToPython()">
-                    <span class="run-icon">▷</span> <!-- Replace with an icon -->
+                    <span class="run-icon">▷</span> 
                     <span class="run-text">Run</span>
                 </button>
             </ul>
@@ -32,7 +32,7 @@
             <textarea id="codeInput" class="code-editor" oninput="updateLineNumbers()" onscroll="codeEditorScroll()" onkeyup="updateLineNumbers()"></textarea>
         </div>
         <div class="lexeme_token">
-            <div class="lexeme_token2">
+            <div class="lexeme_token_inner">
                 <div class="lexeme_master">
                     <h2>Lexemes</h2>
                     <textarea id="lexeme" onscroll="lexemeTokenScroll('lexeme')" readonly></textarea>
@@ -50,10 +50,5 @@
         </div>
         
       </div>
-    <!-- <h1>Welcome to Eel</h1>
-    <p>Enter your name:</p>
-    <input type="text" id="nameInput" placeholder="Your name">
-    <button onclick="sayHello()">Say Hello</button>
-    <p id="response"></p> -->
 </body>
 </html>

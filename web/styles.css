@@ -1,4 +1,3 @@
-/* Navbar Styles */
 .navbar {
     display: flex;
     justify-content: space-between;
@@ -17,7 +16,7 @@
 .nav-left {
     display: flex;
     align-items: center;
-    gap: 20px; /* Space between logo and Files link */
+    gap: 20px; 
 }
 
 .nav-logo {
@@ -58,8 +57,8 @@
 .run-button {
     display: flex;
     align-items: center;
-    gap: 8px; /* Space between icon and text */
-    background-color: #5d292b; /* Button background color */
+    gap: 8px; 
+    background-color: #5d292b; 
     color: white;
     border: none;
     padding: 5px 10px;
@@ -76,11 +75,11 @@
 }
 
 .run-icon {
-    font-size: 1.2rem; /* Adjust icon size */
+    font-size: 1.2rem; 
 }
 
 .run-text {
-    font-size: 1rem; /* Adjust text size */
+    font-size: 1rem; 
 }
 
 .nav-links {
@@ -128,8 +127,8 @@ body {
     align-items: center; 
     flex-direction: row; 
     padding-top: 60px;
-    width: calc(100% - 20px); /* Subtract the horizontal margin from the width */
-    height: calc(100% - 20px - 60px);  /* Subtract the vertical margin from the height */
+    width: calc(100% - 20px); 
+    height: calc(100% - 20px - 60px);  
     gap: 10px;
     margin: 10px;
 }
@@ -148,7 +147,7 @@ body {
 }
 
 .line-numbers {
-    width: 50px; /* Adjust the width as needed */
+    width: 50px; 
     height: 100%;
     border-radius: 10px;
     background-color: #5d292b;
@@ -160,13 +159,12 @@ body {
     box-sizing: border-box;
     overflow: hidden;
     white-space: nowrap;
-    user-select: none; /* Prevent selecting line numbers */
+    user-select: none; 
     font-size: 16px;
     font-family: 'Consolas', monospace;
-    line-height: 1.5; /* Match textarea line height */
+    line-height: 1.5; 
 }
 
-/* Textarea */
 .code-editor {
     flex-grow: 1;
     padding: 5px 10px;
@@ -181,79 +179,75 @@ body {
     overflow: auto;
 }
 
-    .lexeme_token {
-        flex-grow: 1; 
-        flex-basis: 0;
-        height: 100%;
-        background-color: #864446; 
-        border-radius: 10px; 
-        padding: 15px; 
-        display: flex;
-        flex-direction: column;
-        justify-content: space-between; /* Add space between the two sections */
-        align-items: stretch;
-        box-sizing: border-box;
-        gap: 10px;
-    }
+.lexeme_token {
+    flex-grow: 1; 
+    flex-basis: 0;
+    height: 100%;
+    background-color: #864446; 
+    border-radius: 10px; 
+    padding: 15px; 
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between; 
+    align-items: stretch;
+    box-sizing: border-box;
+    gap: 10px;
+}
 
-    .lexeme_token2 {
-        display: flex;
-        flex-direction: row; /* Align inner divs horizontally */
-        justify-content: space-between; /* Add space between inner divs */
+.lexeme_token_inner {
+    display: flex;
+    flex-direction: row; 
+    justify-content: space-between; 
+    flex-grow: 2; 
+    flex-basis: 0; 
+    height: 100%; 
+    gap: 10px;
+}
 
-        flex-grow: 2; /* Ensures it expands proportionally */
-        flex-basis: 0; 
-        height: 100%; /* Ensures it stretches vertically */
-        gap: 10px;
-    }
+.lexeme_master, .token_master {
+    display: flex;
+    flex-direction: column; 
+    flex: 1; 
+    height: 100%;
+    box-sizing: border-box;
+    border-radius: 10px;
+    align-items: center; 
+}
 
-    .lexeme_master,
-    .token_master {
-        display: flex;
-        flex-direction: column; /* Align items vertically */
-        flex: 1; /* Ensure both divs share the width equally */
-        height: 100%;
-        box-sizing: border-box;
-        border-radius: 10px;
-        align-items: center; 
-    }
+textArea {
+    width: 100%;
+    height: 100%;
+    white-space: pre; /* Prevent text wrapping */
+    overflow: auto;
+    resize: none;
+    background-color: #5d292b;
+    color: #ffffff;
+    border: none;
+    border-radius: 10px;
+    padding: 10px;
+    font-family: 'Consolas', monospace;
+    font-size: 16px;
+    outline: none;
+    box-shadow: inset 0 0 5px rgba(0, 0, 0, 0.5);
+    box-sizing: border-box;
+}
 
-    textArea {
-        width: 100%;
-        height: 100%;
-        white-space: pre; /* Prevent text wrapping */
-        overflow: auto;
-        resize: none;
-        background-color: #5d292b;
-        color: #ffffff;
-        border: none;
-        border-radius: 10px;
-        padding: 10px;
-        font-family: 'Consolas', monospace;
-        font-size: 16px;
-        outline: none;
-        box-shadow: inset 0 0 5px rgba(0, 0, 0, 0.5);
-        box-sizing: border-box;
-    }
-
-    
-
-    .error_box {
-        display: flex;
-        flex-direction: column; /* Align items vertically */
-        align-items: center; 
-        flex-grow: 1; 
-        flex-basis: 0; 
-        width: 100%;
-        height: 100%;
-        resize: none;
-        box-sizing: border-box;
-    }
+.error_box {
+    display: flex;
+    flex-direction: column; 
+    align-items: center; 
+    flex-grow: 1; 
+    flex-basis: 0; 
+    width: 100%;
+    height: 100%;
+    resize: none;
+    box-sizing: border-box;
+}
     
 h2 {
     margin: 0;
     padding-bottom: 10px;
-    font-size: 1.05rem; /* Optional: Adjust font size if needed */
+    font-size: 1.05rem; 
     font-family: 'Consolas', monospace;
     color: #fdca01;
 }
@@ -263,25 +257,20 @@ h2 {
     height: 10px;
     background-color: transparent; 
 }
-
-/* Hide the scrollbar track (background area) */
 ::-webkit-scrollbar-track {
-    background: transparent; /* Makes the track invisible */
+    background: transparent; 
 }
 
-/* Show the draggable part (thumb) */
 ::-webkit-scrollbar-thumb {
-    background: #fdca01;  /* The color of the thumb */
+    background: #fdca01;  
     border-radius: 10px;
     cursor: pointer;
 }
 
-/* Optional: Style the thumb on hover */
 ::-webkit-scrollbar-thumb:hover {
-    background: #f9b600;  /* A lighter yellow when hovered */
+    background: #f9b600;  
 }
 
-/* Optional: Handle the corner if present */
 ::-webkit-scrollbar-corner {
     background: transparent;
 }

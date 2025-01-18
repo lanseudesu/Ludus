@@ -1,11 +1,5 @@
-// function sayHello() {
-//     const name = document.getElementById('nameInput').value;
-//     eel.say_hello_py(name)(response => {
-//         document.getElementById('response').innerText = response;
-//     });
-// }
 function navigateTo(section) {
-    eel.navigate_to(section)(); // Call a Python function to handle navigation
+    eel.navigate_to(section)(); 
 }
 
 function updateLineNumbers() {
@@ -35,21 +29,21 @@ function lexemeTokenScroll(sourceId) {
     const tokenArea = document.getElementById("token");
 
     if (sourceId === "lexeme") {
-        tokenArea.scrollTop = lexemeArea.scrollTop; // Sync token's scroll to lexeme's scroll
+        tokenArea.scrollTop = lexemeArea.scrollTop; 
     } else if (sourceId === "token") {
-        lexemeArea.scrollTop = tokenArea.scrollTop; // Sync lexeme's scroll to token's scroll
+        lexemeArea.scrollTop = tokenArea.scrollTop; 
     }
 }
 
 function sendTextToPython() {
-    const inputText = document.getElementById("codeInput").value; // Get text from the textarea
-    eel.process_text(inputText); // Send it to the Python function via eel
+    const inputText = document.getElementById("codeInput").value; 
+    eel.process_text(inputText); 
 }
 
 eel.expose(updateLexemeToken);
 function updateLexemeToken(lexemes, tokens) {
-    document.getElementById("lexeme").value = lexemes; // Set the value of the lexeme textarea
-    document.getElementById("token").value = tokens; // Set the value of the lexeme textarea
+    document.getElementById("lexeme").value = lexemes; 
+    document.getElementById("token").value = tokens; 
 }
 
 eel.expose(updateError);
