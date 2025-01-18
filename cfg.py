@@ -105,8 +105,27 @@ cfg = {
     "<S>": [["a", "<A>", "<B>", "b"]],
     "<A>": [["c"], ["λ"]],
     "<B>": [["d"], ["λ"]],
-    "try": [["z", "x", "y"]],
-    "uhm": [["timothee", "chalamet"]]
+
+    # khar 123-180
+    "<factor>": [["id", "<id_rhs_tail>"], ["<value>"], ["-", "<negative>"],
+                 ["<builtin_w_ret>"], ["!", "<not_tail>"], ["(", "<expr>", ")"]],
+    "<id_rhs_tail>": [["(", "<args>", ")"], [".", "<rhs_dot_tail>"], 
+                     ["[", "<index>", "]", "<rhs_bracket_tail>"], ["λ"]],
+    "<args>": [["<valid_args>", "<args_recur>"], ["λ"]],
+    "<valid_args>": [["id", "<id_rhs_tail>"], ["<value>"]],
+    "<args_recur>": [[",", "<valid_args>", "<args_recur>"], ["λ"]],
+    "<rhs_dot_tail>": [["id"], ["seek", "(", "<seek_tail>", ")"], ["drop", "(", "<index>", ")"]],
+    "<rhs_bracket_tail>": [["[", "<index>", "]"], [".", "<rhs_inner_bracket_tail>"], ["λ"]],
+    "<rhs_inner_bracket_tail>": [["drop", "(", "<index>", ")"], ["seek", "(", "<append>", ")"]],
+    "<seek_tail>": [["<append>"], ["[", "<append>", "<append_recur>", "]"]],
+    "<assign_op>": [["+", "="], ["-", "="], ["*", "="], ["/", "="], ["%", "="]],
+    "<negative>": [["(", "<expr>", ")"], ["id", "<id_rhs_tail>"], ["<builtin_w_ret>"]],
+    "<arith_op>": [["+"], ["-"], ["/"], ["%"], ["*"], ["^"]],
+    "<not_tail>": [["(", "<expr>", ")"], ["id"]],
+    "<relat_op>": [["<"], [">"], ["<", "="], [">", "="], ["=", "="], ["!", "="]],
+    "<logic_op>": [["&", "&"], ["|", "|"], ["AND"], ["OR"]],
+    "<builtin_no_ret>": [["shoot", "(", "<shoot_args>", ")"], ["shootNxt", "(", "<shoot_args>", ")"],
+                         ["wipe", "(", ")"]],
    
 }
 
