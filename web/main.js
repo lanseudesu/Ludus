@@ -7,7 +7,6 @@ function updateLineNumbers() {
     const lineNumbers = document.getElementById("lineNumbers");
     const lines = textarea.value.split("\n").length;
 
-    // Generate line numbers dynamically
     let lineNumbersHTML = "";
     for (let i = 1; i <= lines; i++) {
         lineNumbersHTML += i + "<br>";
@@ -20,7 +19,6 @@ function codeEditorScroll() {
     const textarea = document.getElementById("codeInput");
     const lineNumbers = document.getElementById("lineNumbers");
 
-    // Sync scrolling
     lineNumbers.scrollTop = textarea.scrollTop;
 }
 

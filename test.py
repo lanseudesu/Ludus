@@ -1,25 +1,18 @@
 import eel
 from ludus import lexer
 
-# Initialize the Eel app
-eel.init('web')  # The folder containing web files
+eel.init('web')  
 
-# Python function callable from JavaScript
 @eel.expose
 def navigate_to(section):
     print(f"Navigating to {section}")
-    # Logic to update the app state or load specific content
-    if section == "home":
-        # Handle home navigation
+    if section == "code-gen":
         pass
-    elif section == "features":
-        # Handle features navigation
+    elif section == "lexer":
         pass
-    elif section == "about":
-        # Handle about navigation
+    elif section == "syntax":
         pass
-    elif section == "contact":
-        # Handle contact navigation
+    elif section == "semantic":
         pass
 
 @eel.expose
@@ -29,7 +22,7 @@ def process_text(input_text):
     if error:
         eel.updateError("\n".join(error))
 
-    lexemes = [token.lexeme for token in tokens]  # Extract lexemes from tokens
+    lexemes = [token.lexeme for token in tokens]  
     tokens = [token.token for token in tokens]
     eel.updateLexemeToken("\n".join(lexemes),"\n".join(tokens))
 
