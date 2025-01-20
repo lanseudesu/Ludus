@@ -47,15 +47,15 @@ def compute_follow_set(cfg, start_symbol, first_set):
             for production in productions:
                 for i, item in enumerate(production):
                     if item == symbol:  # find occurrences of the symbol
+                        beta = production[i + 1]
                         if i + 1 < len(production):  
-                            beta = production[i + 1]
+                            
                             if beta in first_set:  # beta is non-terminal
                                 result.update(first_set[beta] - {"λ"})
                             else:  # beta is terminal
                                 result.add(beta)
-
                         if i + 1 == len(production) or (beta in first_set and "λ" in first_set[beta]):
-                            result.update(follow_of(beta)) # add follow set of lhs to symbol's fs
+                            result.update(follow_of(non_terminal)) # add follow set of lhs to symbol's fs
         
         follow_set[symbol] = result  
         return result
@@ -115,7 +115,7 @@ def display_predict_sets(predict_set):
     print("\nPredict Sets:")
     for (non_terminal, production), predict in predict_set.items():
         production_str = ", ".join(production)
-        print(f"{non_terminal} → {{ {production_str} }} :  {predict} ")
+        print(f"{non_terminal} -> {{ {production_str} }} :  {predict} ")
 
 display_predict_sets(predict_set)
 

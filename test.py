@@ -21,6 +21,8 @@ def process_text(input_text):
 
     if error:
         eel.updateError("\n".join(error))
+    else:
+        eel.clearError()
 
     lexemes = [token.lexeme for token in tokens]  
     tokens = [token.token for token in tokens]

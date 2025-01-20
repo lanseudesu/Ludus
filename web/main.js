@@ -48,3 +48,8 @@ eel.expose(updateError);
 function updateError(errors) {
     document.getElementById("error").value = errors; 
 }
+
+eel.expose(clearError);
+function clearError() {
+    document.getElementById("error").value = ""; 
+}

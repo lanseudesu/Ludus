@@ -178,6 +178,8 @@ class Lexer:
             self.advance()
         else:
             if token == TT_COMMENTS2 or token == TT_COMMENTS1:
+                print("asd")
+                self.advance()
                 pass
             else:
                 tokens.append(Token(f'{cur_ln}.{cur_col}: {lexeme}', f'{cur_ln}.{cur_col}: {token}',)) 
@@ -474,11 +476,7 @@ class Lexer:
                                 if self.current_char == 'e':
                                     char_str += 'e' 
                                     self.advance()
-                                    if self.current_char in ALPHANUM or self.current_char == '_':
-                                        self.tokenize_id(cur_ln, cur_col, char_str, id_delim, errors, tokens)
-                                    else:
-                                        self.process_token(cur_ln, cur_col, TT_FLAG, TT_FLAG, flag_delim, errors, tokens)
-                                        
+                                    self.tokenize_keyword(cur_ln, cur_col, char_str, flag_delim, errors, tokens)
                                 else: 
                                     self.tokenize_id(cur_ln, cur_col, char_str, id_delim, errors, tokens)
                             else: 
@@ -736,6 +734,8 @@ class Lexer:
                                             self.tokenize_id(cur_ln, cur_col, char_str, id_delim, errors, tokens)
                                     else:
                                         self.tokenize_id(cur_ln, cur_col, char_str, id_delim, errors, tokens)
+                                elif self.current_char is None:
+                                    self.tokenize_keyword(cur_ln, cur_col, char_str, '(', errors, tokens)
                                 elif self.current_char in ALPHANUM or self.current_char == '_':
                                     self.tokenize_id(cur_ln, cur_col, char_str, id_delim, errors, tokens)
                                 else:
@@ -881,6 +881,8 @@ class Lexer:
                                                 self.tokenize_id(cur_ln, cur_col, char_str, id_delim, errors, tokens)
                                         else:
                                             self.tokenize_id(cur_ln, cur_col, char_str, id_delim, errors, tokens)
+                                    elif self.current_char is None:
+                                        self.tokenize_keyword(cur_ln, cur_col, char_str, '(', errors, tokens)
                                     elif self.current_char in ALPHANUM or self.current_char == '_':
                                         self.tokenize_id(cur_ln, cur_col, char_str, id_delim, errors, tokens)
                                     else:
@@ -952,10 +954,7 @@ class Lexer:
                             if self.current_char == 'e':
                                 char_str += 'e' 
                                 self.advance()
-                                if self.current_char in ALPHANUM or self.current_char == '_':
-                                    self.tokenize_id(cur_ln, cur_col, char_str, id_delim, errors, tokens)
-                                else:
-                                    self.process_token(cur_ln, cur_col, TT_FLAG, TT_FLAG, flag_delim, errors, tokens)
+                                self.tokenize_keyword(cur_ln, cur_col, char_str, flag_delim, errors, tokens)
                             else: 
                                 self.tokenize_id(cur_ln, cur_col, char_str, id_delim, errors, tokens)
                         else: 
@@ -1159,28 +1158,26 @@ class Lexer:
 
                 if backtick_count != 3:  
                     errors.append(f"Incomplete comment delimiter at line {self.pos.ln + 1}, column {self.pos.col - backtick_count}")
-                    return
-
-                comment = ""
-                while True:
-                    if self.current_char is None: 
-                        errors.append(f"Unclosed multi-line comment starting at line {self.pos.ln + 1}")
-                        break
-
-                    if self.current_char == '`':  
-                        close_count = 0
-                        while self.current_char == '`' and close_count < 3:
-                            close_count += 1
-                            self.advance()
-
-                        if close_count == 3:  
-                            self.process_token(cur_ln, cur_col, comment.strip(), TT_COMMENTS2, whitespace, errors, tokens)
+                else:
+                    comment = ""
+                    while True:
+                        if self.current_char is None: 
+                            errors.append(f"Unclosed multi-line comment starting at line {self.pos.ln + 1}")
                             break
-                        else:  
-                            comment += '`' * close_count
-                    else:
-                        comment += self.current_char
-                        self.advance()
+
+                        if self.current_char == '`':  
+                            close_count = 0
+                            while self.current_char == '`' and close_count < 3:
+                                close_count += 1
+                                self.advance()
+
+                            if close_count == 3:  
+                                break
+                            else:  
+                                comment += '`' * close_count
+                        else:
+                            comment += self.current_char
+                            self.advance()
             else:
                 errors.append(f"Unknown character ' {self.current_char} ' at line {self.pos.ln + 1}, column {self.pos.col + 1}")
                 self.advance()
