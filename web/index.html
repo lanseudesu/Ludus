@@ -1,54 +1,63 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-    <title>Ludus</title>
-    <script type="text/javascript" src="/eel.js"></script>
-    <script src="main.js"></script>
-    <link rel="stylesheet" href="styles.css">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Ludus</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.5/codemirror.min.js"></script>
+  <link rel="stylesheet" href="codemirror.css">
+  <link rel="stylesheet" href="styles.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.5/addon/mode/simple.min.js"></script>
+  <script src="ludus.js"></script>
+  <script type="text/javascript" src="/eel.js"></script>
+  <script src="main.js"></script>
 </head>
 <body>
-    <nav class="navbar">
-        <div class="nav-left">
-            <div class="nav-logo">Ludus</div>
-            <ul class="nav-files">
-                <li><a href="#files" onclick="navigateTo('files')">Files</a></li>
-                <button class="run-button" onclick="sendTextToPython()">
-                    <span class="run-icon">▷</span> 
-                    <span class="run-text">Run</span>
-                </button>
-            </ul>
-        </div>
-        
-        <ul class="nav-links">
-            <li><a href="#code-gen" onclick="navigateTo('code-gen')">Code Gen</a></li>
-            <li><a href="#lexer" onclick="navigateTo('lexer')">Lexer</a></li>
-            <li><a href="#syntax" onclick="navigateTo('syntax')">Syntax</a></li>
-            <li><a href="#semantic" onclick="navigateTo('semantic')">Semantic</a></li>
+  <nav class="navbar">
+    <div class="nav-left">
+        <div class="nav-logo">Ludus</div>
+        <ul class="nav-files">
+            <li><a href="#files" onclick="navigateTo('files')">Files</a></li>
+            <button class="run-button" onclick="sendTextToPython()">
+                <span class="run-icon">▷</span> 
+                <span class="run-text">Run</span>
+            </button>
         </ul>
-    </nav>
-    <div class="master-box">
-        <div class="code-editor-wrapper">
-            <div class="line-numbers" id="lineNumbers"></div>
-            <textarea id="codeInput" class="code-editor" oninput="updateLineNumbers()" onscroll="codeEditorScroll()" onkeyup="updateLineNumbers()"></textarea>
+    </div>
+    
+    <ul class="nav-links">
+        <li><a href="#code-gen" onclick="navigateTo('code-gen')">Code Gen</a></li>
+        <li><a href="#lexer" onclick="navigateTo('lexer')">Lexer</a></li>
+        <li><a href="#syntax" onclick="navigateTo('syntax')">Syntax</a></li>
+        <li><a href="#semantic" onclick="navigateTo('semantic')">Semantic</a></li>
+    </ul>
+  </nav>
+  <div class="master_box">
+    <div class="code-editor-wrapper">
+        <div class="line-numbers" id="lineNumbers"></div>
+        <textarea id="editor" class="code-editor"></textarea>
+    </div>
+    <div class="lexeme_token">
+      <div class="lexeme_token_inner">
+        <div class="lexeme_master">
+              <h2>Lexemes</h2>
+              <div id="lexeme" class="lexeme" onscroll="lexemeTokenScroll('lexeme')" contenteditable="false"></div>
         </div>
-        <div class="lexeme_token">
-            <div class="lexeme_token_inner">
-                <div class="lexeme_master">
-                    <h2>Lexemes</h2>
-                    <textarea id="lexeme" onscroll="lexemeTokenScroll('lexeme')" readonly></textarea>
-                </div>
-                <div class="token_master">
-                    <h2>Tokens</h2>
-                    <textarea id="token" onscroll="lexemeTokenScroll('token')" readonly></textarea>
-                </div>
-            </div>
-            <div class="error_box">
-                <h2>Errors</h2>
-                <textarea id="error" readonly></textarea>
-            </div>
-            
-        </div>
-        
+        <div class="token_master">
+              <h2>Tokens</h2>
+              <div id="token" class="token" onscroll="lexemeTokenScroll('token')" contenteditable="false"></div>
+          </div>
       </div>
+      <div class="error_box">
+          <h2>Errors</h2>
+          <textarea id="error" readonly></textarea>
+      </div>
+      
+  </div>
+
+  </div>
+  
+  
+  
 </body>
 </html>

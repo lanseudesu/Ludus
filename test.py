@@ -13,14 +13,14 @@ def navigate_to(section):
     elif section == "syntax":
         pass
     elif section == "semantic":
-        pass
+        pass 
 
 @eel.expose
 def process_text(input_text):
     tokens, error = lexer.run("yo", input_text)
 
     if error:
-        eel.updateError("\n".join(error))
+        eel.updateError("\n\n".join(error))
     else:
         eel.clearError()
 
@@ -28,5 +28,4 @@ def process_text(input_text):
     tokens = [token.token for token in tokens]
     eel.updateLexemeToken("\n".join(lexemes),"\n".join(tokens))
 
-# Start the Eel app
 eel.start('index.html', size=(1920,1080))

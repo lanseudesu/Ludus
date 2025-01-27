@@ -1,30 +1,48 @@
-function navigateTo(section) {
-    eel.navigate_to(section)(); 
-}
+let editor;
 
-function updateLineNumbers() {
-    const textarea = document.getElementById("codeInput");
-    const lineNumbers = document.getElementById("lineNumbers");
-    const lines = textarea.value.split("\n").length;
+document.addEventListener("DOMContentLoaded", () => {
+    editor = CodeMirror.fromTextArea(document.getElementById("editor"), {
+        lineNumbers: false, 
+        mode: "ludus",
+        theme: "default",
+    });
 
-    let lineNumbersHTML = "";
-    for (let i = 1; i <= lines; i++) {
-        lineNumbersHTML += i + "<br>";
+    function updateLineNumbers() {
+        const lineNumbersElement = document.getElementById("lineNumbers");
+        const totalLines = editor.lineCount();
+        let lineNumbersHTML = '';
+
+        for (let i = 1; i <= totalLines; i++) {
+            lineNumbersHTML += i + '<br>';
+        }
+
+        if (lineNumbersElement) lineNumbersElement.innerHTML = lineNumbersHTML;
     }
 
-    lineNumbers.innerHTML = lineNumbersHTML;
-}
+    function syncLineNumbersScroll() {
+        const lineNumbersElement = document.getElementById("lineNumbers");
+        const scrollInfo = editor.getScrollInfo();
+        lineNumbersElement.scrollTop = scrollInfo.top;
+    }
 
-function codeEditorScroll() {
-    const textarea = document.getElementById("codeInput");
-    const lineNumbers = document.getElementById("lineNumbers");
+    editor.on("scroll", () => {
+        updateLineNumbers();
+        syncLineNumbersScroll();
+    });
+    editor.on("change", updateLineNumbers);
 
-    lineNumbers.scrollTop = textarea.scrollTop;
+    updateLineNumbers();
+});
+
+function navigateTo(section) {
+    eel.navigate_to(section)(); 
 }
 
 function lexemeTokenScroll(sourceId) {
     const lexemeArea = document.getElementById("lexeme");
     const tokenArea = document.getElementById("token");
+
+    if (!lexemeArea || !tokenArea) return; 
 
     if (sourceId === "lexeme") {
         tokenArea.scrollTop = lexemeArea.scrollTop; 
@@ -34,22 +52,35 @@ function lexemeTokenScroll(sourceId) {
 }
 
 function sendTextToPython() {
-    const inputText = document.getElementById("codeInput").value; 
+    const inputText = editor.getValue(); 
     eel.process_text(inputText); 
 }
 
 eel.expose(updateLexemeToken);
 function updateLexemeToken(lexemes, tokens) {
-    document.getElementById("lexeme").value = lexemes; 
-    document.getElementById("token").value = tokens; 
+    const lexemeArea = document.getElementById("lexeme");
+    const tokenArea = document.getElementById("token");
+
+    const lexemeWithColors = lexemes.replace(/(\d+(\.\d+)?)(?=:)/g, function(match) {
+        return `<span class="number">${match}</span>`;  
+    });
+
+    const tokenWithColors = tokens.replace(/(\d+(\.\d+)?)(?=:)/g, function(match) {
+        return `<span class="number">${match}</span>`;  
+    });
+
+    if (lexemeArea) lexemeArea.innerHTML = lexemeWithColors;  
+    if (tokenArea) tokenArea.innerHTML = tokenWithColors;  
 }
 
 eel.expose(updateError);
 function updateError(errors) {
-    document.getElementById("error").value = errors; 
+    const errorArea = document.getElementById("error");
+    if (errorArea) errorArea.value = errors; 
 }
 
 eel.expose(clearError);
 function clearError() {
-    document.getElementById("error").value = ""; 
+    const errorArea = document.getElementById("error");
+    if (errorArea) errorArea.value = ""; 
 }

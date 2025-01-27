@@ -18,16 +18,16 @@ whitespace = '# \n'
 id_delim       = whitespace + arith_op + relat_op + ',.:[]{}()'
 numlit_delim   = arith_op + relat_op + whitespace + ',){}:]'
 commslit_delim = whitespace + ',:={])+!'
-flag_delim     = whitespace + relat_op + arith_op + ',:])'
+flag_delim     = whitespace + relat_op + arith_op + ',:]){'
 
 lparen_delim   = ALPHANUM + '_ .()"-!['
-rparen_delim   = whitespace + arith_op + relat_op + '{})],.'
-lcurly_delim   = ALPHANUM + whitespace + '_{(-!'
-rcurly_delim   = whitespace 
 lbracket_delim = ALPHANUM + '_ .]-("'
-rbracket_delim = whitespace + arith_op + relat_op + ',.[:)}'
-comma_delim    = ALPHANUM + whitespace + '_["-('
+lcurly_delim   = ALPHANUM + whitespace + '_{(-!'
+comma_delim    = ALPHANUM + whitespace + '_.["-(!'
 period_delim   = ALPHA + '_'  
+rparen_delim   = whitespace + arith_op + relat_op + '{})],.'
+rcurly_delim   = whitespace 
+rbracket_delim = whitespace + arith_op + relat_op + ',.[:)}'
 
 nl_delim       = ALPHA + whitespace + '_{}`\t'
 space_delim    = ALPHANUM + whitespace + arith_op + relat_op + '_,.&|!:()[]{}"`'
@@ -74,7 +74,7 @@ TT_GTE        = '>='
 # logical operators:
 TT_AND        = 'AND'
 TT_OR         = 'OR'
-TT_NOT        = 'NOT'
+TT_NOT        = '!'
 
 # assignment operators:
 TT_COLON      = ':'
@@ -178,11 +178,20 @@ class Lexer:
             self.advance()
         else:
             if token == TT_COMMENTS2 or token == TT_COMMENTS1:
-                print("asd")
                 self.advance()
                 pass
             else:
-                tokens.append(Token(f'{cur_ln}.{cur_col}: {lexeme}', f'{cur_ln}.{cur_col}: {token}',)) 
+                if token == TT_COMMS:
+                    newline_count = lexeme.count('\n') 
+                    if newline_count > 0:
+                        token += '\n' * newline_count
+                        tokens.append(Token(f'{cur_ln}.{cur_col}: {lexeme}', f'{cur_ln}.{cur_col}: {token}',)) 
+                    else:
+                       tokens.append(Token(f'{cur_ln}.{cur_col}: {lexeme}', f'{cur_ln}.{cur_col}: {token}',))  
+                else:
+                    tokens.append(Token(f'{cur_ln}.{cur_col}: {lexeme}', f'{cur_ln}.{cur_col}: {token}',)) 
+
+                #tokens.append(Token(f'{cur_ln}.{cur_col}: {lexeme}', f'{cur_ln}.{cur_col}: {token}',)) -- use if not using webbased gui
 
     def make_tokens(self):
         tokens = []
@@ -1117,8 +1126,8 @@ class Lexer:
             elif self.current_char in '=&|':
                 token_map = {
                     '=': [(TT_EE, delim7)],
-                    '&': [(TT_AND, ' ')],
-                    '|': [(TT_OR, ' ')],
+                    '&': [('&&', ' ')],
+                    '|': [('||', ' ')],
                 }
                 char = self.current_char
                 self.advance()
