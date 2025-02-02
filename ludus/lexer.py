@@ -1048,7 +1048,9 @@ class Lexer:
                     if lhs is not None and lhs in valid_lhs:
                         self.process_token(cur_ln, cur_col, '-', TT_MINUS, delim4, errors, tokens)
                     else:
-                        if self.current_char in NUM or self.current_char == '.':
+                        if self.current_char is None:
+                            self.process_token(cur_ln, cur_col, '-', TT_NEG, delim4, errors, tokens)
+                        elif self.current_char in NUM or self.current_char == '.':
                             result, error = self.make_number('-')
 
                             if error:

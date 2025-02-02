@@ -23,6 +23,7 @@ def parser(parse_table, start_symbol, input_buffer):
             print(f"Matched: {top}")
             pointer += 1
         elif top in parse_table:
+            print(parse_table[top])
             if current_input in parse_table[top]:
                 production = parse_table[top][current_input]
                 print(f"Expand: {top} → {' '.join(production)}")
@@ -30,16 +31,16 @@ def parser(parse_table, start_symbol, input_buffer):
                     stack.extend(reversed(production))
                 print(stack)
             else:
-                raise SyntaxError(f"Unexpected token '{current_input}' at {pointer}")
+                raise SyntaxError(f"Unexpected token 1 '{current_input}' at {pointer}")
         else:
-            raise SyntaxError(f"Unexpected token '{current_input}' at {pointer}")
+            raise SyntaxError(f"Unexpected token 2 '{current_input}' at {pointer}")
 
     if pointer == len(input_buffer) - 1:
         print("slmt neso academy!")
     else:
         raise SyntaxError("Input not fully consumed.")
     
-input_buffer = ["a", "d", "b"]
-parser(parse_table, "<S>", input_buffer)
+input_buffer = ["play", "(", ")","{","shoot","(",")","}","gameOver"]
+parser(parse_table, "<program>", input_buffer)
 
 
