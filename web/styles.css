@@ -132,11 +132,36 @@ body {
     margin: 10px; 
 }
 
+.master_box2 {
+    display: flex;
+    justify-content: center; 
+    align-items: center; 
+    flex-direction: column; 
+    padding-top: 60px;
+    width: calc(100% - 20px); 
+    height: calc(100% - 20px - 60px);  
+    gap: 10px;
+    margin: 10px; 
+}
+
 .code-editor-wrapper {
     flex-grow: 2; 
     flex-basis: 0;
     height: 100%;
     width: 70%; 
+    background-color: #864446; 
+    border-radius: 10px; 
+    padding: 15px; 
+    display: flex;
+    justify-content: center; 
+    align-items: center; 
+    box-sizing: border-box; 
+    overflow: hidden;
+}
+
+.code-editor-wrapper2 {
+    height: 100%;
+    width: 100%; 
     background-color: #864446; 
     border-radius: 10px; 
     padding: 15px; 
@@ -245,7 +270,36 @@ body {
     box-sizing: border-box;
 }
 
+.error_box2 {
+    display: flex;
+    flex-direction: column; 
+    align-items: center; 
+    width: 100%;
+    height: 40%;
+    padding: 15px;
+    resize: none;
+    box-sizing: border-box;
+    border-radius: 10px;
+    background-color: #864446; 
+}
+
 #error {
+    width: 100%;
+    height: 100%;
+    resize: none;
+    background-color: #5d292b;
+    color: #ffffff;
+    border: none;
+    border-radius: 10px;
+    padding: 10px;
+    font-family: 'Consolas', monospace;
+    font-size: 16px;
+    outline: none;
+    box-shadow: inset 0 0 5px rgba(0, 0, 0, 0.5);
+    box-sizing: border-box;
+}
+
+#error2 {
     width: 100%;
     height: 100%;
     resize: none;

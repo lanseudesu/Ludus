@@ -126,9 +126,11 @@ class Position:
 
 
 class Token:
-    def __init__(self, lexeme, token):
+    def __init__(self, lexeme, token, line, column):
         self.lexeme = lexeme
         self.token = token
+        self.line = line
+        self.column = column
     
     def __repr__(self):
         return f'{self.lexeme}:{self.token}'
@@ -185,13 +187,13 @@ class Lexer:
                     newline_count = lexeme.count('\n') 
                     if newline_count > 0:
                         token += '\n' * newline_count
-                        tokens.append(Token(f'{cur_ln}.{cur_col}: {lexeme}', f'{cur_ln}.{cur_col}: {token}',)) 
+                        tokens.append(Token(lexeme, token, cur_ln, cur_col)) 
                     else:
-                       tokens.append(Token(f'{cur_ln}.{cur_col}: {lexeme}', f'{cur_ln}.{cur_col}: {token}',))  
+                       tokens.append(Token(lexeme, token, cur_ln, cur_col))  
                 else:
-                    tokens.append(Token(f'{cur_ln}.{cur_col}: {lexeme}', f'{cur_ln}.{cur_col}: {token}',)) 
+                    tokens.append(Token(lexeme, token, cur_ln, cur_col)) 
 
-                #tokens.append(Token(f'{cur_ln}.{cur_col}: {lexeme}', f'{cur_ln}.{cur_col}: {token}',)) -- use if not using webbased gui
+                #tokens.append(Token(lexeme, token, pos_start=self.pos))  -- use if not using webbased gui
 
     def make_tokens(self):
         tokens = []
@@ -1127,7 +1129,7 @@ class Lexer:
                     self.process_token(cur_ln, cur_col, '.', TT_PERIOD, period_delim, errors, tokens)  
             elif self.current_char in '=&|':
                 token_map = {
-                    '=': [(TT_EE, delim7)],
+                    '=': [(TT_EE, delim3)],
                     '&': [('&&', ' ')],
                     '|': [('||', ' ')],
                 }
@@ -1203,6 +1205,8 @@ class Lexer:
         errors = []
         zero_int = False
         reserved_dec = ''
+        cur_ln = self.pos.ln + 1
+        cur_col = self.pos.col + 1
 
         def add_error(message):
             errors.append(f"{message} at line {self.pos.ln + 1}, column {self.pos.col - len(num_str) + 1}")
@@ -1299,15 +1303,17 @@ class Lexer:
             token_type = TT_XP if dot_count > 0 else TT_HP
         else:
             num_str = '-' + num_str
-            if num_str == '-0':
-                return Token('0', TT_HP), errors
+            if num_str == '-0' or num_str == '-0.0':
+                return Token('0', TT_HP, cur_ln, cur_col), errors
             token_type = TT_NXP if dot_count > 0 else TT_NHP
             
-        return Token(num_str, token_type), errors
+        return Token(num_str, token_type, cur_ln, cur_col), errors
 
     def make_identifier(self, id_str): # todo
         id_len = len(id_str)
         errors = []
+        cur_ln = self.pos.ln + 1
+        cur_col = self.pos.col + 1
 
         def add_error(message):
             errors.append(f"{message} at line {self.pos.ln + 1}, column {self.pos.col - len(id_str) + 1}")
@@ -1324,7 +1330,7 @@ class Lexer:
                 add_error(f"Maximum number characters reached in '{id_str}'")
                 return [], errors
             
-        return Token(id_str, self.identifiers(id_str)), errors
+        return Token(id_str, self.identifiers(id_str), cur_ln, cur_col), errors
 
     def identifiers(self, id_str):
         if id_str not in self.identifier_map:
@@ -1350,6 +1356,8 @@ class Lexer:
             self.process_token(cur_ln, cur_col, char_str, char_str, valid_delim, errors, tokens)
 
     def make_string(self): 
+        cur_ln = self.pos.ln + 1
+        cur_col = self.pos.col + 1
         string = ''  
         escape_character = False  
         errors = []
@@ -1379,7 +1387,7 @@ class Lexer:
                     escape_character = True
                 elif self.current_char == '"':  
                     self.advance() 
-                    return Token('"' + string + '"', TT_COMMS), errors  
+                    return Token('"' + string + '"', TT_COMMS, cur_ln, cur_col), errors  
                 elif self.current_char == '\n':
                     errors.append(f'Unclosed string literal "{string} at line {self.pos.ln + 1}, column {self.pos.col - len(string)}')
                     return [], errors

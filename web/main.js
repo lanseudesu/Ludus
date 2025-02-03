@@ -1,11 +1,18 @@
 let editor;
 
 document.addEventListener("DOMContentLoaded", () => {
+    const savedText = localStorage.getItem("editorText");  // Retrieve saved text
+
     editor = CodeMirror.fromTextArea(document.getElementById("editor"), {
         lineNumbers: false, 
         mode: "ludus",
         theme: "default",
     });
+
+    // Restore saved text if available
+    if (savedText) {
+        editor.setValue(savedText);
+    }
 
     function updateLineNumbers() {
         const lineNumbersElement = document.getElementById("lineNumbers");
@@ -25,17 +32,21 @@ document.addEventListener("DOMContentLoaded", () => {
         lineNumbersElement.scrollTop = scrollInfo.top;
     }
 
-    editor.on("scroll", () => {
+    // Save editor content automatically when the user types
+    editor.on("change", () => {
+        localStorage.setItem("editorText", editor.getValue());
         updateLineNumbers();
-        syncLineNumbersScroll();
     });
-    editor.on("change", updateLineNumbers);
+
+    editor.on("scroll", syncLineNumbersScroll);
 
     updateLineNumbers();
 });
 
-function navigateTo(section) {
-    eel.navigate_to(section)(); 
+function preserveText() {
+    if (editor) {
+        localStorage.setItem("editorText", editor.getValue());
+    }
 }
 
 function lexemeTokenScroll(sourceId) {
@@ -51,9 +62,14 @@ function lexemeTokenScroll(sourceId) {
     }
 }
 
-function sendTextToPython() {
+function lexicalAnalyzer() {
     const inputText = editor.getValue(); 
-    eel.process_text(inputText); 
+    eel.lexical_analyzer(inputText); 
+}
+
+function syntaxAnalyzer() {
+    const inputText = editor.getValue(); 
+    eel.syntax_analyzer(inputText); 
 }
 
 eel.expose(updateLexemeToken);
