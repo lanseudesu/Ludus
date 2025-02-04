@@ -95,6 +95,12 @@ function updateError(errors) {
     if (errorArea) errorArea.value = errors; 
 }
 
+eel.expose(updateTerminal);
+function updateTerminal(result) {
+    const errorArea = document.getElementById("error2");
+    if (errorArea) errorArea.value = result; 
+}
+
 eel.expose(clearError);
 function clearError() {
     const errorArea = document.getElementById("error");

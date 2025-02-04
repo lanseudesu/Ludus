@@ -39,9 +39,9 @@ cfg = {
                       ["nxp_ltr"]],
     "<elems_recur>": [[",", "<value>", "<elems_recur>"],
                       ["λ"]],
-    "<row_recur>": [[",", "[", "value", ",", "<elems_recur>"],
+    "<row_recur>": [[",", "[", "<value>", "<elems_recur>", "]", "<row_recur>"],
                     ["λ"]], 
-    "<row_recur2>": [[",", "[", "value", ",", "value", ",", "<elems_recur>", "]", "<row_recur2>"],
+    "<row_recur2>": [[",", "[", "<value>", ",", "<value>", ",", "<elems_recur>", "]", "<row_recur2>"],
                      ["λ"]],
     "<func_dec>": [["generate", "id", "(", "<params>", ")", "<func_dec>"],
                    ["<struct_dec>"]],
@@ -79,16 +79,21 @@ cfg = {
     "<dot_tail>": [["id", "<col_or_ass>"], 
                    ["drop", "(", "<index>", ")"], 
                    ["join", "(", "<join_tail>", ")"]], 
-    "<bracket_tail>": [["<col_or_ass>"], 
-                       ["[", "<index>", "]", "<col_or_ass>"], 
+    "<bracket_tail>": [[":", "<expr>", "<elems_recur>"],
+                       [",", "id", "<id_tail>", "<id_tail_recur>", ":", "<expr>"], 
+                       ["<assign_op>", "<expr>"],
+                       ["[", "<index>", "]", "<arr2d_rhs>"], 
                        [".", "<inner_bracket_tail>"]], 
     "<inner_bracket_tail>": [["drop", "(", "<index>", ")"], 
                              ["join", "(", "<append>", "<append_recur>", ")"]],
     "<index>": [["hp_ltr", "<arith_tail>"], 
                 ["id", "<id_tail>", "<arith_tail>"], 
                 ["λ"]], 
-      
-    
+    "<arr2d_rhs>": [[":", "<arr2d_rhs_tail>"],
+                    [",", "id", "<id_tail>", "<id_tail_recur>", ":", "<expr>"], 
+                    ["<assign_op>", "<expr>"]],
+    "<arr2d_rhs_tail>": [["[", "<value>", "<elems_recur>", "]", "<row_recur>"], 
+                         ["<expr>"]], 
     "<join_tail>": [["<append>", "<append_recur>"], 
                     ["[", "<append>", "<append_recur>", "]"]], 
     "<append>": [["<value>"], 
@@ -96,11 +101,9 @@ cfg = {
                  ["(", "<factor>", "<arith_tail>", ")"]],
     "<append_recur>": [[",", "<append>", "<append_recur>"], 
                        ["λ"]], 
-    "<col_or_ass>": [[":", "<col_tail>"], 
+    "<col_or_ass>": [[":", "<expr>", "<expr_recur>"], 
                      [",", "id", "<id_tail>", "<id_tail_recur>", ":", "<expr>"], 
                      ["<assign_op>", "<expr>"]],
-    "<col_tail>": [["<expr>", "<expr_recur>"], 
-                   ["[", "<value>", ",", "<elems_recur>", "]", "<row_recur>"]], 
     "<id_tail>": [[".", "id"], 
                   ["[", "<index>", "]", "<id_tail_arr>"], 
                   ["λ"]], 
@@ -108,10 +111,8 @@ cfg = {
                       ["λ"]],
     "<id_tail_recur>": [[",", "id", "<id_tail>", "<id_tail_recur>"], 
                         ["λ"]], 
-    "<expr_recur>": [[",", "<expr_recur_tail>"], 
+    "<expr_recur>": [[",", "id", "<id_tail>", ":", "<expr>", "<expr_recur>"], 
                      ["λ"]], 
-    "<expr_recur_tail>": [["id", "<id_tail>", ":", "<expr>", "<expr_recur>"], 
-                          ["<value>", "<elems_recur>"]], 
     "<expr>": [["<relat_expr>", "<expr_tail>"]],
     "<expr_tail>": [["<logic_op>", "<expr>"], 
                     ["λ"]],
@@ -134,7 +135,7 @@ cfg = {
     "<rhs_bracket_tail>": [["[", "<index>", "]"], [".", "<rhs_inner_bracket_tail>"], ["λ"]],
     "<rhs_inner_bracket_tail>": [["drop", "(", "<index>", ")"], ["seek", "(", "<append>", ")"]],
     "<seek_tail>": [["<append>"], ["[", "<append>", "<append_recur>", "]"]],
-    "<assign_op>": [["+", "="], ["-", "="], ["*", "="], ["/", "="], ["%", "="]],
+    "<assign_op>": [["+="], ["-="], ["*="], ["/="], ["%="]],
     "<negative>": [["(", "<expr>", ")"], ["id", "<id_rhs_tail>"], ["<builtin_w_ret>"]],
     "<arith_op>": [["+"], ["-"], ["/"], ["%"], ["*"], ["^"]],
     "<not_tail>": [["(", "<expr>", ")"], ["id"]],
@@ -174,11 +175,11 @@ cfg = {
     "<struct_fields_recur>": [[":", "<value>", "<def_recur>"], 
                               ["λ"]],
     "<struct_inst>": [["access", "id", "id", "<inst_dec>"]],
-    "<inst_dec>": [[":", "value", "<instval_recur>"], 
+    "<inst_dec>": [[":", "<value>", "<instval_recur>"], 
                    ["λ"]],
-    "<instval_recur>": [[",", "value", "<instval_recur>"], 
+    "<instval_recur>": [[",", "<value>", "<instval_recur>"], 
                         ["λ"]],
-    "<conditional>": [["<if_stmt>", "<flank_stmt>"]],
+    "<conditional>": [["<if_stmt>"],["<flank_stmt>"]],
     "<if_stmt>": [["if", "<expr>", "{", "<body>", "}", "<else_elif>"]],
     "<else_elif>": [["<else_stmt>"], ["<elif_stmt>"], 
                     ["λ"]],
@@ -197,7 +198,7 @@ cfg = {
     "<for_loop>": [["for", "id", ":", "<arith_expr>", ",", "<expr>", ",", "id", "<update>", "{", "<loop_body>", "}"]],
     "<update>": [["<assign_op>", "<arith_expr>"], [":", "<arith_expr>"]],
     "<while_loop>": [["while", "<expr>", "{", "<loop_body>", "}"]],
-    "<do_while_loop>": [["do", "{", "<loop_body>", "}", "while", "<logical_expr>"]],
+    "<do_while_loop>": [["grind", "{", "<loop_body>", "}", "while", "<expr>"]],
     "<loop_body>": [["<loop_stmts>", "<loop_body_recur>"]],
     "<loop_body_recur>": [["<loop_body>"], 
                           ["λ"]],
@@ -236,7 +237,7 @@ cfg = {
     "<for_func>": [["for", "id", ":", "<arith_expr>", ",", "<expr>", ",", "id",
                    "<update>", "{", "<loop_body_func>", "}"]],
     "<while_func>": [["while", "<expr>", "{", "<loop_body_func>", "}"]],
-    "<do_while_func>": [["do", "{", "<loop_body_func>", "}", "while", "<logical_expr>"]],
+    "<do_while_func>": [["grind", "{", "<loop_body_func>", "}", "while", "<expr>"]],
     "<loop_body_func>": [["<func_stmts_loop>", "<loop_body_recur>"]],
     "<func_stmts_loop>": [["<if_func_loop>"], ["<common_stmts>"], ["<flank_func>"], 
                      ["<recall_stmt>"], ["<looping_func>"]],
@@ -345,14 +346,14 @@ def compute_predict_set(cfg, first_set, follow_set):
     return predict_set
 
 first_set = compute_first_set(cfg)
-# print("First Sets:")
-# for non_terminal, first in first_set.items():
-#     print(f"{non_terminal} -> {first}")
+print("First Sets:")
+for non_terminal, first in first_set.items():
+    print(f"{non_terminal} -> {first}")
 
 follow_set = compute_follow_set(cfg, "<program>", first_set)
-# print("\nFollow Sets:")
-# for non_terminal, follow in follow_set.items():
-#     print(f"{non_terminal} -> {follow}")
+print("\nFollow Sets:")
+for non_terminal, follow in follow_set.items():
+    print(f"{non_terminal} -> {follow}")
 
 predict_set = compute_predict_set(cfg, first_set, follow_set)
 
@@ -362,7 +363,7 @@ def display_predict_sets(predict_set):
         production_str = ", ".join(production)
         print(f"{non_terminal} -> {{ {production_str} }} :  {predict} ")
 
-# display_predict_sets(predict_set)
+display_predict_sets(predict_set)
 
 def gen_parse_table():
     parse_table = {}

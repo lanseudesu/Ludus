@@ -26,6 +26,8 @@ def lexical_analyzer(input_text):
 
 @eel.expose
 def syntax_analyzer(input_text):
-    parser.parse("yo", input_text)
+    result = parser.parse("yo", input_text)
+
+    eel.updateTerminal(result)
 
 eel.start('index.html', size=(1920,1080))
