@@ -91,7 +91,7 @@ class Parser:
         
         var_name = Identifier(symbol=self.current_token.lexeme)
         variable_name = self.current_token.lexeme
-        self.current_token = self.get_next_token()  # Move past identifier
+        self.current_token = self.get_next_token() 
 
         self.skip_whitespace()
 
@@ -162,6 +162,22 @@ class Parser:
             self.current_token = self.get_next_token()
             self.skip_whitespace()
             return literal
+        elif tk == 'comms_ltr':
+            value = re.sub(r'^"(.*)"$', r'\1', self.current_token.lexeme)
+            literal = CommsLiteral(value)
+            self.current_token = self.get_next_token()
+            self.skip_whitespace()
+            return literal
+        elif tk == 'flag_ltr':
+            lexeme = self.current_token.lexeme 
+            if lexeme == 'true':
+                value = True
+            else:
+                value = False
+            literal = FlagLiteral(value)
+            self.current_token = self.get_next_token()
+            self.skip_whitespace()
+            return literal
         elif tk == '(':
             self.current_token = self.get_next_token()
             self.skip_whitespace()
@@ -173,7 +189,7 @@ class Parser:
             return value
 
         else:
-            raise ParserError(f"Unexpected token found during parsing: {tk}", self.current_token)
+            raise ParserError(f"Unexpected token found during parsing: {tk}", self.current_token.token)
 
 def check(fn, text):
     lexer = Lexer(fn, text)

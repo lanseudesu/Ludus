@@ -8,7 +8,9 @@ class SymbolTable:
 
     TYPE_MAP = {
         int: "hp",
-        float: "xp"
+        float: "xp",
+        str: "comms",
+        bool: "flag"
     }
 
     def define_variable(self, name: str, value):

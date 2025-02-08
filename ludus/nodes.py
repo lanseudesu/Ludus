@@ -5,6 +5,8 @@ class NodeType:
     PROGRAM         = "Program"
     HP_LITERAL      = "HpLiteral"
     XP_LITERAL      = "XpLiteral"
+    COMMS_LITERAL   = "CommsLiteral"
+    FLAG_LITERAL    = "FlagLiteral"
     IDENTIFIER      = "Identifier"
     BINARY_EXPR     = "BinaryExpr"
     FUNCTION_DEC    = "FunctionDec"
@@ -47,7 +49,6 @@ class BinaryExpr(Expr):
         self.operator = operator
         self.right = right
         
-
 class Identifier(Expr):
     def __init__(self, symbol: str):
         super().__init__(NodeType.IDENTIFIER)
@@ -62,6 +63,16 @@ class XpLiteral(Expr):
     def __init__(self, value):
         super().__init__(NodeType.XP_LITERAL)
         self.value = float(value)
+
+class CommsLiteral(Expr):
+    def __init__(self, value):
+        super().__init__(NodeType.COMMS_LITERAL)
+        self.value = str(value)
+
+class FlagLiteral(Expr):
+    def __init__(self, value: bool):
+        super().__init__(NodeType.FLAG_LITERAL)
+        self.value = value
 
 class PlayFunc(Stmt):
     def __init__(self, body: 'BlockStmt'):
