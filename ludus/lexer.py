@@ -101,6 +101,8 @@ TT_NEWLINE	  = 'newline'
 TT_SPACE	  = 'space'
 TT_XP_FORMATTING = 'xp formatting'
 
+TT_EOF = 'EOF'
+
 ### POSITION ###
 
 class Position:
@@ -1231,6 +1233,8 @@ class Lexer:
                 errors.append(f"Unknown character ' {self.current_char} ' at line {self.pos.ln + 1}, column {self.pos.col + 1}")
                 self.advance()
         
+        tokens.append(Token(TT_EOF, TT_EOF, cur_ln, cur_col))
+
         return tokens, errors
     
     def make_number(self, num_str): 

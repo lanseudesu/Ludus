@@ -3,9 +3,14 @@ import json
 
 class NodeType:
     PROGRAM         = "Program"
-    NUMERIC_LITERAL = "NumericLiteral"
+    HP_LITERAL      = "HpLiteral"
+    XP_LITERAL      = "XpLiteral"
     IDENTIFIER      = "Identifier"
     BINARY_EXPR     = "BinaryExpr"
+    FUNCTION_DEC    = "FunctionDec"
+    BLOCK_STMT      = "BlockStmt"
+    PLAY_FUNC       = "PlayFunc"
+    VAR_DEC         = "VarDec"
 
 class Stmt:
     def __init__(self, kind: str):
@@ -36,18 +41,48 @@ class Expr(Stmt):
         super().__init__(kind)
 
 class BinaryExpr(Expr):
-    def __init__(self, left: Expr, right: Expr, operator: str):
+    def __init__(self, left: Expr, operator: str, right: Expr, ):
         super().__init__(NodeType.BINARY_EXPR)
         self.left = left
-        self.right = right
         self.operator = operator
+        self.right = right
+        
 
 class Identifier(Expr):
     def __init__(self, symbol: str):
         super().__init__(NodeType.IDENTIFIER)
         self.symbol = symbol
 
-class NumericLiteral(Expr):
-    def __init__(self, value: float):
-        super().__init__(NodeType.NUMERIC_LITERAL)
+class HpLiteral(Expr):
+    def __init__(self, value):
+        super().__init__(NodeType.HP_LITERAL)
+        self.value = int(value)
+
+class XpLiteral(Expr):
+    def __init__(self, value):
+        super().__init__(NodeType.XP_LITERAL)
+        self.value = float(value)
+
+class PlayFunc(Stmt):
+    def __init__(self, body: 'BlockStmt'):
+        super().__init__(NodeType.PLAY_FUNC)
+        self.name = 'play'
+        self.body = body
+
+class FunctionDec(Stmt):
+    def __init__(self, name: Identifier, parameters: List[Identifier], body: 'BlockStmt'):
+        super().__init__(NodeType.FUNCTION_DEC)
+        self.name = name
+        self.parameters = parameters
+        self.body = body
+
+class BlockStmt(Stmt):
+    def __init__(self, statements: List[Stmt]):
+        super().__init__(NodeType.BLOCK_STMT)
+        self.statements = statements
+
+class VarDec(Stmt):
+    def __init__(self, name: Identifier, value: Expr):
+        super().__init__(NodeType.VAR_DEC)
+        self.name = name
         self.value = value

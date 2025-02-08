@@ -32,6 +32,8 @@ class Parser:
         while self.stack:
             self.top = self.stack.pop()
 
+            print(self.current_token.token)
+
             while self.current_token.token in {"newline", "space"}:
                 self.current_token = self.get_next_token()
 
@@ -59,7 +61,7 @@ class Parser:
                 print("2")
                 return f"Unexpected token '{self.current_token.token}' at line {self.current_token.line} and column {self.current_token.column}."
 
-        if self.current_token_index == len(self.tokens):
+        if self.current_token.token == 'EOF':
             return 'Valid syntax.'
         else:
             return "Input not fully consumed."

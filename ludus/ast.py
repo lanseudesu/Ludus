@@ -1,5 +1,7 @@
 from .lexer import Lexer
-from .nodes import BinaryExpr, Expr, Identifier, NumericLiteral, Program, Stmt
+from .nodes import *
+from .runtime.symbol_table import SymbolTableError, SymbolTable
+from .runtime.interpreter import SemanticError, evaluate 
 import re
 
 class ParserError(Exception):
@@ -16,6 +18,7 @@ class Parser:
         self.tokens = tokens
         self.current_token_index = 0
         self.current_token = self.get_next_token()
+        self.symbol_table = SymbolTable()
 
     def get_next_token(self):
         if self.current_token_index < len(self.tokens):
@@ -38,17 +41,74 @@ class Parser:
         program = Program(body=[])
 
         try:
-            while self.current_token is not None:  
-                program.body.append(self.parse_stmt())
+            while self.current_token and self.current_token.token != 'EOF':
+                program.body.append(self.parse_func())
+                self.current_token = self.get_next_token()
         except ParserError as e:
-            #print(e)
-            return e
+            return e, self.symbol_table
+        except SemanticError as e:
+            return e, self.symbol_table
+        except SymbolTableError as e:
+            return e, self.symbol_table
+        
+        return program, self.symbol_table
+    
+    def parse_func(self):
+        self.skip_whitespace()
 
-        return program
+        if not self.current_token or self.current_token.token != "play":
+            raise ParserError("Expected function declaration keyword 'play'.", self.current_token.token)
+
+        if self.current_token and self.current_token.token == 'play':
+            self.current_token = self.get_next_token() # eat play
+            self.current_token = self.get_next_token() # eat (
+            self.current_token = self.get_next_token() # eat )
+            self.current_token = self.get_next_token() # eat {
+
+        body = []
+        while self.current_token and self.current_token.token != "}":
+            stmt = self.parse_stmt()
+            body.append(stmt)
+            self.skip_whitespace()
+
+        self.expect("}", "Expected '}' to close function body.")
+
+        return PlayFunc(body=BlockStmt(statements=body))
 
     def parse_stmt(self) -> Stmt:
         self.skip_whitespace()
-        return self.parse_expr()
+
+        if self.current_token and re.match(r'^id\d+$', self.current_token.token):
+            return self.parse_var_dec()
+        else:
+            return self.parse_expr()
+    
+    def parse_var_dec(self) -> VarDec:
+        self.skip_whitespace()
+
+        if not self.current_token or not re.match(r'^id\d+$', self.current_token.token):
+            raise ParserError("Expected variable name.", self.current_token.token)
+        
+        var_name = Identifier(symbol=self.current_token.lexeme)
+        variable_name = self.current_token.lexeme
+        self.current_token = self.get_next_token()  # Move past identifier
+
+        self.skip_whitespace()
+
+        if not self.current_token or self.current_token.token != ":":
+            raise ParserError("Expected ':' in variable declaration.", self.current_token)
+        
+        self.current_token = self.get_next_token()
+        self.skip_whitespace()
+
+        value = self.parse_expr()
+        evaluated_val = evaluate(value, self.symbol_table)
+        
+        self.symbol_table.define_variable(variable_name, evaluated_val)
+        self.skip_whitespace()
+
+        return VarDec(name=var_name, value=value)
+
 
     def parse_expr(self) -> Expr:
         self.skip_whitespace()
@@ -92,8 +152,13 @@ class Parser:
             self.current_token = self.get_next_token()
             self.skip_whitespace()
             return identifier
-        elif tk == 'hp_ltr':
-            literal = NumericLiteral(value=self.current_token.lexeme)
+        elif tk == 'hp_ltr' or tk == 'nhp_ltr':
+            literal = HpLiteral(value=self.current_token.lexeme)
+            self.current_token = self.get_next_token()
+            self.skip_whitespace()
+            return literal
+        elif tk == 'xp_ltr' or tk == 'nxp_ltr':
+            literal = XpLiteral(value=self.current_token.lexeme)
             self.current_token = self.get_next_token()
             self.skip_whitespace()
             return literal
@@ -118,6 +183,5 @@ def check(fn, text):
         return 'Lexical errors found, cannot continue with syntax analyzing. Please check lexer tab.' 
 
     syntax = Parser(tokens)
-    result = syntax.produce_ast()
-    print(result)
-    return result
+    result, table = syntax.produce_ast()
+    return result, table

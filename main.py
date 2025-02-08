@@ -12,7 +12,7 @@ def lexical_analyzer(input_text):
     else:
         eel.clearError()
 
-    
+    tokens.pop()
     linenumbers = [token.line for token in tokens]
     colnumbers = [token.column for token in tokens]
     lexemes = [token.lexeme for token in tokens]  
@@ -31,8 +31,9 @@ def syntax_analyzer(input_text):
 
 @eel.expose
 def semantic_analyzer(input_text):
-    result = ast.check("yo", input_text)
+    result, table = ast.check("yo", input_text)
 
-    eel.updateTerminal(result)
+    output = str(result) + "\n" + str(table)
+    eel.updateTerminal(output)
 
-eel.start('index.html', size=(1920,1080)) 
+eel.start('semantic_page.html', size=(1920,1080)) 
