@@ -72,6 +72,11 @@ function syntaxAnalyzer() {
     eel.syntax_analyzer(inputText); 
 }
 
+function semanticAnalyzer() {
+    const inputText = editor.getValue(); 
+    eel.semantic_analyzer(inputText); 
+}
+
 eel.expose(updateLexemeToken);
 function updateLexemeToken(lexemes, tokens) {
     const lexemeArea = document.getElementById("lexeme");

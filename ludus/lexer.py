@@ -120,6 +120,16 @@ class Position:
             self.col = 0
 
         return self
+    
+    def retreat(self, current_char):
+        self.idx -= 1
+        self.col -= 1
+
+        if current_char == '\n':
+            self.ln -= 1
+            self.col = 0
+
+        return self
 
     def copy(self):
         return Position(self.idx, self.ln, self.col, self.fn, self.ftxt)
@@ -151,6 +161,10 @@ class Lexer:
     def advance(self):
         self.prev_char = self.current_char
         self.pos.advance(self.current_char)
+        self.current_char = self.text[self.pos.idx] if self.pos.idx < len(self.text) else None
+
+    def retreat(self):
+        self.pos.retreat(self.current_char)
         self.current_char = self.text[self.pos.idx] if self.pos.idx < len(self.text) else None
     
     def invalid_delim_error(self, valid_delims, error_msg): #todo: refactor
@@ -200,6 +214,7 @@ class Lexer:
     def make_tokens(self):
         tokens = []
         errors = []
+        lhs_space = ''
     
         while self.current_char is not None:
             cur_ln = self.pos.ln + 1
@@ -213,8 +228,9 @@ class Lexer:
                 self.process_token(cur_ln, cur_col, '\\n', TT_NEWLINE, nl_delim, errors, tokens)
 
             elif self.current_char == ' ':
+                lhs_space = self.prev_char
                 while self.current_char == ' ':
-                    self.advance()  
+                    self.advance()
                 self.process_token(cur_ln, cur_col, ' ', TT_SPACE, space_delim, errors, tokens)
             elif self.current_char in NUM:
                 result, error = self.make_number('')
@@ -1048,9 +1064,26 @@ class Lexer:
                     self.advance()
                     self.process_token(cur_ln, cur_col, '-=', TT_MINUS_EQ, delim4, errors, tokens)
                 else:
-                    #check lhs if id, number, )
+                    # Check lhs if id, number, )
                     if lhs is not None and lhs in valid_lhs:
                         self.process_token(cur_ln, cur_col, '-', TT_MINUS, delim4, errors, tokens)
+                    elif lhs == ' ':
+                        if lhs_space is not None and lhs_space in valid_lhs:
+                            self.process_token(cur_ln, cur_col, '-', TT_MINUS, delim4, errors, tokens)
+                        else:
+                            if self.current_char is None:
+                                self.process_token(cur_ln, cur_col, '-', TT_NEG, delim4, errors, tokens)
+                            elif self.current_char in NUM or self.current_char == '.':
+                                result, error = self.make_number('-')
+
+                                if error:
+                                    errors.extend(error)
+                                    continue  
+
+                                self.process_token(cur_ln, cur_col, result.lexeme, result.token, numlit_delim, errors, tokens)
+                            else:
+                                self.process_token(cur_ln, cur_col, '-', TT_NEG, delim4, errors, tokens)
+
                     else:
                         if self.current_char is None:
                             self.process_token(cur_ln, cur_col, '-', TT_NEG, delim4, errors, tokens)
@@ -1064,6 +1097,7 @@ class Lexer:
                             self.process_token(cur_ln, cur_col, result.lexeme, result.token, numlit_delim, errors, tokens)
                         else:
                             self.process_token(cur_ln, cur_col, '-', TT_NEG, delim4, errors, tokens)
+
                 
             elif self.current_char in '*/%<>': 
                 token_map = {

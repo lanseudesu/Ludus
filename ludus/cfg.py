@@ -11,7 +11,7 @@ cfg = {
     "<global_dec_tail3>": [["<id_recur>", "<dead_dec>"],
                            ["[", "<arr_size>", "]", "<arr_tail3>"]],
     "<arr_tail1>": [[":", "<value>", ",", "<value>", "<elems_recur>"],
-                    ["[", "hp_ltr", "]", ":", "[", "<value>", ",", "<value>", ",", "<elems_recur>", "]", ",", "[", "<value>", ",", "<value>", ",", "<elems_recur>", "]", "<row_recur2>"]],
+                    ["[", "hp_ltr", "]", ":", "[", "<value>", ",", "<value>", "<elems_recur>", "]", ",", "[", "<value>", ",", "<value>", "<elems_recur>", "]", "<row_recur2>"]],
     "<arr_tail2>": [[":", "<value>", "<elems_recur>"],
                     ["[", "<arr_size>", "]", ":", "[", "<value>", ",", "<elems_recur>", "]", "<row_recur>"]],
     "<arr_tail3>": [["<dead_dec>"],
@@ -41,8 +41,9 @@ cfg = {
                       ["λ"]],
     "<row_recur>": [[",", "[", "<value>", "<elems_recur>", "]", "<row_recur>"],
                     ["λ"]], 
-    "<row_recur2>": [[",", "[", "<value>", ",", "<value>", ",", "<elems_recur>", "]", "<row_recur2>"],
+    "<row_recur2>": [[",", "[", "<value>", ",", "<value>", "<elems_recur>", "]", "<row_recur2>"],
                      ["λ"]],
+
     "<func_dec>": [["generate", "id", "(", "<params>", ")", "<func_dec>"],
                    ["<struct_dec>"]],
     "<struct_dec>": [["build", "id", "<struct_dec>"],
@@ -152,7 +153,7 @@ cfg = {
                         ["levelDown", "(", "id", "<id_tail>", ")"], 
                         ["toHp", "(", "id", "<id_tail>", ")"], 
                         ["toXp", "(", "id", "<id_tail>", ")"], 
-                        ["levelComms", "(", "id", "<id_tail>", ")"]], 
+                        ["toComms", "(", "id", "<id_tail>", ")"]], 
     "<shoot_args>": [["<expr>"], 
                      ["λ"]],
     "<load_args>": [["comms_ltr"], 
@@ -345,15 +346,19 @@ def compute_predict_set(cfg, first_set, follow_set):
 
     return predict_set
 
+# for non_terminal, productions in cfg.items():
+#     for i, item in enumerate(productions):
+#         print(f"{non_terminal} -> {productions[i]}")
+
 first_set = compute_first_set(cfg)
-print("First Sets:")
-for non_terminal, first in first_set.items():
-    print(f"{non_terminal} -> {first}")
+# print("First Sets:")
+# for non_terminal, first in first_set.items():
+#     print(f"{non_terminal} -> {first}")
 
 follow_set = compute_follow_set(cfg, "<program>", first_set)
-print("\nFollow Sets:")
-for non_terminal, follow in follow_set.items():
-    print(f"{non_terminal} -> {follow}")
+# print("\nFollow Sets:")
+# for non_terminal, follow in follow_set.items():
+#     print(f"{non_terminal} -> {follow}")
 
 predict_set = compute_predict_set(cfg, first_set, follow_set)
 
@@ -363,7 +368,7 @@ def display_predict_sets(predict_set):
         production_str = ", ".join(production)
         print(f"{non_terminal} -> {{ {production_str} }} :  {predict} ")
 
-display_predict_sets(predict_set)
+# display_predict_sets(predict_set)
 
 def gen_parse_table():
     parse_table = {}
@@ -377,15 +382,15 @@ def gen_parse_table():
         
 parse_table = gen_parse_table()
 
-# def display_parse_table(parse_table):
-#     print()
-#     for non_terminal, rules in parse_table.items():
-#         print(f"Non-terminal: {non_terminal}")
-#         for terminal, production in rules.items():
-#             print(f"  Terminal: {terminal} -> Production: {production}")
-#         print()  
+def display_parse_table(parse_table):
+    print()
+    for non_terminal, rules in parse_table.items():
+        print(f"Non-terminal: {non_terminal}")
+        for terminal, production in rules.items():
+            print(f"  Terminal: {terminal} -> Production: {production}")
+        print()  
 
-# display_parse_table(parse_table)
+#display_parse_table(parse_table)
 
 def check_ambiguity(cfg, predict_set):
     ambiguous_productions = []
@@ -404,4 +409,4 @@ def check_ambiguity(cfg, predict_set):
     else:
         print("\nNo ambiguities found in the CFG.")
 
-check_ambiguity(cfg, predict_set)
+#check_ambiguity(cfg, predict_set)
