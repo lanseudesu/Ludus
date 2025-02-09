@@ -3,6 +3,7 @@ from .nodes import *
 from .runtime.symbol_table import SymbolTableError, SymbolTable
 from .runtime.interpreter import SemanticError, evaluate 
 import re
+from typing import Union
 
 class ParserError(Exception):
     def __init__(self, message, token):
@@ -41,7 +42,7 @@ class Parser:
         program = Program(body=[])
 
         try:
-            while self.current_token and self.current_token.token != 'EOF':
+            while self.current_token and self.current_token.token != 'gameOver':
                 program.body.append(self.parse_func())
                 self.current_token = self.get_next_token()
         except ParserError as e:
@@ -79,37 +80,128 @@ class Parser:
         self.skip_whitespace()
 
         if self.current_token and re.match(r'^id\d+$', self.current_token.token):
+            return self.parse_var_init()
+        elif self.current_token and self.current_token.token in ['hp','xp','comms','flag']:
             return self.parse_var_dec()
         else:
             return self.parse_expr()
     
-    def parse_var_dec(self) -> VarDec:
+    def parse_var_init(self) -> Union[VarDec, BatchVarDec]:
         self.skip_whitespace()
 
         if not self.current_token or not re.match(r'^id\d+$', self.current_token.token):
             raise ParserError("Expected variable name.", self.current_token.token)
         
-        var_name = Identifier(symbol=self.current_token.lexeme)
-        variable_name = self.current_token.lexeme
-        self.current_token = self.get_next_token() 
-
+        var_names = [Identifier(symbol=self.current_token.lexeme)]  
+        self.current_token = self.get_next_token()
         self.skip_whitespace()
 
         if not self.current_token or self.current_token.token != ":":
-            raise ParserError("Expected ':' in variable declaration.", self.current_token)
+            raise ParserError("Expected ':' in variable initialization.", self.current_token)
         
         self.current_token = self.get_next_token()
         self.skip_whitespace()
 
         value = self.parse_expr()
         evaluated_val = evaluate(value, self.symbol_table)
-        
-        self.symbol_table.define_variable(variable_name, evaluated_val)
+        expected_type = type(evaluated_val)  
+
+        while self.current_token and self.current_token.token == ",":
+            self.current_token = self.get_next_token()  
+            self.skip_whitespace()
+
+            if not self.current_token or not re.match(r'^id\d+$', self.current_token.token):
+                raise ParserError("Expected variable name after ','.", self.current_token.token)
+
+            var_names.append(Identifier(symbol=self.current_token.lexeme))
+            variable_name = self.current_token.lexeme
+            self.current_token = self.get_next_token()
+            self.skip_whitespace()
+
+            if not self.current_token or self.current_token.token != ":":
+                raise ParserError("Expected ':' in variable initialization.", self.current_token)
+            
+            self.current_token = self.get_next_token()
+            self.skip_whitespace()
+
+            value = self.parse_expr()
+            evaluated_val = evaluate(value, self.symbol_table)
+
+            if type(evaluated_val) != expected_type:
+                raise SemanticError(f"TypeMismatchError: Expected {expected_type.__name__}, but got {type(evaluated_val).__name__} in '{variable_name}'.")
+
+        for var in var_names:
+            self.symbol_table.define_variable(var.symbol, evaluated_val)
+
         self.skip_whitespace()
 
-        return VarDec(name=var_name, value=value)
+        if len(var_names) > 1:
+            return BatchVarDec(declarations=[VarDec(name=var, value=value) for var in var_names])
+        else:
+            return VarDec(name=var_names[0], value=value)
 
 
+
+    def parse_var_dec(self) -> Union[VarDec, BatchVarDec]:
+        datatype = self.current_token.token  
+
+        self.current_token = self.get_next_token()
+        self.skip_whitespace()
+
+        if not self.current_token or not re.match(r'^id\d+$', self.current_token.token):
+            raise ParserError("Expected variable name.", self.current_token.token)
+        
+        var_names = []
+        
+        while True:
+            var_names.append(Identifier(symbol=self.current_token.lexeme))
+            self.current_token = self.get_next_token()
+        
+            while self.current_token and self.current_token.token == 'space':
+                self.current_token = self.get_next_token()
+
+            if self.current_token and self.current_token.token == ",":
+                self.current_token = self.get_next_token()
+                self.skip_whitespace()
+            else:
+                break  
+        value = None 
+       
+        if self.current_token and self.current_token.token == 'newline':
+            if datatype == 'hp':
+                value = 0
+            elif datatype == 'xp':
+                value = 0.0
+            elif datatype == 'comms':
+                value = ''
+            elif datatype == 'flag':
+                value = False
+            else:
+                raise ParserError(f"Unknown data type '{datatype}'.", self.current_token.token)
+            
+            for var in var_names:
+                self.symbol_table.define_def_variable(var.symbol, value)
+
+        elif self.current_token and self.current_token.token == ':':
+            self.current_token = self.get_next_token()
+            self.skip_whitespace()
+
+            if not self.current_token or self.current_token.token != 'dead':
+                raise ParserError("Expected 'dead' after ':'.", self.current_token.token)
+
+            value = None  
+            self.current_token = self.get_next_token()  
+            for var in var_names:
+                self.symbol_table.define_dead_variable(var.symbol, datatype)
+
+        self.skip_whitespace()
+
+        if len(var_names) > 1:
+            var_declarations = [VarDec(name=var, value=value) for var in var_names]
+            return BatchVarDec(declarations=var_declarations)
+        else:
+            return VarDec(name=var_names[0], value=value)
+ 
     def parse_expr(self) -> Expr:
         self.skip_whitespace()
         return self.parse_additive_expr()

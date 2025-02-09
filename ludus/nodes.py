@@ -13,6 +13,7 @@ class NodeType:
     BLOCK_STMT      = "BlockStmt"
     PLAY_FUNC       = "PlayFunc"
     VAR_DEC         = "VarDec"
+    BATCH_VAR_DEC   = "BatchVarDec"
 
 class Stmt:
     def __init__(self, kind: str):
@@ -97,3 +98,8 @@ class VarDec(Stmt):
         super().__init__(NodeType.VAR_DEC)
         self.name = name
         self.value = value
+
+class BatchVarDec(Stmt):
+    def __init__(self, declarations: list[VarDec]):
+        super().__init__(NodeType.BATCH_VAR_DEC)
+        self.declarations = declarations
