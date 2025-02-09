@@ -7,21 +7,24 @@ class SemanticError(Exception):
 symbol_table = SymbolTable()
 
 def eval_numeric_binary_expr(lhs, rhs, operator):
-    if operator == "+":
-        result = lhs + rhs
-    elif operator == "-":
-        result = lhs - rhs
-    elif operator == "*":
-        result = lhs * rhs
-    elif operator == "/":
-        if rhs == 0:
-            raise SemanticError("ZeroDivisionError: Division by zero is not allowed")
-        result = lhs / rhs
-    else:
-        if rhs == 0:
-            raise SemanticError("ZeroDivisionError: Modulo by zero is not allowed.")
-        result = lhs / rhs
-    return result
+    try:
+        if operator == "+":
+            result = lhs + rhs
+        elif operator == "-":
+            result = lhs - rhs
+        elif operator == "*":
+            result = lhs * rhs
+        elif operator == "/":
+            if rhs == 0:
+                raise SemanticError("ZeroDivisionError: Division by zero is not allowed")
+            result = lhs / rhs
+        else:
+            if rhs == 0:
+                raise SemanticError("ZeroDivisionError: Modulo by zero is not allowed.")
+            result = lhs % rhs
+        return result
+    except TypeError as e:
+        raise SemanticError(f"TypeError: 'dead' types cannot be used as an operand.")
 
 def eval_binary_expr(binop, symbol_table):
     lhs = evaluate(binop.left, symbol_table)  
