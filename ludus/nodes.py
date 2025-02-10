@@ -1,5 +1,4 @@
 from typing import List, Optional
-import json
 
 class NodeType:
     PROGRAM         = "Program"
@@ -15,6 +14,9 @@ class NodeType:
     VAR_DEC         = "VarDec"
     BATCH_VAR_DEC   = "BatchVarDec"
     ARRAY_DEC       = "ArrayDec"
+    ASS_STMT        = "AssignmentStmt"
+    ARR_ASS_STMT    = "ArrayAssignmentStmt"
+    VAR_ASS_STMT    = "VarAssignmentStmt"
 
 class Stmt:
     def __init__(self, kind: str):
@@ -23,17 +25,43 @@ class Stmt:
     def __repr__(self, indent=0):
         return self.custom_repr(self, indent)
 
-    def custom_repr(self, obj, indent):
+    def custom_repr(self, obj, indent=0):
         ind = ' ' * (indent * 2)
         items = []
+
         for key, value in obj.__dict__.items():
-            if isinstance(value, Stmt):
-                items.append(f'{ind}  {key}: {value.__repr__(indent + 1)}')
+            if isinstance(value, Stmt):  
+                items.append(f'{ind}  {key}: {value.custom_repr(value, indent + 1)}')
             elif isinstance(value, list):
-                items.append(f'{ind}  {key}: [\n' + ',\n'.join(item.__repr__(indent + 2) if isinstance(item, Stmt) else f'{ind}  {json.dumps(item)}' for item in value) + f'\n{ind}  ]')
+                if all(isinstance(item, (int, float, str, bool, type(None))) for item in value):
+                    formatted_list = ', '.join(self.format_value(item) for item in value)
+                    items.append(f'{ind}  {key}: [ {formatted_list} ]')
+                else:
+                    formatted_list = []
+                    for item in value:
+                        if isinstance(item, list):  
+                            nested_formatted = '[\n' + ',\n'.join(f'{ind}    {self.format_value(it)}' if not isinstance(it, Stmt) 
+                                                                else f'{ind}    {it.custom_repr(it, indent + 2)}' 
+                                                                for it in item) + f'\n{ind}  ]'
+                            formatted_list.append(nested_formatted)
+                        elif isinstance(item, Stmt):
+                            formatted_list.append(f'{ind}  {item.custom_repr(item, indent + 1)}')
+                        else:
+                            formatted_list.append(f'{ind}  {self.format_value(item)}')
+                    
+                    items.append(f'{ind}  {key}: [\n' + ',\n'.join(formatted_list) + f'\n{ind}  ]')
             else:
-                items.append(f'{ind}  {key}: {json.dumps(value)}')
-        return f'{ind}{{\n{",\n".join(items)}\n{ind}}}'
+                items.append(f'{ind}  {key}: {self.format_value(value)}')
+
+        return f'{ind}{{\n' + ",\n".join(items) + f'\n{ind}}}'
+
+    def format_value(self, value):
+        if value is None:
+            return "None"
+        elif isinstance(value, str):
+            return f'"{value}"'
+        else:
+            return str(value)
 
 class Program(Stmt):
     def __init__(self, body: List[Stmt]):
@@ -45,7 +73,7 @@ class Expr(Stmt):
         super().__init__(kind)
 
 class BinaryExpr(Expr):
-    def __init__(self, left: Expr, operator: str, right: Expr, ):
+    def __init__(self, left: Expr, operator: str, right: Expr):
         super().__init__(NodeType.BINARY_EXPR)
         self.left = left
         self.operator = operator
@@ -106,8 +134,30 @@ class BatchVarDec(Stmt):
         self.declarations = declarations
 
 class ArrayDec(Stmt):
-    def __init__(self, name: Identifier, dimensions: List[Optional[int]], values: List):
+    def __init__(self, name: Identifier, dimensions: List[Optional[int]], elements: List[Expr]):
         super().__init__(NodeType.ARRAY_DEC)
         self.name = name
         self.dimensions = dimensions
-        self.values = values
+        self.elements = elements
+
+class AssignmentStmt(Stmt):
+    def __init__(self, kind: str):
+        super().__init__(NodeType.ASS_STMT)
+        self.kind = kind
+
+class ArrAssignment(AssignmentStmt):
+    def __init__(self, left: Identifier, operator: str, right: Expr):
+        super().__init__(NodeType.ARR_ASS_STMT)
+        self.left = left
+        self.operator = operator
+        self.right = right
+
+class VarAssignment(AssignmentStmt):
+    def __init__(self, left: Identifier, operator: str, right: Expr):
+        super().__init__(NodeType.VAR_ASS_STMT)
+        self.left = left
+        self.operator = operator
+        self.right = right
+
+
+# assignment expression node

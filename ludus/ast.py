@@ -124,10 +124,11 @@ class Semantic:
         else:
             return self.parse_var_dec(datatype)
 
-    def parse_var_init(self) -> Union[VarDec, BatchVarDec]:
+    def parse_var_init(self) -> Union[VarDec, BatchVarDec, VarAssignment]:
         self.skip_whitespace()
-        
+
         var_names = [Identifier(symbol=self.current_token.lexeme)]  
+        name = self.current_token.lexeme
         self.current_token = self.get_next_token() # eat id
         self.skip_whitespace()
 
@@ -150,12 +151,10 @@ class Semantic:
                 evaluated_val = evaluate(value, self.symbol_table)
 
                 for var in var_names:
-                    self.symbol_table.define_variable(var.symbol, evaluated_val)
+                    self.symbol_table.define_def_variable(var.symbol, evaluated_val)
 
                 self.skip_whitespace()
                 return BatchVarDec(declarations=[VarDec(name=var, value=value) for var in var_names])
-
-
         
         self.current_token = self.get_next_token() # eat :
         self.skip_whitespace() 
@@ -163,6 +162,8 @@ class Semantic:
         value = self.parse_expr()
         evaluated_val = evaluate(value, self.symbol_table)
         expected_type = type(evaluated_val)  
+
+        values_table={name: {"values": value, "eval_values": evaluated_val}}
 
         while self.current_token and self.current_token.token == ",":
             self.current_token = self.get_next_token()  
@@ -184,19 +185,24 @@ class Semantic:
 
             value = self.parse_expr()
             evaluated_val = evaluate(value, self.symbol_table)
+            values_table[variable_name] = {"values": value, "eval_values": evaluated_val}
 
             if type(evaluated_val) != expected_type:
                 raise SemanticError(f"TypeMismatchError: Expected {expected_type.__name__}, but got {type(evaluated_val).__name__} in '{variable_name}'.")
 
-        for var in var_names:
-            self.symbol_table.define_variable(var.symbol, evaluated_val)
-
         self.skip_whitespace()
-
         if len(var_names) > 1:
-            return BatchVarDec(declarations=[VarDec(name=var, value=value) for var in var_names])
+            for var in var_names:
+                self.symbol_table.define_def_variable(var.symbol, values_table[var.symbol]["eval_values"])
+            return BatchVarDec(declarations=[VarDec(name=var, value=values_table[var.symbol]["values"]) for var in var_names])
         else:
-            return VarDec(name=var_names[0], value=value)
+            var = var_names[0]
+            if self.symbol_table.check_var(var.symbol):
+                self.symbol_table.define_variable(var.symbol, evaluated_val)
+                return VarAssignment(var, ':', value)
+            else:
+                self.symbol_table.define_variable(var.symbol, evaluated_val)
+                return VarDec(var, value)  
 
     def parse_var_dec(self, datatype) -> Union[VarDec, BatchVarDec]:
         var_names = []
@@ -271,10 +277,10 @@ class Semantic:
 
         if self.current_token and self.current_token.token == 'newline':
             default_value = {
-                'hp': 0,
-                'xp': 0.0,
-                'comms': '',
-                'flag': False
+                'hp': HpLiteral(0),
+                'xp': XpLiteral(0.0),
+                'comms': CommsLiteral(''),
+                'flag': FlagLiteral(False)
             }.get(datatype, None)
 
             if default_value is None:
@@ -283,22 +289,28 @@ class Semantic:
             if len(dimensions) == 2:
                 if dimensions[0] is None and dimensions[1] is None:
                     values = []  # arr[][]
+                    eval_values = []
 
                 elif dimensions[0] is None and dimensions[1] is not None:
                     values = [default_value] * dimensions[1]  # arr[][int]
+                    eval_values = [default_value.value] * dimensions[1]
 
                 elif dimensions[0] is not None and dimensions[1] is None:
                     values = [[] for _ in range(dimensions[0])]  # arr[int][]
+                    eval_values = [[] for _ in range(dimensions[0])]
 
                 elif dimensions[0] is not None and dimensions[1] is not None:
                     values = [[default_value] * dimensions[1] for _ in range(dimensions[0])]  # arr[int][int]
+                    eval_values = [[default_value.value] * dimensions[1] for _ in range(dimensions[0])] 
             else:
                 if dimensions[0] is None:
                     values = []  # arr[]
+                    eval_values = []
                 else:
                     values = [default_value] * dimensions[0]
+                    eval_values = [default_value.value] * dimensions[0]
             
-            self.symbol_table.define_dead_array(arr_name.symbol, dimensions, values, datatype)
+            self.symbol_table.define_dead_array(arr_name.symbol, dimensions, eval_values, datatype)
 
         elif self.current_token and self.current_token.token == ':':
             self.current_token = self.get_next_token() #eat :
@@ -309,28 +321,20 @@ class Semantic:
             if len(dimensions) == 2:
                 if dimensions[0] is None and dimensions[1] is None:
                     values = None  # arr[][]
-
-                elif dimensions[0] is None and dimensions[1] is not None:
-                    values = [None] * dimensions[1]  # arr[][int]
-
-                elif dimensions[0] is not None and dimensions[1] is None:
-                    values = [[None] for _ in range(dimensions[0])]  # arr[int][]
-
-                elif dimensions[0] is not None and dimensions[1] is not None:
-                    values = [[None] * dimensions[1] for _ in range(dimensions[0])]  # arr[int][int]
+                else:
+                    raise ParserError("NullPointerError: Null arrays cannot be initialized with specific size.")
             else:
                 if dimensions[0] is None:
                     values = None  # arr[]
                 else:
-                    values = [None] * dimensions[0]
+                    raise ParserError("NullPointerError: Null arrays cannot be initialized with specific size.")
             
             self.symbol_table.define_dead_array(arr_name.symbol, dimensions, values, datatype)
         
         
-        return ArrayDec(arr_name.symbol, dimensions, values)
+        return ArrayDec(arr_name, dimensions, values)
 
-
-    def parse_array(self) -> ArrayDec:
+    def parse_array(self) -> Union[ArrayDec, ArrAssignment]:
         self.skip_whitespace()
 
         arr_name = Identifier(symbol=self.current_token.lexeme)
@@ -350,36 +354,72 @@ class Semantic:
             self.expect("]", "Expected ']' to close array dimension declaration.")
             self.skip_whitespace()
 
-        self.expect(":", "Expected ':' in array initialization.")
-        self.skip_whitespace()
-        
-        values = self.parse_array_values(expected_dims=dimensions, depth=0)
-        if all(dim is None for dim in dimensions):
-            if isinstance(values[0], list):  
-                dimensions = [len(values), len(values[0])]
-            else:  
-                dimensions = [len(values)]
-        
-        self.symbol_table.define_array(arr_name.symbol, dimensions, values)
-        return ArrayDec(arr_name.symbol, dimensions, values)
+        is_modification = self.symbol_table.check_array(arr_name.symbol)
 
+        self.expect(":", "Expected ':' in array initialization or modification.")
+        self.skip_whitespace()
+
+        if is_modification:
+            if self.symbol_table.check_dead_array(arr_name.symbol):
+                existing_dimensions = self.symbol_table.get_array_dimensions(arr_name.symbol)
+                if len(existing_dimensions) != len(dimensions):
+                    raise ParserError(f"ArrayIndexError: Incorrect number of dimensions for '{arr_name.symbol}'.")
+                
+                values, eval_values = self.parse_array_values(expected_dims=dimensions, depth=0)
+                if all(dim is None for dim in dimensions):
+                    if isinstance(values[0], list):  
+                        dimensions = [len(values), len(values[0])]
+                    else:  
+                        dimensions = [len(values)]
+                self.symbol_table.define_array(arr_name.symbol, dimensions, eval_values, True)
+                return ArrayDec(arr_name, dimensions, values)
+            else: 
+                if all(dim is not None for dim in dimensions):
+                    existing_dimensions = self.symbol_table.get_array_dimensions(arr_name.symbol)
+                    if len(existing_dimensions) != len(dimensions):
+                        raise ParserError(f"ArrayIndexError: Incorrect number of dimensions for '{arr_name.symbol}'.")
+                    for i, dim in enumerate(dimensions):
+                        if dim is not None and dim >= existing_dimensions[i]:
+                            raise SemanticError(f"ArrayIndexError: Index {dim} is out of bounds for dimension {i} in '{arr_name.symbol}'.")
+                    
+                    value = self.parse_expr()
+                    evaluated_val = evaluate(value, self.symbol_table)
+                    self.symbol_table.modify_array(arr_name.symbol, dimensions, evaluated_val)
+                    return ArrAssignment(arr_name, ':', value)
+                else:
+                    raise ParserError(f"DeclarationError: Array '{arr_name.symbol}' is already defined.")
+        else:
+            values, eval_values = self.parse_array_values(expected_dims=dimensions, depth=0)
+            if all(dim is None for dim in dimensions):
+                if isinstance(values[0], list):  
+                    dimensions = [len(values), len(values[0])]
+                else:  
+                    dimensions = [len(values)]
+            
+            self.symbol_table.define_array(arr_name.symbol, dimensions, eval_values)
+            return ArrayDec(arr_name, dimensions, values)
 
     def parse_array_values(self, expected_dims, depth):
         values = []
+        eval_values = []
         
         if expected_dims[depth] is None or isinstance(expected_dims[depth], int):
             while self.current_token and self.current_token.token != 'newline':
                 if depth + 1 < len(expected_dims):  # 2d array
                     self.expect("[", "Expected '[' for nested array values.")
                     self.skip_whitespace()
-                    values.append(self.parse_array_values(expected_dims, depth + 1))
+                    res_val, res_eval = self.parse_array_values(expected_dims, depth + 1)
+                    values.append(res_val)
+                    eval_values.append(res_eval)
                     self.expect("]", "Expected ']' to close nested array values.")
                 else:  
                     value = self.parse_expr()
+                    eval_value = evaluate(value, self.symbol_table)
                     if value.kind not in ["HpLiteral", "XpLiteral", "CommsLiteral", "FlagLiteral"]:
                         raise ParserError("Arrays can only be initialied with literal values.")
-                    evaluated_val = evaluate(value, self.symbol_table)  
-                    values.append(evaluated_val)
+                    values.append(value)
+                    eval_values.append(eval_value)
+
                 
                 self.skip_whitespace()
                 if self.current_token.token == ',':
@@ -393,7 +433,7 @@ class Semantic:
                 f"ArraySizeError: Expected {expected_dims[depth]} elements, but got {len(values)}."
             )
 
-        return values
+        return values, eval_values
   
     def parse_expr(self) -> Expr:
         self.skip_whitespace()

@@ -32,7 +32,7 @@ class Parser:
         while self.stack:
             self.top = self.stack.pop()
 
-            print(self.current_token.token)
+            #print(self.current_token.token)
 
             while self.current_token.token in {"newline", "space"}:
                 self.current_token = self.get_next_token()
@@ -40,25 +40,25 @@ class Parser:
             if re.match(r'^id\d+$', self.current_token.token):
                 self.current_token.token= 'id'
 
-            print(self.top)
-            print(self.current_token.token)
+            # print(self.top)
+            # print(self.current_token.token)
 
             if self.top == self.current_token.token:
-                print(f"Matched: {self.top}")
+                #print(f"Matched: {self.top}")
                 self.current_token = self.get_next_token()
             elif self.top in parse_table:
                 if self.current_token.token in parse_table[self.top]:
                     production = parse_table[self.top][self.current_token.token]
-                    print(f"Expand: {self.top} → {' '.join(production)}")
+                    #print(f"Expand: {self.top} → {' '.join(production)}")
 
                     if "λ" not in production:
                         self.stack.extend(reversed(production))
-                    print(self.stack)
+                    #print(self.stack)
                 else:
-                    print("1") #error append then return false :DDDDD
+                    #print("1") #error append then return false :DDDDD
                     return f"Unexpected token '{self.current_token.token}' at line {self.current_token.line} and column {self.current_token.column}."
             else:
-                print("2")
+                #print("2")
                 return f"Unexpected token '{self.current_token.token}' at line {self.current_token.line} and column {self.current_token.column}."
 
         if self.current_token.token == 'EOF':

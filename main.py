@@ -32,7 +32,7 @@ def syntax_analyzer(input_text):
 @eel.expose
 def semantic_analyzer(input_text):
     result, table = ast.check("yo", input_text)
-
+    
     output = str(result) + "\n" + str(table) # todo: get rid of table if error also valid semantic if valid semantic instead of ast
     eel.updateTerminal(output)
 
