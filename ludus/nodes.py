@@ -1,4 +1,4 @@
-from typing import List
+from typing import List, Optional
 import json
 
 class NodeType:
@@ -14,6 +14,7 @@ class NodeType:
     PLAY_FUNC       = "PlayFunc"
     VAR_DEC         = "VarDec"
     BATCH_VAR_DEC   = "BatchVarDec"
+    ARRAY_DEC       = "ArrayDec"
 
 class Stmt:
     def __init__(self, kind: str):
@@ -103,3 +104,10 @@ class BatchVarDec(Stmt):
     def __init__(self, declarations: list[VarDec]):
         super().__init__(NodeType.BATCH_VAR_DEC)
         self.declarations = declarations
+
+class ArrayDec(Stmt):
+    def __init__(self, name: Identifier, dimensions: List[Optional[int]], values: List):
+        super().__init__(NodeType.ARRAY_DEC)
+        self.name = name
+        self.dimensions = dimensions
+        self.values = values

@@ -8,4 +8,4 @@ Requirements:
 
 pip install eel
 
-then run 'test.py'
+then run 'main.py'
