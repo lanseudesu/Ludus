@@ -17,6 +17,8 @@ class NodeType:
     ASS_STMT        = "AssignmentStmt"
     ARR_ASS_STMT    = "ArrayAssignmentStmt"
     VAR_ASS_STMT    = "VarAssignmentStmt"
+    STRUCT_FIELD    = "StructField"
+    STRUCT_DEC      = "StructDec"
 
 class Stmt:
     def __init__(self, kind: str):
@@ -159,5 +161,14 @@ class VarAssignment(AssignmentStmt):
         self.operator = operator
         self.right = right
 
+class StructFields(Stmt):
+    def __init__(self, name: Identifier, value: Expr):
+        super().__init__(NodeType.STRUCT_FIELD)
+        self.name = name
+        self.value = value
 
-# assignment expression node
+class StructDec(Stmt):
+    def __init__(self, name: Identifier, body: List[StructFields]):
+        super().__init__(NodeType.STRUCT_DEC)
+        self.name = name
+        self.body = body

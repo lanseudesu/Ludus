@@ -106,8 +106,12 @@ class Semantic:
     
         elif self.current_token and self.current_token.token in ['hp','xp','comms','flag']:
             return self.var_or_arr()
+        elif self.current_token and self.current_token.token == 'build':
+            return self.parse_struct()
         else:
-            return self.parse_expr()
+            raise ParserError(f"Unexpected token found during parsing: {self.current_token.token}")
+    
+    ### ARRAYS AND VARIABLES
     
     def var_or_arr(self):
         datatype = self.current_token.token  
@@ -435,6 +439,57 @@ class Semantic:
 
         return values, eval_values
   
+    ############ STRUCTS ###############
+
+    def parse_struct(self) -> StructDec:
+        fields_table = {}
+        fields = []
+
+        self.current_token = self.get_next_token() # eat build
+        self.skip_whitespace()
+        if not self.current_token or not re.match(r'^id\d+$', self.current_token.token):
+                raise ParserError("Expected struct name after 'build'.")
+        struct_name = Identifier(self.current_token.lexeme)
+        self.current_token = self.get_next_token() # eat id
+        self.skip_whitespace()
+        self.expect("{","StructDeclarationError: Struct fields must be enclosed in curly braces.")
+        self.skip_whitespace()
+        while self.current_token and self.current_token.token != '}':
+            datatype = self.current_token.token  
+            self.current_token = self.get_next_token()  # eat datatype
+            self.skip_whitespace()
+            field_name = Identifier(self.current_token.lexeme)  
+            self.current_token = self.get_next_token()  # eat id
+            self.skip_whitespace()
+            value = None  
+            if self.current_token.token == ':':  
+                self.current_token = self.get_next_token()  # eat :
+                self.skip_whitespace()
+                value = self.parse_expr()  
+                eval_val = evaluate(value, self.symbol_table)  
+                fields.append(StructFields(field_name, value))  
+                fields_table[field_name.symbol] = {
+                    "datatype": datatype,
+                    "value": eval_val
+                }
+                self.skip_whitespace()
+            else:
+                fields.append(StructFields(field_name, None))
+                fields_table[field_name.symbol] = {
+                    "datatype": datatype,
+                    "value": None
+                }
+            if self.current_token and self.current_token.token == ',':
+                self.current_token = self.get_next_token()  # eat ,
+                self.skip_whitespace()
+        self.current_token = self.get_next_token() # eat }
+        self.skip_whitespace()
+
+        self.symbol_table.define_struct(struct_name.symbol, fields_table)
+        return StructDec(struct_name, fields)
+    
+    ############ EXPRESSIONS ############
+
     def parse_expr(self) -> Expr:
         self.skip_whitespace()
         return self.parse_additive_expr()
