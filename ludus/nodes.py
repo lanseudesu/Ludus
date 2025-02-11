@@ -25,6 +25,7 @@ class NodeType:
     IMMO_VAR_DEC        = "ImmoVarDec"
     BATCH_IMMO_VAR_DEC  = "BatchImmoVarDec"
     IMMO_ARRAY_DEC      = "ImmoArrayDec"
+    IMMO_INST         = "ImmoStructInst"
 
 class Stmt:
     def __init__(self, kind: str):
@@ -217,3 +218,9 @@ class ImmoArrayDec(Stmt):
         self.dimensions = dimensions
         self.elements = elements
 
+class ImmoInstDec(Stmt):
+    def __init__(self, name: Identifier, parent: str, body: List[StructFields]):
+        super().__init__(NodeType.IMMO_INST)
+        self.name = name
+        self.parent = parent
+        self.body = body

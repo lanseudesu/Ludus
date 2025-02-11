@@ -282,7 +282,8 @@ class SymbolTable:
                 raise SymbolTableError(f"FieldTypeError: Type mismatch for field '{field}': Expected '{expected_type}', but got '{actual_type_name}'.")
         
         self.structinst_table[name] = {
-            "fields": fields_table
+            "fields": fields_table,
+            "immo" : False
         }
 
     def check_structinst(self, name: str):
@@ -302,12 +303,30 @@ class SymbolTable:
             raise SymbolTableError(f"DeclarationError: Field '{field}' does not exist in Struct Instance '{name}'.")
         
     def modify_structinst_field(self, name: str, field: str, value):
+        if self.structinst_table[name]["immo"] == True:
+            raise SymbolTableError(f"ImmoStructInstanceError: Struct Instance '{name}' is declared as an immutable struct instance.")
+
         expected_type = self.structinst_table[name]["fields"][field]["datatype"]
         actual_type_name = self.TYPE_MAP.get(type(value), None)  
         if actual_type_name != expected_type:
             raise SymbolTableError(f"FieldTypeError: Type mismatch for field '{field}': Expected '{expected_type}', but got '{actual_type_name}'.")
         
         self.structinst_table[name]["fields"][field]["value"] = value
+
+    def define_immo_structinst(self, name: str, fields_table):
+        if name in self.array_table:  
+            raise SymbolTableError(f"DeclarationError: '{name}' is already declared as an array.")
+        elif name in self.table:  
+            raise SymbolTableError(f"DeclarationError: '{name}' is already declared as a variable.")
+        elif name in self.struct_table:  
+            raise SymbolTableError(f"DeclarationError: '{name}' is already declared as a struct.")
+        elif name in self.structinst_table:  
+            raise SymbolTableError(f"DeclarationError: Struct Instance '{name}' already exists.")
+        
+        self.structinst_table[name] = {
+            "fields": fields_table,
+            "immo" : True
+        }
     
     def __repr__(self):
         tables = {

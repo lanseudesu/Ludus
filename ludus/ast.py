@@ -608,7 +608,8 @@ class Semantic:
         self.current_token = self.get_next_token() # eat immo
         self.skip_spaces()
         if self.current_token.token == 'access':
-            pass
+            immo_inst = self.parse_immo_inst()
+            return immo_inst
         else:
             if not self.current_token or not re.match(r'^id\d+$', self.current_token.token):
                 raise ParserError("Expected identifier or 'access' after 'immo'.")
@@ -763,6 +764,59 @@ class Semantic:
                 raise ParserError(f"ArraySizeError: Expected {dimensions[0]} rows, but got {len(eval_values)}.")
         self.symbol_table.define_immo_array(arr_name.symbol, dimensions, eval_values)
         return ImmoArrayDec(arr_name, dimensions, values)
+    
+    def parse_immo_inst(self) -> ImmoInstDec:
+        self.current_token = self.get_next_token()  # eat 'access'
+        self.skip_spaces()
+        if not self.current_token or not re.match(r'^id\d+$', self.current_token.token):
+            raise ParserError("Expected struct name after 'access'.")
+        struct_parent = self.current_token.lexeme
+        if not self.symbol_table.check_struct(struct_parent):
+            raise ParserError(f"Struct '{struct_parent}' is not defined.")
+        field_table = self.symbol_table.get_fieldtable(struct_parent)
+        self.current_token = self.get_next_token()  # eat id
+        self.skip_spaces()
+        if not self.current_token or not re.match(r'^id\d+$', self.current_token.token):
+            raise ParserError("Expected struct instance name after struct name.")
+        inst_name = Identifier(self.current_token.lexeme)
+        self.current_token = self.get_next_token()  # eat id
+        self.skip_spaces()
+        values, eval_values = [], []
+        self.expect(":","Expected ':' after struct instance name.")
+        self.skip_spaces()
+        while self.current_token.token != ",":  
+            value = self.parse_expr()
+            eval_val = evaluate(value, self.symbol_table)
+            values.append(value)
+            eval_values.append(eval_val)
+            self.skip_spaces()
+            if self.current_token.token == ",":
+                self.current_token = self.get_next_token()  # eat ','
+                self.skip_spaces()
+                if self.current_token.token == 'newline':
+                    raise ParserError("Unexpected newline found after struct instance value.")
+            elif self.current_token.token == 'newline':
+                break
+        struct_fields = []
+        new_field_table = {}
+        field_names = list(field_table.keys())
+
+        if len(eval_values) != len(field_names):
+            raise ParserError(f"Wrong number of values provided for struct '{struct_parent}'. Expected {len(field_names)}, got {len(eval_values)}.")
+        
+        for i, field in enumerate(field_names):
+            expected_type = field_table[field]["datatype"]
+
+            actual_type_name = self.TYPE_MAP.get(type(eval_values[i]), None)
+            if actual_type_name != expected_type:
+                raise ParserError(f"FieldTypeError: Type mismatch for field '{field}'. Expected '{expected_type}', but got '{actual_type_name}'.")
+                
+            value_to_use = eval_values[i]
+            struct_fields.append(StructFields(field, values[i]))  
+            new_field_table[field] = {"datatype": expected_type, "value": value_to_use}
+
+        self.symbol_table.define_immo_structinst(inst_name.symbol, new_field_table)
+        return ImmoInstDec(inst_name, struct_parent, struct_fields) 
     
     ############ EXPRESSIONS ##############
 
