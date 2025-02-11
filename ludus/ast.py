@@ -604,7 +604,7 @@ class Semantic:
     
     ############ IMMO ##############
 
-    def parse_immo(self) -> ImmoVarDec:
+    def parse_immo(self):
         self.current_token = self.get_next_token() # eat immo
         self.skip_spaces()
         if self.current_token.token == 'access':
@@ -613,28 +613,66 @@ class Semantic:
             if not self.current_token or not re.match(r'^id\d+$', self.current_token.token):
                 raise ParserError("Expected identifier or 'access' after 'immo'.")
             la_token = self.look_ahead()
-            if la_token is not None and la_token.token == ':':  
+            if la_token is not None and la_token.token in [':',',']:  
                 immo_var = self.parse_immo_var()  
                 return immo_var
             else:
                 raise ParserError(f"bruh")  
             
-    def parse_immo_var(self) -> ImmoVarDec:
-        immo_name = Identifier(self.current_token.lexeme)
-        if self.symbol_table.check_var(immo_name.symbol):
-            raise ParserError(f"DeclarationError: Variable '{immo_name.symbol}' is already defined.")
-        self.current_token = self.get_next_token() # eat id
-        self.skip_spaces()
-        self.expect(":", "Expected ':' after immo variable name.")
-        self.skip_spaces()
-        value = self.parse_expr()
-        evaluated_val = evaluate(value, self.symbol_table)
-        self.symbol_table.define_immo_variable(immo_name.symbol, evaluated_val)
-        return ImmoVarDec(immo_name, value)
-            
+    def parse_immo_var(self) -> Union[ImmoVarDec, BatchImmoVarDec]:
+        immo_declarations = [] 
+        first_type = None
+        while True:
+            identifiers = [Identifier(self.current_token.lexeme)]
+            if self.symbol_table.check_var(identifiers[0].symbol):
+                raise ParserError(f"DeclarationError: Variable '{identifiers[0].symbol}' is already defined.")
+            self.current_token = self.get_next_token()  # eat id
+            self.skip_spaces()
 
+            while self.current_token.token == ',':
+                self.current_token = self.get_next_token()  # eat ,
+                self.skip_spaces()
+                if not self.current_token or not re.match(r'^id\d+$', self.current_token.token):
+                    raise ParserError("Expected identifier after ',' in immutable variable declaration.")
+                if self.symbol_table.check_var(self.current_token.lexeme):
+                    raise ParserError(f"DeclarationError: Variable '{self.current_token.lexeme}' is already defined.")
+                identifiers.append(Identifier(self.current_token.lexeme))
+                self.current_token = self.get_next_token()  # eat id
+                self.skip_spaces()
+
+            self.expect(":", "Expected ':' after immutable variable name.")
+            self.skip_spaces()
+            value = self.parse_expr()
+            evaluated_val = evaluate(value, self.symbol_table)
+            value_type = self.TYPE_MAP.get(type(evaluated_val), None)
+            self.skip_spaces()
+
+            if len(identifiers) > 1:
+                for immo_name in identifiers:
+                    self.symbol_table.define_immo_variable(immo_name.symbol, evaluated_val)
+                    immo_declarations.append(ImmoVarDec(immo_name, value))
+                break
+            else:
+                if first_type is None:
+                    first_type = value_type
+                elif first_type != value_type:
+                    raise ParserError(f"TypeMismatchError: Expected all values to be '{first_type}', but got '{value_type}'.")
+
+                self.symbol_table.define_immo_variable(identifiers[0].symbol, evaluated_val)
+                immo_declarations.append(ImmoVarDec(identifiers[0], value))  
+                self.skip_spaces()
+                if self.current_token.token == ',':  
+                    self.current_token = self.get_next_token()  # eat ,
+                    self.skip_spaces()
+                else:
+                    break
+        
+        if len(immo_declarations) > 1:
+            return BatchImmoVarDec(declarations=immo_declarations)
+        else:
+            return ImmoVarDec(immo_declarations[0], value)
     
-    ############ EXPRESSIONS ############
+    ############ EXPRESSIONS ##############
 
     def parse_expr(self) -> Expr:
         self.skip_whitespace()

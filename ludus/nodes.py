@@ -23,6 +23,7 @@ class NodeType:
     INST_ASS_STMT       = "InstAssignmentStmt"
     STRUCT_INST_FIELD   = "StructInstField"
     IMMO_VAR_DEC        = "ImmoVarDec"
+    BATCH_IMMO_VAR_DEC  = "BatchImmoVarDec"
 
 class Stmt:
     def __init__(self, kind: str):
@@ -203,4 +204,8 @@ class ImmoVarDec(Stmt):
         self.name = name
         self.value = value
 
+class BatchImmoVarDec(Stmt):
+    def __init__(self, declarations: list[ImmoVarDec]):
+        super().__init__(NodeType.BATCH_IMMO_VAR_DEC)
+        self.declarations = declarations
 
