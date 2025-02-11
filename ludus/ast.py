@@ -616,6 +616,9 @@ class Semantic:
             if la_token is not None and la_token.token in [':',',']:  
                 immo_var = self.parse_immo_var()  
                 return immo_var
+            elif la_token is not None and la_token.token == '[':  
+                immo_arr = self.parse_immo_arr()
+                return immo_arr
             else:
                 raise ParserError(f"bruh")  
             
@@ -671,6 +674,95 @@ class Semantic:
             return BatchImmoVarDec(declarations=immo_declarations)
         else:
             return ImmoVarDec(immo_declarations[0], value)
+    
+    def parse_immo_arr(self) -> ImmoArrayDec:
+        arr_name = Identifier(self.current_token.lexeme)
+        if self.symbol_table.check_array(arr_name.symbol):
+            raise ParserError(f"DeclarationError: Array '{arr_name.symbol}' is already defined.")
+        self.current_token = self.get_next_token() # eat id
+        self.skip_spaces()
+        dimensions, values, eval_values = [], [], []
+        self.expect("[","Expected '[' to start immutable array declaration.")
+        self.skip_spaces()
+        dim = int(self.current_token.lexeme)
+        if dim < 2:
+            raise ParserError(f"ArraySizeError: Expected array size to be greater than 1, but got {dim}.")
+        dimensions.append(dim)
+        self.current_token = self.get_next_token() # eat hp_ltr
+        self.skip_spaces()
+        self.expect("]","Expected ']' to close immutable array declaration.")
+        self.skip_spaces()
+        if self.current_token.token == '[':
+            self.current_token = self.get_next_token()
+            self.skip_spaces()
+            dim = int(self.current_token.lexeme)
+            if dim < 2:
+                raise ParserError(f"ArraySizeError: Expected array size to be greater than 1, but got {dim}.")
+            dimensions.append(dim)
+            self.current_token = self.get_next_token() # eat hp_ltr
+            self.skip_spaces()
+            self.expect("]","Expected ']' to close immutable array declaration.")
+            self.skip_spaces()
+        self.expect(":","Expected ':' after immutable array declaration.")
+        self.skip_spaces()
+        first_type = None
+        if len(dimensions) == 1:
+            while self.current_token.token != "]":
+                value = self.parse_expr()
+                evaluated_val = evaluate(value, self.symbol_table)
+                value_type = self.TYPE_MAP.get(type(evaluated_val), None)
+                if first_type is None:
+                    first_type = value_type
+                elif first_type != value_type:
+                    raise ParserError(f"TypeMismatchError: Expected all elements to be '{first_type}', but got '{value_type}'.")
+                values.append(value)
+                eval_values.append(evaluated_val)
+                self.skip_spaces()
+                if self.current_token.token == ",":
+                    self.current_token = self.get_next_token()  # eat ,
+                    self.skip_spaces()
+                else:
+                    break
+            if len(eval_values) != dimensions[0]:
+                    raise ParserError(f"ArraySizeError: Expected {dimensions[0]} elements, but got {len(eval_values)}.")
+        elif len(dimensions) == 2:
+            while True:  
+                row_values, row_eval_values = [], []
+                self.expect("[", "Expected '[' to start a row in the immutable array.")
+                self.skip_spaces()
+                while self.current_token.token != "]":
+                    value = self.parse_expr()
+                    evaluated_val = evaluate(value, self.symbol_table)
+                    value_type = self.TYPE_MAP.get(type(evaluated_val), None)
+                    if first_type is None:
+                        first_type = value_type
+                    elif first_type != value_type:
+                        raise ParserError(f"TypeMismatchError: Expected all elements to be '{first_type}', but got '{value_type}'.")
+                    row_values.append(value)
+                    row_eval_values.append(evaluated_val)
+                    self.skip_spaces()
+                    
+                    if self.current_token.token == ",":
+                        self.current_token = self.get_next_token()  # eat ,
+                        self.skip_spaces()
+                    else:
+                        break  
+                self.expect("]", "Expected ']' to close a row in the immutable array.")
+                self.skip_spaces()
+                if len(row_eval_values) != dimensions[1]:
+                    raise ParserError(f"ArraySizeError: Expected {dimensions[1]} elements per row, but got {len(row_eval_values)}.")
+                values.append(row_values)
+                eval_values.append(row_eval_values)
+                if self.current_token.token == ",":
+                    self.current_token = self.get_next_token()  # eat ,
+                    self.skip_spaces()
+                else:
+                    break  
+
+            if len(eval_values) != dimensions[0]:
+                raise ParserError(f"ArraySizeError: Expected {dimensions[0]} rows, but got {len(eval_values)}.")
+        self.symbol_table.define_immo_array(arr_name.symbol, dimensions, eval_values)
+        return ImmoArrayDec(arr_name, dimensions, values)
     
     ############ EXPRESSIONS ##############
 

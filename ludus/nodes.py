@@ -24,6 +24,7 @@ class NodeType:
     STRUCT_INST_FIELD   = "StructInstField"
     IMMO_VAR_DEC        = "ImmoVarDec"
     BATCH_IMMO_VAR_DEC  = "BatchImmoVarDec"
+    IMMO_ARRAY_DEC      = "ImmoArrayDec"
 
 class Stmt:
     def __init__(self, kind: str):
@@ -208,4 +209,11 @@ class BatchImmoVarDec(Stmt):
     def __init__(self, declarations: list[ImmoVarDec]):
         super().__init__(NodeType.BATCH_IMMO_VAR_DEC)
         self.declarations = declarations
+
+class ImmoArrayDec(Stmt):
+    def __init__(self, name: Identifier, dimensions: List[Optional[int]], elements: List[Expr]):
+        super().__init__(NodeType.IMMO_ARRAY_DEC)
+        self.name = name
+        self.dimensions = dimensions
+        self.elements = elements
 

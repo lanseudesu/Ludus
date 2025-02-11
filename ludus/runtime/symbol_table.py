@@ -9,7 +9,7 @@ class SymbolTable:
         self.struct_table = {}
         self.table = {}
         self.array_table = {}
-        self.structints_table = {}
+        self.structinst_table = {}
 
     TYPE_MAP = {
         int: "hp",
@@ -88,7 +88,7 @@ class SymbolTable:
             raise SymbolTableError(f"DeclarationError: '{name}' is already declared as an array.")
         elif name in self.struct_table:  
             raise SymbolTableError(f"DeclarationError: '{name}' is already declared as a struct.")
-        elif name in self.structints_table:  
+        elif name in self.structinst_table:  
             raise SymbolTableError(f"DeclarationError: {name}' is already declared as a struct instance.")
         
         value_type = type(value)
@@ -144,10 +144,13 @@ class SymbolTable:
 
         value_type_str = self.TYPE_MAP.get(value_type, str(value_type))
 
+       
+        
         self.array_table[name] = {
             "type": value_type_str,
             "dimensions": dimensions,
-            "values": values
+            "values": values,
+            "immo" : False
         }
         
     def define_dead_array(self, name: str, dimensions: list, values: list, datatype):
@@ -160,7 +163,8 @@ class SymbolTable:
         self.array_table[name] = {
             "type": datatype,
             "dimensions": dimensions,
-            "values": values
+            "values": values,
+            "immo" : False
         }
 
     def check_dead_array(self, name: str):
@@ -171,6 +175,8 @@ class SymbolTable:
         
     def check_array(self, name: str):
         if name in self.array_table:
+            if self.array_table[name]["immo"] == True:
+                raise SymbolTableError(f"ImmoArrayError: Array '{name}' is declared as an immutable array.")
             return True
         else:
             return False
@@ -197,6 +203,30 @@ class SymbolTable:
                 target[index] = value
             else:
                 target = target[index]
+    
+    def define_immo_array(self, name: str, dimensions: list, values: list):
+        if name in self.table:
+            raise SymbolTableError(f"DeclarationError: '{name}' is already declared as a variable.")
+        elif name in self.struct_table:
+            raise SymbolTableError(f"DeclarationError: '{name}' is already declared as a struct.")
+        elif name in self.structinst_table:
+            raise SymbolTableError(f"DeclarationError: '{name}' is already declared as a struct instance.")
+        
+        if len(dimensions) > 1:
+            value_type = type(values[0][0])
+        else:
+            value_type = type(values[0])
+        
+        datatype = self.TYPE_MAP.get(value_type, str(value_type))
+        
+        self.array_table[name] = {
+            "type": datatype,
+            "dimensions": dimensions,
+            "values": values,
+            "immo" : True
+        }
+   
+    ####### STRUCT ################
     
     def define_struct(self, name: str, fields_table):
         if name in self.array_table:  
@@ -239,7 +269,7 @@ class SymbolTable:
             raise SymbolTableError(f"DeclarationError: '{name}' is already declared as a variable.")
         elif name in self.struct_table:  
             raise SymbolTableError(f"DeclarationError: '{name}' is already declared as a struct.")
-        elif name in self.structints_table:  
+        elif name in self.structinst_table:  
             raise SymbolTableError(f"DeclarationError: Struct Instance '{name}' already exists.")
         
         for field, details in fields_table.items():
@@ -251,7 +281,7 @@ class SymbolTable:
             if actual_type_name != expected_type:
                 raise SymbolTableError(f"FieldTypeError: Type mismatch for field '{field}': Expected '{expected_type}', but got '{actual_type_name}'.")
         
-        self.structints_table[name] = {
+        self.structinst_table[name] = {
             "fields": fields_table
         }
 
@@ -262,29 +292,29 @@ class SymbolTable:
             raise SymbolTableError(f"DeclarationError: Struct Instance '{name}' does not exist.")
         elif name in self.struct_table:  
             raise SymbolTableError(f"DeclarationError: Struct Instance '{name}' does not exist.")
-        elif name not in self.structints_table:  
+        elif name not in self.structinst_table:  
             raise SymbolTableError(f"DeclarationError: Struct Instance '{name}' does not exist.")
         
         return True
     
     def check_structinst_field(self, name: str, field: str):
-        if field not in self.structints_table[name]["fields"]:
+        if field not in self.structinst_table[name]["fields"]:
             raise SymbolTableError(f"DeclarationError: Field '{field}' does not exist in Struct Instance '{name}'.")
         
     def modify_structinst_field(self, name: str, field: str, value):
-        expected_type = self.structints_table[name]["fields"][field]["datatype"]
+        expected_type = self.structinst_table[name]["fields"][field]["datatype"]
         actual_type_name = self.TYPE_MAP.get(type(value), None)  
         if actual_type_name != expected_type:
             raise SymbolTableError(f"FieldTypeError: Type mismatch for field '{field}': Expected '{expected_type}', but got '{actual_type_name}'.")
         
-        self.structints_table[name]["fields"][field]["value"] = value
+        self.structinst_table[name]["fields"][field]["value"] = value
     
     def __repr__(self):
         tables = {
             "Variables": self.table if self.table else None,
             "Arrays": self.array_table if self.array_table else None,
             "Structs": self.struct_table if self.struct_table else None,
-            "Struct Instances": self.structints_table if self.structints_table else None
+            "Struct Instances": self.structinst_table if self.structinst_table else None
         }
         tables = {key: value for key, value in tables.items() if value is not None}
         return str(tables)
