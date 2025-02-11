@@ -112,13 +112,14 @@ class Semantic:
                 return self.parse_inst_ass()
             else:
                 raise ParserError(f"Unexpected token found during parsing: {la_token.token}")
-    
         elif self.current_token and self.current_token.token in ['hp','xp','comms','flag']:
             return self.var_or_arr()
         elif self.current_token and self.current_token.token == 'build':
             return self.parse_struct()
         elif self.current_token and self.current_token.token == 'access':
             return self.parse_struct_inst()
+        elif self.current_token and self.current_token.token == 'immo':
+            return self.parse_immo()
         else:
             raise ParserError(f"Unexpected token found during parsing: {self.current_token.token}")
     
@@ -600,6 +601,37 @@ class Semantic:
         self.symbol_table.modify_structinst_field(struct_inst_name.symbol, inst_field_name.symbol, eval)
         
         return InstAssignment(left, ':', value)
+    
+    ############ IMMO ##############
+
+    def parse_immo(self) -> ImmoVarDec:
+        self.current_token = self.get_next_token() # eat immo
+        self.skip_spaces()
+        if self.current_token.token == 'access':
+            pass
+        else:
+            if not self.current_token or not re.match(r'^id\d+$', self.current_token.token):
+                raise ParserError("Expected identifier or 'access' after 'immo'.")
+            la_token = self.look_ahead()
+            if la_token is not None and la_token.token == ':':  
+                immo_var = self.parse_immo_var()  
+                return immo_var
+            else:
+                raise ParserError(f"bruh")  
+            
+    def parse_immo_var(self) -> ImmoVarDec:
+        immo_name = Identifier(self.current_token.lexeme)
+        if self.symbol_table.check_var(immo_name.symbol):
+            raise ParserError(f"DeclarationError: Variable '{immo_name.symbol}' is already defined.")
+        self.current_token = self.get_next_token() # eat id
+        self.skip_spaces()
+        self.expect(":", "Expected ':' after immo variable name.")
+        self.skip_spaces()
+        value = self.parse_expr()
+        evaluated_val = evaluate(value, self.symbol_table)
+        self.symbol_table.define_immo_variable(immo_name.symbol, evaluated_val)
+        return ImmoVarDec(immo_name, value)
+            
 
     
     ############ EXPRESSIONS ############

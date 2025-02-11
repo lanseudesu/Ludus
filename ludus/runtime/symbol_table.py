@@ -30,6 +30,9 @@ class SymbolTable:
             )
         
         if name in self.table:
+            if self.table[name]["immo"] == True:
+                raise SymbolTableError(f"DeclarationError: '{name}' is declared as an immutable variable.")
+            
             expected_type = self.table[name]["type"]
             
             if expected_type != value_type_str:
@@ -39,7 +42,8 @@ class SymbolTable:
 
         self.table[name] = {
             "type": value_type_str,
-            "value": value
+            "value": value,
+            "immo" : False
         }
 
     def define_dead_variable(self, name: str, datatype):
@@ -55,7 +59,8 @@ class SymbolTable:
 
         self.table[name] = {
             "type": datatype,  
-            "value": None
+            "value": None,
+            "immo" : False
         }
 
     def define_def_variable(self, name: str, value):
@@ -73,10 +78,28 @@ class SymbolTable:
         value_type_str = self.TYPE_MAP.get(value_type, str(value_type))
 
         self.table[name] = {
-            "type": value_type_str,
-            "value": value
+            "type" : value_type_str,
+            "value": value,
+            "immo" : False
         }
 
+    def define_immo_variable(self, name: str, value):
+        if name in self.array_table:  
+            raise SymbolTableError(f"DeclarationError: '{name}' is already declared as an array.")
+        elif name in self.struct_table:  
+            raise SymbolTableError(f"DeclarationError: '{name}' is already declared as a struct.")
+        elif name in self.structints_table:  
+            raise SymbolTableError(f"DeclarationError: {name}' is already declared as a struct instance.")
+        
+        value_type = type(value)
+        value_type_str = self.TYPE_MAP.get(value_type, str(value_type))
+        
+        self.table[name] = {
+            "type" : value_type_str,
+            "value": value,
+            "immo" : True
+        }
+    
     def get_variable(self, name: str):
         if name not in self.table:
             raise SymbolTableError(f"NameError: Variable '{name}' is not defined.")

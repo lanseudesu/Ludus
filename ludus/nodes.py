@@ -22,6 +22,7 @@ class NodeType:
     STRUCT_INST         = "StructInst"
     INST_ASS_STMT       = "InstAssignmentStmt"
     STRUCT_INST_FIELD   = "StructInstField"
+    IMMO_VAR_DEC        = "ImmoVarDec"
 
 class Stmt:
     def __init__(self, kind: str):
@@ -196,5 +197,10 @@ class InstAssignment(AssignmentStmt):
         self.operator = operator
         self.right = right
 
+class ImmoVarDec(Stmt):
+    def __init__(self, name: Identifier, value: Expr):
+        super().__init__(NodeType.IMMO_VAR_DEC)
+        self.name = name
+        self.value = value
 
 
