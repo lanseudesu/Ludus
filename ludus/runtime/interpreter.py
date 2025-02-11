@@ -23,12 +23,12 @@ def eval_numeric_binary_expr(lhs, rhs, operator):
                 raise SemanticError("ZeroDivisionError: Modulo by zero is not allowed.")
             result = lhs % rhs
         return result
-    except TypeError as e:
-        raise SemanticError(f"TypeError: 'dead' types cannot be used as an operand.")
+    except TypeError:
+        raise SemanticError("TypeError: 'dead' types cannot be used as an operand.")
 
-def eval_binary_expr(binop, symbol_table):
-    lhs = evaluate(binop.left, symbol_table)  
-    rhs = evaluate(binop.right, symbol_table)  
+def eval_binary_expr(binop, symbol_table, scope=None):
+    lhs = evaluate(binop.left, symbol_table, scope)  
+    rhs = evaluate(binop.right, symbol_table, scope)  
 
     if isinstance(lhs, str) and isinstance(rhs, str):
         return eval_concat(lhs, rhs, binop.operator)
@@ -40,14 +40,13 @@ def eval_binary_expr(binop, symbol_table):
         raise SemanticError("TypeError: Cannot mix comms and numeric types in an expression.")
 
     return eval_numeric_binary_expr(lhs, rhs, binop.operator)
+
 def eval_concat(lhs, rhs, operator):
     if operator != '+':
-        raise SemanticError(f"TypeError: Only valid operator between comms is '+'.")
-
-    result = lhs + rhs
-    return result
+        raise SemanticError("TypeError: Only valid operator between comms is '+'.")
+    return lhs + rhs
     
-def evaluate(ast_node, symbol_table):
+def evaluate(ast_node, symbol_table, scope=None):
     if ast_node.kind == "HpLiteral":
         return ast_node.value
     elif ast_node.kind == "XpLiteral":
@@ -57,8 +56,8 @@ def evaluate(ast_node, symbol_table):
     elif ast_node.kind == "FlagLiteral":
         return ast_node.value
     elif ast_node.kind == "BinaryExpr":
-        return eval_binary_expr(ast_node, symbol_table)
+        return eval_binary_expr(ast_node, symbol_table, scope) 
     elif ast_node.kind == "Identifier":
-        return symbol_table.get_variable(ast_node.symbol)
+        return symbol_table.get_variable(ast_node.symbol, scope)  
     else:
-        raise SemanticError("This AST Node has not yet been setup for interpretation.")
+        raise SemanticError("This AST Node has not yet been set up for interpretation.")
