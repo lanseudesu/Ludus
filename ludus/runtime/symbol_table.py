@@ -231,6 +231,30 @@ class SymbolTable:
         self.structints_table[name] = {
             "fields": fields_table
         }
+
+    def check_structinst(self, name: str):
+        if name in self.array_table:  
+            raise SymbolTableError(f"DeclarationError: Struct Instance '{name}' does not exist.")
+        elif name in self.table:  
+            raise SymbolTableError(f"DeclarationError: Struct Instance '{name}' does not exist.")
+        elif name in self.struct_table:  
+            raise SymbolTableError(f"DeclarationError: Struct Instance '{name}' does not exist.")
+        elif name not in self.structints_table:  
+            raise SymbolTableError(f"DeclarationError: Struct Instance '{name}' does not exist.")
+        
+        return True
+    
+    def check_structinst_field(self, name: str, field: str):
+        if field not in self.structints_table[name]["fields"]:
+            raise SymbolTableError(f"DeclarationError: Field '{field}' does not exist in Struct Instance '{name}'.")
+        
+    def modify_structinst_field(self, name: str, field: str, value):
+        expected_type = self.structints_table[name]["fields"][field]["datatype"]
+        actual_type_name = self.TYPE_MAP.get(type(value), None)  
+        if actual_type_name != expected_type:
+            raise SymbolTableError(f"FieldTypeError: Type mismatch for field '{field}': Expected '{expected_type}', but got '{actual_type_name}'.")
+        
+        self.structints_table[name]["fields"][field]["value"] = value
     
     def __repr__(self):
         tables = {

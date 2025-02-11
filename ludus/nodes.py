@@ -20,6 +20,8 @@ class NodeType:
     STRUCT_FIELD        = "StructField"
     STRUCT_DEC          = "StructDec"
     STRUCT_INST         = "StructInst"
+    INST_ASS_STMT       = "InstAssignmentStmt"
+    STRUCT_INST_FIELD   = "StructInstField"
 
 class Stmt:
     def __init__(self, kind: str):
@@ -180,4 +182,19 @@ class StructInst(Stmt):
         self.name = name
         self.parent = parent
         self.body = body
+
+class StructInstField(Stmt):
+    def __init__(self, instance: Identifier, field: Identifier):
+        super().__init__(NodeType.STRUCT_INST_FIELD)
+        self.instance = instance
+        self.field = field
+
+class InstAssignment(AssignmentStmt):
+    def __init__(self, left: StructInstField, operator: str, right: Expr):
+        super().__init__(NodeType.INST_ASS_STMT)
+        self.left = left
+        self.operator = operator
+        self.right = right
+
+
 

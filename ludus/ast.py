@@ -75,7 +75,7 @@ class Semantic:
         
         return program, self.symbol_table
     
-    def parse_func(self):
+    def parse_func(self) -> PlayFunc:
         self.skip_whitespace()
 
         if not self.current_token or self.current_token.token != "play":
@@ -108,6 +108,8 @@ class Semantic:
                 return self.parse_var_init()
             elif la_token is not None and la_token.token == '[':  
                 return self.parse_array()
+            elif la_token is not None and la_token.token == '.':  
+                return self.parse_inst_ass()
             else:
                 raise ParserError(f"Unexpected token found during parsing: {la_token.token}")
     
@@ -577,6 +579,29 @@ class Semantic:
         type_literals = {str: CommsLiteral, int: HpLiteral, float: XpLiteral, bool: FlagLiteral}
         return type_literals.get(type(value), lambda x: x)(value) if value is not None else None
         
+    def parse_inst_ass(self) -> InstAssignment:
+        struct_inst_name = Identifier(self.current_token.lexeme)
+        self.symbol_table.check_structinst(self.current_token.lexeme)
+        self.current_token = self.get_next_token() # eat id
+        if self.current_token.token != '.':
+            raise ParserError("Expected '.' after struct instance name.")
+        self.current_token = self.get_next_token() # eat .
+        if not self.current_token or not re.match(r'^id\d+$', self.current_token.token):
+            raise ParserError("Expected struct instance field name after struct instance name.")
+        inst_field_name = Identifier(self.current_token.lexeme)
+        self.symbol_table.check_structinst_field(struct_inst_name.symbol, self.current_token.lexeme)
+        left = StructInstField(struct_inst_name, inst_field_name)
+        self.current_token = self.get_next_token() # eat id
+        self.skip_spaces()
+        self.expect(":","Expected ':' after struct instance field name.")
+        self.skip_spaces()
+        value = self.parse_expr()
+        eval = evaluate(value, self.symbol_table)
+        self.symbol_table.modify_structinst_field(struct_inst_name.symbol, inst_field_name.symbol, eval)
+        
+        return InstAssignment(left, ':', value)
+
+    
     ############ EXPRESSIONS ############
 
     def parse_expr(self) -> Expr:
