@@ -189,11 +189,11 @@ class SymbolTable:
                 continue
             actual_type_name = self.TYPE_MAP.get(type(value), None)  
             if actual_type_name != expected_type:
-                raise SymbolTableError(f"Type mismatch for field '{field}': Expected '{expected_type}', but got '{actual_type_name}'.")
+                raise SymbolTableError(f"FieldTypeError: Type mismatch for field '{field}': Expected '{expected_type}', but got '{actual_type_name}'.")
         
         self.struct_table = {
-        "name": name,
-        "fields": fields_table
+            "name": name,
+            "fields": fields_table
         }
     
     def __repr__(self):

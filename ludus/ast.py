@@ -468,6 +468,8 @@ class Semantic:
                 value = self.parse_expr()  
                 eval_val = evaluate(value, self.symbol_table)  
                 fields.append(StructFields(field_name, value))  
+                if field_name.symbol in fields_table:
+                    raise ParserError(f"FieldError: Duplicate field name detected: '{field_name.symbol}'.")
                 fields_table[field_name.symbol] = {
                     "datatype": datatype,
                     "value": eval_val
@@ -475,6 +477,8 @@ class Semantic:
                 self.skip_whitespace()
             else:
                 fields.append(StructFields(field_name, None))
+                if field_name.symbol in fields_table:
+                    raise ParserError(f"FieldError: Duplicate field name detected: '{field_name.symbol}'.")
                 fields_table[field_name.symbol] = {
                     "datatype": datatype,
                     "value": None
