@@ -56,11 +56,16 @@ class Parser:
                     #print(self.stack)
                 else:
                     #print("1") #error append then return false :DDDDD
-                    return f"Unexpected token '{self.current_token.token}' at line {self.current_token.line} and column {self.current_token.column}."
+                    expected_tokens = list(parse_table[self.top].keys()) 
+                    return (f"Syntax Error: Unexpected token '{self.current_token.token}' at line {self.current_token.line} and column {self.current_token.column}."
+                            f" Expected tokens: {', '.join(expected_tokens)}.")
             else:
                 #print("2")
-                return f"Unexpected token '{self.current_token.token}' at line {self.current_token.line} and column {self.current_token.column}."
+                return f"Syntax Error: Unexpected token '{self.current_token.token}' at line {self.current_token.line} and column {self.current_token.column}."
 
+        while self.current_token.token in {"newline", "space"}:
+                self.current_token = self.get_next_token()
+        
         if self.current_token.token == 'EOF':
             return 'Valid syntax.'
         else:
