@@ -21,6 +21,13 @@ class Semantic:
         self.current_token = self.get_next_token()
         self.symbol_table = SymbolTable()
 
+    TYPE_MAP = {
+        int: "hp",
+        float: "xp",
+        str: "comms",
+        bool: "flag"
+    }
+
     def get_next_token(self):
         if self.current_token_index < len(self.tokens):
             token = self.tokens[self.current_token_index]
@@ -108,10 +115,12 @@ class Semantic:
             return self.var_or_arr()
         elif self.current_token and self.current_token.token == 'build':
             return self.parse_struct()
+        elif self.current_token and self.current_token.token == 'access':
+            return self.parse_struct_inst()
         else:
             raise ParserError(f"Unexpected token found during parsing: {self.current_token.token}")
     
-    ### ARRAYS AND VARIABLES
+    ######### ARRAYS AND VARIABLES #########
     
     def var_or_arr(self):
         datatype = self.current_token.token  
@@ -492,6 +501,82 @@ class Semantic:
         self.symbol_table.define_struct(struct_name.symbol, fields_table)
         return StructDec(struct_name, fields)
     
+    def parse_struct_inst(self) -> StructInst:
+        self.current_token = self.get_next_token()  # eat 'access'
+        self.skip_whitespace()
+        
+        if not self.current_token or not re.match(r'^id\d+$', self.current_token.token):
+            raise ParserError("Expected struct name after 'access'.")
+
+        struct_parent = self.current_token.lexeme
+
+        if not self.symbol_table.check_struct(struct_parent):
+            raise ParserError(f"Struct '{struct_parent}' is not defined.")
+        
+        field_table = self.symbol_table.get_fieldtable(struct_parent)
+
+        self.current_token = self.get_next_token()  # eat id
+        self.skip_spaces()
+        
+        if not self.current_token or not re.match(r'^id\d+$', self.current_token.token):
+            raise ParserError("Expected struct instance name after struct name.")
+        
+        inst_name = Identifier(self.current_token.lexeme)
+        self.current_token = self.get_next_token()  # eat id
+        self.skip_spaces()
+
+        values, eval_values = [], []
+        if self.current_token.token == ':':
+            self.current_token = self.get_next_token()  # eat ':'
+            self.skip_spaces()
+   
+            while self.current_token.token != ',':
+                value = self.parse_expr()
+                eval_val = evaluate(value, self.symbol_table)
+                values.append(value)
+                eval_values.append(eval_val)
+                self.skip_spaces()
+                if self.current_token.token == ',':
+                    self.current_token = self.get_next_token()  # eat ','
+                    self.skip_spaces()
+                    if self.current_token.token == 'newline':
+                        raise ParserError("Unexpected newline found after struct instance value.")
+                elif self.current_token.token == 'newline':
+                    break
+        return self.create_struct_instance(inst_name, struct_parent, field_table, values, eval_values)
+
+    def create_struct_instance(self, inst_name, struct_parent, field_table, values, eval_values):
+        struct_fields = []
+        new_field_table = {}
+        field_names = list(field_table.keys())
+
+        if len(eval_values) > len(field_names):
+            raise ParserError(f"Too many values provided for struct '{struct_parent}'. Expected {len(field_names)}, got {len(eval_values)}.")
+
+        for i, field in enumerate(field_names):
+            expected_type = field_table[field]["datatype"]
+            default_value = field_table[field]["value"]
+
+            if i < len(eval_values):  
+                actual_type_name = self.TYPE_MAP.get(type(eval_values[i]), None)
+                if actual_type_name != expected_type:
+                    raise ParserError(f"FieldTypeError: Type mismatch for field '{field}'. Expected '{expected_type}', but got '{actual_type_name}'.")
+                
+                value_to_use = eval_values[i]
+                struct_fields.append(StructFields(field, values[i]))  
+            else:  
+                value_to_use = default_value if default_value is not None else None
+                struct_fields.append(StructFields(field, self.get_default_literal(default_value)))
+
+            new_field_table[field] = {"datatype": expected_type, "value": value_to_use}
+
+        self.symbol_table.define_structinst(inst_name.symbol, new_field_table)
+        return StructInst(inst_name, struct_parent, struct_fields)
+
+    def get_default_literal(self, value):
+        type_literals = {str: CommsLiteral, int: HpLiteral, float: XpLiteral, bool: FlagLiteral}
+        return type_literals.get(type(value), lambda x: x)(value) if value is not None else None
+        
     ############ EXPRESSIONS ############
 
     def parse_expr(self) -> Expr:
@@ -534,23 +619,19 @@ class Semantic:
         if tk == 'id':
             identifier = Identifier(symbol=self.current_token.lexeme)
             self.current_token = self.get_next_token()
-            self.skip_whitespace()
             return identifier
         elif tk == 'hp_ltr' or tk == 'nhp_ltr':
             literal = HpLiteral(value=self.current_token.lexeme)
             self.current_token = self.get_next_token()
-            self.skip_whitespace()
             return literal
         elif tk == 'xp_ltr' or tk == 'nxp_ltr':
             literal = XpLiteral(value=self.current_token.lexeme)
             self.current_token = self.get_next_token()
-            self.skip_whitespace()
             return literal
         elif tk == 'comms_ltr':
             value = re.sub(r'^"(.*)"$', r'\1', self.current_token.lexeme)
             literal = CommsLiteral(value)
             self.current_token = self.get_next_token()
-            self.skip_whitespace()
             return literal
         elif tk == 'flag_ltr':
             lexeme = self.current_token.lexeme 
@@ -560,16 +641,12 @@ class Semantic:
                 value = False
             literal = FlagLiteral(value)
             self.current_token = self.get_next_token()
-            self.skip_whitespace()
             return literal
         elif tk == '(':
             self.current_token = self.get_next_token()
-            self.skip_whitespace()
             value = self.parse_expr()  
-            self.skip_whitespace()
             
             self.expect(')', "Unexpected token found inside parenthesised expression. Expected closing parenthesis.")
-            self.skip_whitespace()
             return value
 
         else:

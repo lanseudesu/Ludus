@@ -1,24 +1,25 @@
 from typing import List, Optional
 
 class NodeType:
-    PROGRAM         = "Program"
-    HP_LITERAL      = "HpLiteral"
-    XP_LITERAL      = "XpLiteral"
-    COMMS_LITERAL   = "CommsLiteral"
-    FLAG_LITERAL    = "FlagLiteral"
-    IDENTIFIER      = "Identifier"
-    BINARY_EXPR     = "BinaryExpr"
-    FUNCTION_DEC    = "FunctionDec"
-    BLOCK_STMT      = "BlockStmt"
-    PLAY_FUNC       = "PlayFunc"
-    VAR_DEC         = "VarDec"
-    BATCH_VAR_DEC   = "BatchVarDec"
-    ARRAY_DEC       = "ArrayDec"
-    ASS_STMT        = "AssignmentStmt"
-    ARR_ASS_STMT    = "ArrayAssignmentStmt"
-    VAR_ASS_STMT    = "VarAssignmentStmt"
-    STRUCT_FIELD    = "StructField"
-    STRUCT_DEC      = "StructDec"
+    PROGRAM             = "Program"
+    HP_LITERAL          = "HpLiteral"
+    XP_LITERAL          = "XpLiteral"
+    COMMS_LITERAL       = "CommsLiteral"
+    FLAG_LITERAL        = "FlagLiteral"
+    IDENTIFIER          = "Identifier"
+    BINARY_EXPR         = "BinaryExpr"
+    FUNCTION_DEC        = "FunctionDec"
+    BLOCK_STMT          = "BlockStmt"
+    PLAY_FUNC           = "PlayFunc"
+    VAR_DEC             = "VarDec"
+    BATCH_VAR_DEC       = "BatchVarDec"
+    ARRAY_DEC           = "ArrayDec"
+    ASS_STMT            = "AssignmentStmt"
+    ARR_ASS_STMT        = "ArrayAssignmentStmt"
+    VAR_ASS_STMT        = "VarAssignmentStmt"
+    STRUCT_FIELD        = "StructField"
+    STRUCT_DEC          = "StructDec"
+    STRUCT_INST         = "StructInst"
 
 class Stmt:
     def __init__(self, kind: str):
@@ -172,3 +173,11 @@ class StructDec(Stmt):
         super().__init__(NodeType.STRUCT_DEC)
         self.name = name
         self.body = body
+
+class StructInst(Stmt):
+    def __init__(self, name: Identifier, parent: str, body: List[StructFields]):
+        super().__init__(NodeType.STRUCT_INST)
+        self.name = name
+        self.parent = parent
+        self.body = body
+

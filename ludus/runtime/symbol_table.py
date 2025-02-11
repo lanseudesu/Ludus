@@ -9,6 +9,7 @@ class SymbolTable:
         self.struct_table = {}
         self.table = {}
         self.array_table = {}
+        self.structints_table = {}
 
     TYPE_MAP = {
         int: "hp",
@@ -191,8 +192,43 @@ class SymbolTable:
             if actual_type_name != expected_type:
                 raise SymbolTableError(f"FieldTypeError: Type mismatch for field '{field}': Expected '{expected_type}', but got '{actual_type_name}'.")
         
-        self.struct_table = {
-            "name": name,
+        self.struct_table[name] = {
+            "fields": fields_table
+        }
+
+    def check_struct(self, name: str):
+        if name in self.array_table:  
+            raise SymbolTableError(f"DeclarationError: Struct '{name}' does not exist.")
+        elif name in self.table:  
+            raise SymbolTableError(f"DeclarationError: Struct '{name}' does not exist.")
+        elif name not in self.struct_table:  
+            raise SymbolTableError(f"DeclarationError: Struct '{name}' does not exist.")
+        
+        return True
+    
+    def get_fieldtable(self, name: str):
+        return self.struct_table[name]["fields"]
+    
+    def define_structinst(self, name: str, fields_table):
+        if name in self.array_table:  
+            raise SymbolTableError(f"DeclarationError: '{name}' is already declared as an array.")
+        elif name in self.table:  
+            raise SymbolTableError(f"DeclarationError: '{name}' is already declared as a variable.")
+        elif name in self.struct_table:  
+            raise SymbolTableError(f"DeclarationError: '{name}' is already declared as a struct.")
+        elif name in self.structints_table:  
+            raise SymbolTableError(f"DeclarationError: Struct Instance '{name}' already exists.")
+        
+        for field, details in fields_table.items():
+            expected_type = details["datatype"]
+            value = details["value"]
+            if value is None:
+                continue
+            actual_type_name = self.TYPE_MAP.get(type(value), None)  
+            if actual_type_name != expected_type:
+                raise SymbolTableError(f"FieldTypeError: Type mismatch for field '{field}': Expected '{expected_type}', but got '{actual_type_name}'.")
+        
+        self.structints_table[name] = {
             "fields": fields_table
         }
     
@@ -200,7 +236,8 @@ class SymbolTable:
         tables = {
             "Variables": self.table if self.table else None,
             "Arrays": self.array_table if self.array_table else None,
-            "Structs": self.struct_table if self.struct_table else None
+            "Structs": self.struct_table if self.struct_table else None,
+            "Struct Instances": self.structints_table if self.structints_table else None
         }
         tables = {key: value for key, value in tables.items() if value is not None}
         return str(tables)
