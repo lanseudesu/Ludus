@@ -57,6 +57,7 @@ cfg = {
     "<defparam_recur>": [[",", "<defparam>"],
                          ["λ"]],
     "<common_stmts>": [["<local_dec>"],
+                       ["<local_dec_or_ass>"],
                        ["<builtin_no_ret>"],
                        ["<local_struct>"],
                        ["<struct_inst>"]],
@@ -69,8 +70,8 @@ cfg = {
     "<body_recur>": [["<body>"], 
                      ["λ"]],
     "<local_dec>": [["immo", "<local_immo_tail>"], 
-                    ["<datatype>", "id", "<global_dec_tail3>"], 
-                    ["id", "<dec_tail>"]],
+                    ["<datatype>", "id", "<global_dec_tail3>"]],
+    "<local_dec_or_ass>": [["id", "<dec_tail>"]],
     "<local_immo_tail>": [["id", "<global_dec_tail1>"], 
                           ["access", "id", "id", ":", "<value>", "<elems_recur>"]],
     "<dec_tail>": [["<col_or_ass>"], 
@@ -250,7 +251,6 @@ cfg = {
     "<func_loop_recur>": [["<func_loop_cond>"], ["λ"]]
 }
 
-
 def compute_first_set(cfg):
     first_set = {non_terminal: set() for non_terminal in cfg.keys()}
 
@@ -409,4 +409,4 @@ def check_ambiguity(cfg, predict_set):
     else:
         print("\nNo ambiguities found in the CFG.")
 
-#check_ambiguity(cfg, predict_set)
+# check_ambiguity(cfg, predict_set)
