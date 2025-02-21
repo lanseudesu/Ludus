@@ -38,20 +38,20 @@ class Parser:
             if re.match(r'^id\d+$', self.current_token.token):
                 self.current_token.token= 'id'
 
-            print(f"Current Top = {self.top}")
-            print(f"Current Token = {self.current_token.token}")
+            # print(f"Current Top = {self.top}")
+            # print(f"Current Token = {self.current_token.token}")
 
             if self.top == self.current_token.token:
-                print(f"Matched: {self.current_token.token} and {self.top}")
+                # print(f"Matched: {self.current_token.token} and {self.top}")
                 self.current_token = self.get_next_token()
             elif self.top in parse_table:
                 if self.current_token.token in parse_table[self.top]:
                     production = parse_table[self.top][self.current_token.token]
-                    print(f"Expand: {self.top} → {' '.join(production)}")
+                    # print(f"Expand: {self.top} → {' '.join(production)}")
 
                     if "λ" not in production:
                         self.stack.extend(reversed(production))
-                    print(self.stack)
+                    # print(self.stack)
                 else:
                     expected_tokens = list(parse_table[self.top].keys()) 
                     if self.current_token.token not in expected_tokens:

@@ -20,6 +20,7 @@ class Semantic:
         self.current_token_index = 0
         self.current_token = self.get_next_token()
         self.symbol_table = SymbolTable()
+        self.globalstruct = []
 
     TYPE_MAP = {
         int: "hp",
@@ -68,28 +69,29 @@ class Semantic:
                 if self.current_token and re.match(r'^id\d+$', self.current_token.token):
                     la_token = self.look_ahead()
                     if la_token is not None and la_token.token in [':',',']:  
-                        return self.parse_var_init()
+                        program.body.append(self.parse_var_init("global"))
                     elif la_token is not None and la_token.token == '[':  
-                        return self.parse_array()
+                        program.body.append(self.parse_array("global"))
                     else:
                         raise ParserError(f"Unexpected token found during parsing: {la_token.token}")
                 elif self.current_token and self.current_token.token in ['hp','xp','comms','flag']:
-                    program.body.append(self.parse_func())
-                    self.current_token = self.get_next_token()
+                    program.body.append(self.var_or_arr("global"))
                 elif self.current_token and self.current_token.token == 'immo':
-                    program.body.append(self.parse_func())
+                    program.body.append(self.parse_immo("global"))
                     self.current_token = self.get_next_token()
                 elif self.current_token and self.current_token.token == 'generate':
                     program.body.append(self.parse_func())
                     self.current_token = self.get_next_token()
                 elif self.current_token and self.current_token.token == 'build':
-                    program.body.append(self.parse_func())
-                    self.current_token = self.get_next_token()
+                    program.body.append(self.parse_globalstruct())
                 elif self.current_token and self.current_token.token == 'play':
                     program.body.append(self.parse_func())
                     self.current_token = self.get_next_token()
                 else:
                     raise ParserError(f"Unexpected token found during parsing: {self.current_token.token}")
+                
+            if self.globalstruct:
+                raise ParserError(f"StructError: Global struct '{self.globalstruct[0]}' was declared but not initialized.")
                 
         except ParserError as e:
             return e, self.symbol_table
@@ -239,6 +241,8 @@ class Semantic:
         else:
             var = var_names[0]
             if self.symbol_table.check_var(var.symbol,scope):
+                if scope == "global":
+                    raise ParserError(f"AssignmentError: Assignment statement cannot be done globally for global variable: '{var.symbol}'.")
                 self.symbol_table.define_variable(var.symbol, evaluated_val, scope)
                 return VarAssignment(var, ':', value)
             else:
@@ -478,10 +482,7 @@ class Semantic:
   
     ############ STRUCTS ###############
 
-    def parse_struct(self, scope) -> StructDec:
-        fields_table = {}
-        fields = []
-
+    def parse_globalstruct(self) -> Union[StructDec, GlobalStructDec]:
         self.current_token = self.get_next_token() # eat build
         self.skip_whitespace()
         if not self.current_token or not re.match(r'^id\d+$', self.current_token.token):
@@ -489,6 +490,32 @@ class Semantic:
         struct_name = Identifier(self.current_token.lexeme)
         self.current_token = self.get_next_token() # eat id
         self.skip_whitespace()
+        if self.current_token.token == '{':
+            for item in self.globalstruct:
+                if item == struct_name.symbol:
+                    self.globalstruct.remove(item)
+                    return self.create_struct(struct_name, "global")
+                
+            raise ParserError(f"StructError: Global struct '{struct_name.symbol}' was not declared.")
+        else:
+            if struct_name.symbol in self.globalstruct:
+                raise ParserError(f"StructError: Global struct '{struct_name.symbol}' was already declared.")
+            self.globalstruct.append(struct_name.symbol)
+            return GlobalStructDec(struct_name)
+    
+    def parse_struct(self, scope) -> StructDec:
+        self.current_token = self.get_next_token() # eat build
+        self.skip_whitespace()
+        if not self.current_token or not re.match(r'^id\d+$', self.current_token.token):
+                raise ParserError("Expected struct name after 'build'.")
+        struct_name = Identifier(self.current_token.lexeme)
+        self.current_token = self.get_next_token() # eat id
+        self.skip_whitespace()
+        return self.create_struct(struct_name, scope)
+    
+    def create_struct(self, struct_name, scope) -> StructDec:
+        fields_table = {}
+        fields = []
         self.expect("{","StructDeclarationError: Struct fields must be enclosed in curly braces.")
         self.skip_whitespace()
         while self.current_token and self.current_token.token != '}':
@@ -599,7 +626,7 @@ class Semantic:
 
             new_field_table[field] = {"datatype": expected_type, "value": value_to_use}
 
-        self.symbol_table.define_structinst(inst_name.symbol, new_field_table)
+        self.symbol_table.define_structinst(inst_name.symbol, new_field_table, scope)
         return StructInst(inst_name, struct_parent, struct_fields)
 
     def get_default_literal(self, value):
@@ -700,7 +727,7 @@ class Semantic:
         if len(immo_declarations) > 1:
             return BatchImmoVarDec(declarations=immo_declarations)
         else:
-            return ImmoVarDec(immo_declarations[0], value)
+            return immo_declarations[0]
     
     def parse_immo_arr(self, scope) -> ImmoArrayDec:
         arr_name = Identifier(self.current_token.lexeme)
@@ -939,9 +966,10 @@ def check(fn, text):
 
     result = parse(fn, text)
 
-    if result != 'Valid syntax.':
+    if result != 'No lexical errors found!\nValid syntax.':
         return 'Syntax errors found, cannot continue with semantic analyzing. Please check syntax tab.', {}
 
     semantic = Semantic(tokens)
+    
     result, table = semantic.produce_ast()
     return result, table

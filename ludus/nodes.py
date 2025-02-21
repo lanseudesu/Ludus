@@ -25,7 +25,8 @@ class NodeType:
     IMMO_VAR_DEC        = "ImmoVarDec"
     BATCH_IMMO_VAR_DEC  = "BatchImmoVarDec"
     IMMO_ARRAY_DEC      = "ImmoArrayDec"
-    IMMO_INST         = "ImmoStructInst"
+    IMMO_INST           = "ImmoStructInst"
+    GLOBAL_STRUCT_DEC   = "GlobalStructDec"
 
 class Stmt:
     def __init__(self, kind: str):
@@ -224,3 +225,8 @@ class ImmoInstDec(Stmt):
         self.name = name
         self.parent = parent
         self.body = body
+
+class GlobalStructDec(Stmt):
+    def __init__(self, name: Identifier):
+        super().__init__(NodeType.GLOBAL_STRUCT_DEC)
+        self.name = name
