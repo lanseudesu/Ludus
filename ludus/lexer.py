@@ -186,12 +186,12 @@ class Lexer:
     
     def process_token(self, cur_ln, cur_col, lexeme, token, valid_delims, errors, tokens):
         if (self.current_char == '\n' and '\n' not in valid_delims) or (self.current_char is None and '\n' not in valid_delims):
-            error_msg = f"Invalid delimiter for ' {lexeme} '. Cause: ' \\n '"
+            error_msg = f"Lexical Error: Invalid delimiter for ' {lexeme} '. Cause: ' \\n '"
             errors.append(self.invalid_delim_error(valid_delims, error_msg))
             
             self.advance()
         elif self.current_char is not None and self.current_char not in valid_delims:
-            error_msg = f"Invalid delimiter for ' {lexeme} '. Cause: ' {self.current_char} '"
+            error_msg = f"Lexical Error: Invalid delimiter for ' {lexeme} '. Cause: ' {self.current_char} '"
             errors.append(self.invalid_delim_error(valid_delims, error_msg))
             self.advance()
         else:
@@ -1178,7 +1178,7 @@ class Lexer:
                         self.advance()
                         self.process_token(cur_ln, cur_col, char + char, token_type, valid_delims, errors, tokens)     
                     else:
-                        errors.append(f"Invalid character error at line {self.pos.ln+1}, column {self.pos.col}. Cause: ' {char} '")
+                        errors.append(f"Lexical Error: Invalid character error at line {self.pos.ln+1}, column {self.pos.col}. Cause: ' {char} '")
             elif self.current_char == '!':
                 char = self.current_char
                 self.advance()
@@ -1208,12 +1208,12 @@ class Lexer:
                     self.advance()
 
                 if backtick_count != 3:  
-                    errors.append(f"Incomplete comment delimiter at line {self.pos.ln + 1}, column {self.pos.col - backtick_count}")
+                    errors.append(f"Lexical Error: Incomplete comment delimiter at line {self.pos.ln + 1}, column {self.pos.col - backtick_count}")
                 else:
                     comment = ""
                     while True:
                         if self.current_char is None: 
-                            errors.append(f"Unclosed multi-line comment starting at line {self.pos.ln + 1}")
+                            errors.append(f"Lexical Error: Unclosed multi-line comment starting at line {self.pos.ln + 1}")
                             break
 
                         if self.current_char == '`':  
@@ -1230,7 +1230,7 @@ class Lexer:
                             comment += self.current_char
                             self.advance()
             else:
-                errors.append(f"Unknown character ' {self.current_char} ' at line {self.pos.ln + 1}, column {self.pos.col + 1}")
+                errors.append(f"Lexical Error: Unknown character ' {self.current_char} ' at line {self.pos.ln + 1}, column {self.pos.col + 1}")
                 self.advance()
         
         tokens.append(Token(TT_EOF, TT_EOF, cur_ln, cur_col))
@@ -1269,7 +1269,7 @@ class Lexer:
                         num_str += self.current_char
                         self.advance()
                     if negate: num_str = '-' + num_str
-                    add_error(f"Too many decimal points in {num_str}")
+                    add_error(f"Lexical Error: Too many decimal points in {num_str}")
                     return [], errors
                 if self.prev_char == '-':
                     dot_count += 1
@@ -1300,7 +1300,7 @@ class Lexer:
                             num_str += self.current_char
                             self.advance()
                         if negate: num_str = '-' + num_str
-                        add_error(f"Maximum number of whole numbers reached in {num_str}")
+                        add_error(f"Lexical Error: Maximum number of whole numbers reached in {num_str}")
                         return [], errors
                 else:  
                     if dec_len < 7:
@@ -1318,7 +1318,7 @@ class Lexer:
                                     num_str += self.current_char
                                     self.advance()
                                 if negate: num_str = '-' + num_str
-                                add_error(f"Maximum number of decimal numbers reached in {num_str}")
+                                add_error(f"Lexical Error: Maximum number of decimal numbers reached in {num_str}")
                                 return [], errors
                             else:
                                 reserved_dec = ''
@@ -1330,13 +1330,13 @@ class Lexer:
                             num_str += self.current_char
                             self.advance()
                         if negate: num_str = '-' + num_str
-                        add_error(f"Maximum number of decimal numbers reached in {num_str}")
+                        add_error(f"Lexical Error: Maximum number of decimal numbers reached in {num_str}")
                         return [], errors
             self.advance()
 
         if dot_count > 0 and num_str.endswith('.'):
             if negate: num_str = '-' + num_str
-            add_error(f"Invalid number '{num_str}'. Trailing decimal point without digits")
+            add_error(f"Lexical Error: Invalid number '{num_str}'. Trailing decimal point without digits")
             return [], errors
         
         if not negate:
@@ -1345,7 +1345,7 @@ class Lexer:
             num_str = '-' + num_str
             if num_str == '-0' or num_str == '-0.0':
                 return Token('0', TT_HP, cur_ln, cur_col), errors
-            token_type = TT_NXP if dot_count > 0 else TT_NHP
+            token_type = TT_XP if dot_count > 0 else TT_HP
             
         return Token(num_str, token_type, cur_ln, cur_col), errors
 
@@ -1367,7 +1367,7 @@ class Lexer:
                 while self.current_char is not None and self.current_char not in id_delim:
                         id_str += self.current_char
                         self.advance()
-                add_error(f"Maximum number characters reached in '{id_str}'")
+                add_error(f"Lexical Error: Maximum number characters reached in '{id_str}'")
                 return [], errors
             
         return Token(id_str, self.identifiers(id_str), cur_ln, cur_col), errors
@@ -1429,13 +1429,13 @@ class Lexer:
                     self.advance() 
                     return Token('"' + string + '"', TT_COMMS, cur_ln, cur_col), errors  
                 elif self.current_char == '\n':
-                    errors.append(f'Unclosed string literal "{string} at line {self.pos.ln + 1}, column {self.pos.col - len(string)}')
+                    errors.append(f'Lexical Error: Unclosed string literal "{string} at line {self.pos.ln + 1}, column {self.pos.col - len(string)}')
                     return [], errors
                 else:
                     string += self.current_char  
             self.advance()
 
-        errors.append(f'Unclosed string literal "{string} at line {self.pos.ln + 1}, column {self.pos.col - len(string)}')
+        errors.append(f'Lexical Error: Unclosed string literal "{string} at line {self.pos.ln + 1}, column {self.pos.col - len(string)}')
         return [], errors
 
 ### RUN ###

@@ -33,7 +33,7 @@ def syntax_analyzer(input_text):
 def semantic_analyzer(input_text):
     result, table = ast.check("yo", input_text)
     
-    output = str(result) + "\n" + str(table) # todo: get rid of table if error also valid semantic if valid semantic instead of ast
+    output = str(result) + "\n" + str(table) 
     eel.updateTerminal(output)
 
 eel.start('semantic_page.html', size=(1920,1080)) 

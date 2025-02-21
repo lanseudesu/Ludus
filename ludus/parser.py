@@ -1,4 +1,4 @@
-from .cfg import parse_table
+from .cfg import parse_table, first_set
 from .lexer import Lexer
 import re
 
@@ -53,8 +53,20 @@ class Parser:
                         self.stack.extend(reversed(production))
                     print(self.stack)
                 else:
-                    #print("1") #error append then return false :DDDDD
                     expected_tokens = list(parse_table[self.top].keys()) 
+                    if self.current_token.token not in expected_tokens:
+                        if self.top in first_set:  
+                            expected_tokens = list(first_set[self.top]) 
+                            
+                        if "λ" in expected_tokens:
+                            expected_tokens.remove("λ")
+                            if self.stack:
+                                next_top = self.stack[-1]  
+                                if next_top in parse_table:
+                                    expected_tokens.extend(parse_table[next_top].keys())  
+
+                        expected_tokens = list(set(expected_tokens))
+                    
                     return (f"Syntax Error: Unexpected token '{self.current_token.token}' at line {self.current_token.line} and column {self.current_token.column}."
                             f" Expected tokens: {', '.join(expected_tokens)}.")
             else:
@@ -79,7 +91,7 @@ def parse(fn, text):
     syntax = Parser(tokens)
     result = syntax.parser() 
 
-    return result
+    return f"No lexical errors found!\n{result}"
       
 
 

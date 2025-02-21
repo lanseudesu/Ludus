@@ -390,7 +390,7 @@ def display_parse_table(parse_table):
             print(f"  Terminal: {terminal} -> Production: {production}")
         print()  
 
-#display_parse_table(parse_table)
+# display_parse_table(parse_table)
 
 def check_ambiguity(cfg, predict_set):
     ambiguous_productions = []
