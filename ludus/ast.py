@@ -966,7 +966,7 @@ def check(fn, text):
 
     result = parse(fn, text)
 
-    if result != 'No lexical errors found!\nValid syntax.':
+    if result != 'No lexical errors found!Valid syntax.':
         return 'Syntax errors found, cannot continue with semantic analyzing. Please check syntax tab.', {}
 
     semantic = Semantic(tokens)
