@@ -6,6 +6,7 @@ class NodeType:
     XP_LITERAL          = "XpLiteral"
     COMMS_LITERAL       = "CommsLiteral"
     FLAG_LITERAL        = "FlagLiteral"
+    DEAD_LITERAL        = "DeadLiteral"
     IDENTIFIER          = "Identifier"
     BINARY_EXPR         = "BinaryExpr"
     FUNCTION_DEC        = "FunctionDec"
@@ -113,6 +114,21 @@ class FlagLiteral(Expr):
     def __init__(self, value: bool):
         super().__init__(NodeType.FLAG_LITERAL)
         self.value = value
+
+class DeadLiteral(Expr):
+    def __init__(self, value: None, datatype: str):
+        super().__init__(NodeType.DEAD_LITERAL)
+        self.value = value
+        self.datatype = datatype
+
+    def get_expected_type(self):
+        type_map = {
+            "hp": int,
+            "xp": float,
+            "comms": str,
+            "flag": bool
+        }
+        return type_map.get(self.datatype, None)
 
 class PlayFunc(Stmt):
     def __init__(self, body: 'BlockStmt'):

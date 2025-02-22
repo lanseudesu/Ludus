@@ -1,4 +1,5 @@
 from .new_symboltable import SymbolTable
+from ..error import SemanticError
 
 symbol_table = SymbolTable()
 
@@ -16,8 +17,10 @@ def evaluate(ast_node, symbol_table):
     elif ast_node.kind == "Identifier":
         value = symbol_table.lookup(ast_node.symbol)
         if value is None:
-            raise Exception(f"Variable '{ast_node.symbol}' is not defined.")
+            raise SemanticError(f"Variable '{ast_node.symbol}' is not defined.")
         return value
+    elif ast_node.kind == "DeadLiteral":
+        return None
     
 def eval_binary_expr(binop, symbol_table):
     lhs = evaluate(binop.left, symbol_table)
@@ -27,16 +30,16 @@ def eval_binary_expr(binop, symbol_table):
         return eval_concat(lhs, rhs, binop.operator)
 
     if (isinstance(lhs, str) and isinstance(rhs, bool)) or (isinstance(lhs, bool) and isinstance(rhs, str)):
-        raise Exception("TypeError: Cannot mix comms and flags in an expression.")
+        raise SemanticError("TypeError: Cannot mix comms and flags in an expression.")
 
     if isinstance(lhs, str) != isinstance(rhs, str):
-        raise Exception("TypeError: Cannot mix comms and numeric types in an expression.")
+        raise SemanticError("TypeError: Cannot mix comms and numeric types in an expression.")
 
     return eval_numeric_binary_expr(lhs, rhs, binop.operator)
 
 def eval_concat(lhs, rhs, operator):
     if operator != '+':
-        raise Exception("TypeError: Only valid operator between comms is '+'.")
+        raise SemanticError("TypeError: Only valid operator between comms is '+'.")
     return lhs + rhs
 
 def eval_numeric_binary_expr(lhs, rhs, operator):
@@ -49,13 +52,13 @@ def eval_numeric_binary_expr(lhs, rhs, operator):
             result = lhs * rhs
         elif operator == "/":
             if rhs == 0:
-                raise Exception("ZeroDivisionError: Division by zero is not allowed")
+                raise SemanticError("ZeroDivisionError: Division by zero is not allowed")
             result = lhs / rhs
         else:
             if rhs == 0:
-                raise Exception("ZeroDivisionError: Modulo by zero is not allowed.")
+                raise SemanticError("ZeroDivisionError: Modulo by zero is not allowed.")
             result = lhs % rhs
         return result
     except TypeError:
-        raise Exception("TypeError: 'dead' types cannot be used as an operand.")
+        raise SemanticError("TypeError: 'dead' types cannot be used as an operand.")
 
