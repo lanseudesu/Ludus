@@ -11,13 +11,19 @@ class SymbolTable:
     def define_var(self, name: str, value, datatype):
         self.symbols[name] = {
             "type": datatype,
-            "value": value,
+            "value": value
         }
 
     def define_arr(self, name: str, dimensions, values):
         self.symbols[name] = {
             "dimensions": dimensions,
-            "elements": values,
+            "elements": values
+        }
+
+    def define_structinst(self, name: str, parent: str, values):
+        self.symbols[name] = {
+            "parent": parent,
+            "fields": values
         }
 
     def lookup(self, name: str):
@@ -30,4 +36,4 @@ class SymbolTable:
 
         return value
     def __repr__(self):
-        return f"SymbolTable({self.symbols})"
+        return "SymbolTable:\n" + "\n".join(f"{key}: {value}" for key, value in self.symbols.items())

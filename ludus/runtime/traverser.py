@@ -4,6 +4,13 @@ from .new_interpreter import evaluate
 from ..error import SemanticError
 
 class ASTVisitor:
+    TYPE_MAP = {
+        int: "hp",
+        float: "xp",
+        str: "comms",
+        bool: "flag"
+    }
+
     def __init__(self):
         self.symbol_table = SymbolTable()
 
@@ -57,11 +64,37 @@ class ASTVisitor:
                 raise SemanticError(f"All variables in a batch declaration must have the same type. Found types: {declared_types}")
             self.symbol_table.define_arr(node.name.symbol, node.dimensions, values)
     
-    def visit_FunctionDec(self, node: FunctionDec):
-        self.symbol_table.define(node.name.symbol, {
-            "params": [param.symbol for param in node.parameters],
-            "body": node.body
-        })
+    def visit_StructDec(self, node: StructDec):
+        default_values = {
+            'hp': 0,
+            'xp': 0.0,
+            'comms': '',
+            'flag': False
+        }
+        fields = {}
+        for field in node.body:
+            value = field.value if field.value is not None else default_values.get(field.datatype)
+            if value is None:
+                raise SemanticError(f"Unknown data type '{field.datatype}'.")
+            if field.value is not None:
+                value = evaluate(value, self.symbol_table)
+                val_type = self.TYPE_MAP.get(type(value), str(type(value)))
+                if field.datatype != val_type:
+                    raise SemanticError(f"FieldTypeError: Type mismatch for field '{field.name.symbol}'."
+                                        f" Expected '{field.datatype}', but got '{val_type}'.")
+            fields[field.name.symbol] = {
+                "value": value,
+                "datatype": field.datatype
+            }
+        self.symbol_table.define(node.name.symbol, fields)
+
+    def visit_StructInst(self, node: StructInst):
+        fields = []
+        for field in node.body:
+            value = field.value
+            fields.append(value)
+            
+        self.symbol_table.define_structinst(node.name.symbol, node.parent, fields)
 
     def visit_BlockStmt(self, node: BlockStmt):
         for stmt in node.statements:
@@ -136,4 +169,60 @@ class SemanticAnalyzer(ASTVisitor):
         target[final_idx] = value
         
         self.symbol_table.define_arr(node.left.symbol, array_dim, array_data)
+    
+    def visit_StructInst(self, node: StructInst):
+        structinst = self.symbol_table.lookup(node.name.symbol)
+        structparent = self.symbol_table.lookup(structinst["parent"])
+
+        fields = structinst["fields"]
+        field_names = list(structparent.keys())
+        struct_fields = []
+
+        if len(fields) > len(field_names):
+            raise SemanticError(f"Too many values provided for struct '{structinst["parent"]}'." 
+                                f"Expected {len(structparent)}, got {len(structinst["fields"])}.")
         
+        for i, field in enumerate(field_names):
+            default_value = structparent[field]["value"]
+            expected_type = structparent[field]["datatype"]
+
+            if i < len(fields):
+                value_to_use = fields[i]
+                actual_type = self.TYPE_MAP.get(type(value_to_use), None)
+                if actual_type != expected_type:
+                    raise SemanticError(f"FieldTypeError: Type mismatch for field '{field}'." 
+                                      f" Expected '{expected_type}', but got '{actual_type}'.")
+                struct_fields.append({
+                    "name": field,
+                    "value": value_to_use
+                })
+            else:
+                value_to_use = default_value
+                struct_fields.append({
+                    "name": field,
+                    "value": value_to_use
+                })
+            
+        self.symbol_table.define_structinst(node.name.symbol, node.parent, struct_fields)
+
+    def visit_InstAssignmentStmt(self, node: InstAssignment):
+        structinst = self.symbol_table.lookup(node.left.instance.symbol)
+        field_names = [field["name"] for field in structinst["fields"]]
+        new_field = node.left.field.symbol
+        
+        if new_field not in field_names:
+            raise SemanticError(f"FieldError: Field '{new_field}' does not exist "
+                                f"in struct instance '{node.left.instance.symbol}'.")
+        
+        value = evaluate(node.right, self.symbol_table)
+        new_type = self.TYPE_MAP.get(type(value), None)
+
+        for field in structinst["fields"]:
+            if new_field == field["name"]:
+                old_type = self.TYPE_MAP.get(type(field["value"]), None)
+                if old_type != new_type:
+                    raise SemanticError(f"FieldTypeError: Type mismatch for field '{field["name"]}'."
+                                        f" Expected '{old_type}', but got '{new_type}'.")
+                field["value"] = value
+        
+        self.symbol_table.define_structinst(node.left.instance.symbol, structinst["parent"], structinst["fields"])

@@ -188,10 +188,11 @@ class VarAssignment(AssignmentStmt):
         self.right = right
 
 class StructFields(Stmt):
-    def __init__(self, name: Identifier, value: Expr):
+    def __init__(self, name: Identifier, value: Expr, datatype: str):
         super().__init__(NodeType.STRUCT_FIELD)
         self.name = name
         self.value = value
+        self.datatype = datatype
 
 class StructDec(Stmt):
     def __init__(self, name: Identifier, body: List[StructFields]):
@@ -200,7 +201,7 @@ class StructDec(Stmt):
         self.body = body
 
 class StructInst(Stmt):
-    def __init__(self, name: Identifier, parent: str, body: List[StructFields]):
+    def __init__(self, name: Identifier, parent: str, body: List[Expr]):
         super().__init__(NodeType.STRUCT_INST)
         self.name = name
         self.parent = parent

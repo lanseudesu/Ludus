@@ -14,6 +14,8 @@ class Semantic:
         self.var_list = {"global": []} 
         self.arr_list = {"global": []} 
         self.dead_arr_list = {"global": {}} 
+        self.struct_list = {"global": []}
+        self.struct_inst_list = {}
     
     TYPE_MAP = {
         int: "hp",
@@ -100,13 +102,35 @@ class Semantic:
                 return self.parse_var_init(scope)
             elif la_token is not None and la_token.token == '[':  
                 return self.parse_array(scope)
+            elif la_token is not None and la_token.token == '.':  
+                return self.parse_inst_ass(scope)
             else:
                 raise SemanticError(f"Unexpected token found during parsing: {la_token.token}")
         elif self.current_token and self.current_token.token in ['hp','xp','comms','flag']:
             return self.var_or_arr(scope)
+        elif self.current_token and self.current_token.token == 'build':
+            return self.parse_struct(scope)
+        elif self.current_token and self.current_token.token == 'access':
+            return self.parse_struct_inst(scope)
         else:
             raise SemanticError(f"Unexpected token found during parsing: {self.current_token.token}")
+
+    ######### ARRAYS AND VARIABLES #########    
+    def var_or_arr(self, scope) -> Union[VarDec, ArrayDec]:
+        datatype = self.current_token.token  
+
+        self.current_token = self.get_next_token()
+        self.skip_spaces()
+
+        if not self.current_token or not re.match(r'^id\d+$', self.current_token.token):
+            raise SemanticError("Expected variable name.")
         
+        la_token = self.look_ahead()
+        if la_token is not None and la_token.token == '[':  
+            return self.parse_empty_array(datatype, scope)
+        else:
+            return self.parse_var_dec(datatype, scope)
+    
     def parse_var_init(self, scope) -> Union[VarDec, BatchVarDec, VarAssignment]:
         var_names = [Identifier(symbol=self.current_token.lexeme)]  
         name = self.current_token.lexeme
@@ -185,21 +209,6 @@ class Semantic:
                 return VarAssignment(left=var, operator=':', right=value)
             self.var_list[scope].append(name)
             return VarDec(var, value, scope) 
-        
-    def var_or_arr(self, scope) -> Union[VarDec, ArrayDec]:
-        datatype = self.current_token.token  
-
-        self.current_token = self.get_next_token()
-        self.skip_spaces()
-
-        if not self.current_token or not re.match(r'^id\d+$', self.current_token.token):
-            raise SemanticError("Expected variable name.")
-        
-        la_token = self.look_ahead()
-        if la_token is not None and la_token.token == '[':  
-            return self.parse_empty_array(datatype, scope)
-        else:
-            return self.parse_var_dec(datatype, scope)
         
     def parse_var_dec(self, datatype, scope) -> Union[VarDec, BatchVarDec]:
         var_names = []
@@ -433,6 +442,114 @@ class Semantic:
                 f"ArraySizeError: Expected {expected_dims[depth]} elements, but got {len(values)}."
             )
         return values
+
+    ########## STRUCTS ##########
+    def parse_struct(self, scope) -> StructDec:
+        self.current_token = self.get_next_token() # eat build
+        self.skip_spaces()
+        if not self.current_token or not re.match(r'^id\d+$', self.current_token.token):
+                raise SemanticError("Expected struct name after 'build'.")
+        struct_name = Identifier(self.current_token.lexeme)
+        self.current_token = self.get_next_token() # eat id
+        self.skip_whitespace()
+        return self.create_struct(struct_name, scope)
+    
+    def create_struct(self, struct_name, scope) -> StructDec:
+        name = struct_name.symbol
+        fields_table = []
+        fields = []
+        self.expect("{","StructDeclarationError: Struct fields must be enclosed in curly braces.")
+        self.skip_whitespace()
+        while self.current_token and self.current_token.token != '}':
+            datatype = self.current_token.token
+            self.current_token = self.get_next_token()  # eat datatype
+            self.skip_spaces()
+            field_name = Identifier(self.current_token.lexeme)  
+            self.current_token = self.get_next_token()  # eat id
+            self.skip_spaces()
+            value = None
+            if self.current_token.token == ':':
+                self.current_token = self.get_next_token()  # eat :
+                self.skip_spaces()
+                value = self.parse_expr() 
+                fields.append(StructFields(field_name, value, datatype))
+                if field_name.symbol in fields_table:
+                    raise SemanticError(f"FieldError: Duplicate field name detected: '{field_name.symbol}'.")
+                fields_table.append(field_name.symbol)
+                self.skip_whitespace()
+            else:
+                fields.append(StructFields(field_name, None, datatype))
+                if field_name.symbol in fields_table:
+                    raise SemanticError(f"FieldError: Duplicate field name detected: '{field_name.symbol}'.")
+                fields_table.append(field_name.symbol)
+                self.skip_whitespace()
+            if self.current_token and self.current_token.token == ',':
+                self.current_token = self.get_next_token()  # eat ,
+                self.skip_whitespace()
+        self.current_token = self.get_next_token() # eat }
+        self.skip_whitespace()
+        if name in self.struct_list.get(scope, {}) or name in self.struct_list.get("global", {}):
+            raise SemanticError(f"DeclarationError: Struct '{name}' already exists.")
+        if scope not in self.struct_list:
+            self.struct_list[scope] = []
+        self.struct_list[scope].append(name)
+        return StructDec(struct_name, fields)
+
+    def parse_struct_inst(self, scope) -> StructInst:
+        self.current_token = self.get_next_token()  # eat 'access'
+        self.skip_spaces()
+        if not self.current_token or not re.match(r'^id\d+$', self.current_token.token):
+            raise SemanticError("Expected struct name after 'access'.")
+        struct_parent = self.current_token.lexeme
+        if struct_parent not in self.struct_list.get(scope, []) and struct_parent not in self.struct_list.get("global", []):
+            raise SemanticError(f"DeclarationError: Struct '{struct_parent}' is not defined.")
+        self.current_token = self.get_next_token()  # eat id
+        self.skip_spaces()
+        if not self.current_token or not re.match(r'^id\d+$', self.current_token.token):
+            raise SemanticError("Expected struct instance name after struct name.")
+        inst_name = Identifier(self.current_token.lexeme)
+        self.current_token = self.get_next_token()  # eat id
+        self.skip_spaces()
+        values = []
+        if self.current_token.token == ':':
+            self.current_token = self.get_next_token()  # eat ':'
+            self.skip_spaces()
+            while self.current_token.token != ',':
+                value = self.parse_expr()
+                values.append(value)
+                self.skip_spaces()
+                if self.current_token.token == ',':
+                    self.current_token = self.get_next_token()  # eat ','
+                    self.skip_spaces()
+                    if self.current_token.token == 'newline':
+                        raise SemanticError("Unexpected newline found after struct instance value.")
+                elif self.current_token.token == 'newline':
+                    break
+        if inst_name.symbol in self.struct_inst_list.get(scope, []):
+            raise SemanticError(f"DeclarationError: Struct instance '{inst_name.symbol}' already exist.")
+        if scope not in self.struct_inst_list:
+            self.struct_inst_list[scope] = []
+        self.struct_inst_list[scope].append(inst_name.symbol)
+        return StructInst(inst_name, struct_parent, values)
+
+    def parse_inst_ass(self, scope) -> InstAssignment:
+        struct_inst_name = Identifier(self.current_token.lexeme)
+        if struct_inst_name.symbol not in self.struct_inst_list.get(scope, []):
+            raise SemanticError(f"DeclarationError: Struct instance '{struct_inst_name.symbol}' is not defined.")
+        self.current_token = self.get_next_token() # eat id
+        if self.current_token.token != '.':
+            raise SemanticError("Expected '.' after struct instance name.")
+        self.current_token = self.get_next_token() # eat .
+        if not self.current_token or not re.match(r'^id\d+$', self.current_token.token):
+            raise SemanticError("Expected struct instance field name after struct instance name.")
+        inst_field_name = Identifier(self.current_token.lexeme)
+        left = StructInstField(struct_inst_name, inst_field_name)
+        self.current_token = self.get_next_token() # eat id
+        self.skip_spaces()
+        self.expect(":","Expected ':' after struct instance field name.")
+        self.skip_spaces()
+        value = self.parse_expr()
+        return InstAssignment(left, ':', value)
 
     ########## EXPR ############
     def parse_expr(self) -> Expr:
