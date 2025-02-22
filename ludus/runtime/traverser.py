@@ -109,3 +109,31 @@ class SemanticAnalyzer(ASTVisitor):
         if len(declared_types) > 1:
             raise SemanticError(f"All variables in a batch declaration must have the same type. Found types: {declared_types}")
 
+    def visit_ArrayAssignmentStmt(self, node: ArrAssignment):
+        array_info = self.symbol_table.lookup(node.left.symbol)
+        array_data = array_info["elements"]
+        array_dim = array_info["dimensions"]
+        value = evaluate(node.right, self.symbol_table)
+        val_type = self.TYPE_MAP.get(type(value), str(type(value)))
+
+        if len(array_dim) != len(node.index):
+            raise SemanticError(f"ArrayIndexError: Incorrect number of dimensions for '{node.left.symbol}'.")
+        
+        target = array_data
+        for i, idx in enumerate(node.index[:-1]):
+            if idx < 0 or idx >= len(target):
+                raise SemanticError(f"ArrayIndexError: Index {idx} out of bounds for dimension {i} of array '{node.left.symbol}'.")
+            target = target[idx]
+
+        final_idx = node.index[-1]
+        if final_idx < 0 or final_idx >= len(target):
+            raise SemanticError(f"ArrayIndexError: Index {final_idx} out of bounds for final dimension of array '{node.left.symbol}'.")
+
+        expected_type = self.TYPE_MAP.get(type(target[final_idx]), str(type(target[final_idx])))
+        if val_type != expected_type:
+            raise SemanticError(f"TypeMismatchError: Array '{node.left.symbol}' expects '{expected_type}' data type, not '{val_type}'.")
+
+        target[final_idx] = value
+        
+        self.symbol_table.define_arr(node.left.symbol, array_dim, array_data)
+        

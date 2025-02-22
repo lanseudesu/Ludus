@@ -173,9 +173,10 @@ class AssignmentStmt(Stmt):
         self.kind = kind
 
 class ArrAssignment(AssignmentStmt):
-    def __init__(self, left: Identifier, operator: str, right: Expr):
+    def __init__(self, left: Identifier, index, operator: str, right: Expr):
         super().__init__(NodeType.ARR_ASS_STMT)
         self.left = left
+        self.index = index
         self.operator = operator
         self.right = right
 

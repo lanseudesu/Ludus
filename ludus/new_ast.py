@@ -379,6 +379,8 @@ class Semantic:
                         if val_type != expected_type:
                             raise SemanticError(f"TypeMismatchError: Array '{name}' expects '{expected_type}' data type.")
                     dimensions = [len(values)]
+            
+            self.dead_arr_list[scope].pop(name, None)
             if scope not in self.arr_list:
                 self.arr_list[scope] = []
             self.arr_list[scope].append(name)
@@ -391,7 +393,7 @@ class Semantic:
         if name in self.arr_list[scope]:
             if all(dim is not None for dim in dimensions):
                 value = self.parse_expr()
-                return ArrAssignment(arr_name, ':', value)
+                return ArrAssignment(arr_name, dimensions, ':', value)
             else:
                 raise SemanticError(f"AssignmentError: Index must not be blank for array index assignment for array name '{arr_name.symbol}'.")
         else:
