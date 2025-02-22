@@ -204,11 +204,12 @@ class StructDec(Stmt):
         self.body = body
 
 class StructInst(Stmt):
-    def __init__(self, name: Identifier, parent: str, body: List[Expr]):
+    def __init__(self, name: Identifier, parent: str, body: List[Expr], immo: bool):
         super().__init__(NodeType.STRUCT_INST)
         self.name = name
         self.parent = parent
         self.body = body
+        self.immo = immo
 
 class StructInstField(Stmt):
     def __init__(self, instance: Identifier, field: Identifier):

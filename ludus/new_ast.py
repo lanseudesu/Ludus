@@ -530,7 +530,7 @@ class Semantic:
         if scope not in self.struct_inst_list:
             self.struct_inst_list[scope] = []
         self.struct_inst_list[scope].append(inst_name.symbol)
-        return StructInst(inst_name, struct_parent, values)
+        return StructInst(inst_name, struct_parent, values, False)
 
     def parse_inst_ass(self, scope) -> InstAssignment:
         struct_inst_name = Identifier(self.current_token.lexeme)
@@ -675,6 +675,42 @@ class Semantic:
         self.arr_list[scope].append(name)
         return ArrayDec(arr_name, dimensions, values, True)
     
+    def parse_immo_inst(self, scope) -> ImmoInstDec:
+        self.current_token = self.get_next_token()  # eat 'access'
+        self.skip_spaces()
+        if not self.current_token or not re.match(r'^id\d+$', self.current_token.token):
+            raise SemanticError("Expected struct name after 'access'.")
+        struct_parent = self.current_token.lexeme
+        if struct_parent not in self.struct_list.get(scope, []) and struct_parent not in self.struct_list.get("global", []):
+            raise SemanticError(f"DeclarationError: Struct '{struct_parent}' is not defined.")
+        self.current_token = self.get_next_token()  # eat id
+        self.skip_spaces()
+        if not self.current_token or not re.match(r'^id\d+$', self.current_token.token):
+            raise SemanticError("Expected struct instance name after struct name.")
+        inst_name = Identifier(self.current_token.lexeme)
+        self.current_token = self.get_next_token()  # eat id
+        self.skip_spaces()
+        values = []
+        self.expect(":","Expected ':' after struct instance name.")
+        self.skip_spaces()
+        while self.current_token.token != ',':
+            value = self.parse_expr()
+            values.append(value)
+            self.skip_spaces()
+            if self.current_token.token == ',':
+                self.current_token = self.get_next_token()  # eat ','
+                self.skip_spaces()
+                if self.current_token.token == 'newline':
+                    raise SemanticError("Unexpected newline found after struct instance value.")
+            elif self.current_token.token == 'newline':
+                break
+        if inst_name.symbol in self.struct_inst_list.get(scope, []):
+            raise SemanticError(f"DeclarationError: Struct instance '{inst_name.symbol}' already exist.")
+        if scope not in self.struct_inst_list:
+            self.struct_inst_list[scope] = []
+        self.struct_inst_list[scope].append(inst_name.symbol)
+        return StructInst(inst_name, struct_parent, values, True)
+
     ########## EXPR ############
     def parse_expr(self) -> Expr:
         self.skip_spaces()

@@ -94,7 +94,7 @@ class ASTVisitor:
             value = field.value
             fields.append(value)
             
-        self.symbol_table.define_structinst(node.name.symbol, node.parent, fields)
+        self.symbol_table.define_structinst(node.name.symbol, node.parent, fields, node.immo)
 
     def visit_BlockStmt(self, node: BlockStmt):
         for stmt in node.statements:
@@ -210,10 +210,12 @@ class SemanticAnalyzer(ASTVisitor):
                     "value": value_to_use
                 })
             
-        self.symbol_table.define_structinst(node.name.symbol, node.parent, struct_fields)
+        self.symbol_table.define_structinst(node.name.symbol, node.parent, struct_fields, node.immo)
 
     def visit_InstAssignmentStmt(self, node: InstAssignment):
         structinst = self.symbol_table.lookup(node.left.instance.symbol)
+        if structinst["immo"] == True:
+            raise SemanticError(f"InstanceAssignmentError: '{node.left.instance.symbol}' is declared as an immutable struct instance.")
         field_names = [field["name"] for field in structinst["fields"]]
         new_field = node.left.field.symbol
         
@@ -232,4 +234,4 @@ class SemanticAnalyzer(ASTVisitor):
                                         f" Expected '{old_type}', but got '{new_type}'.")
                 field["value"] = value
         
-        self.symbol_table.define_structinst(node.left.instance.symbol, structinst["parent"], structinst["fields"])
+        self.symbol_table.define_structinst(node.left.instance.symbol, structinst["parent"], structinst["fields"], structinst["immo"])

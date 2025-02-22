@@ -22,10 +22,11 @@ class SymbolTable:
             "immo": immo
         }
 
-    def define_structinst(self, name: str, parent: str, values):
+    def define_structinst(self, name: str, parent: str, values, immo):
         self.symbols[name] = {
             "parent": parent,
-            "fields": values
+            "fields": values,
+            "immo": immo
         }
 
     def lookup(self, name: str):
