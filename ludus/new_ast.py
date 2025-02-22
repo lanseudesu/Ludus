@@ -112,6 +112,8 @@ class Semantic:
             return self.parse_struct(scope)
         elif self.current_token and self.current_token.token == 'access':
             return self.parse_struct_inst(scope)
+        elif self.current_token and self.current_token.token == 'immo':
+            return self.parse_immo(scope)
         else:
             raise SemanticError(f"Unexpected token found during parsing: {self.current_token.token}")
 
@@ -161,10 +163,10 @@ class Semantic:
                     self.var_list[scope].append(var.symbol)
 
                 self.skip_spaces()
-                return BatchVarDec(declarations=[VarDec(var, value, scope) for var in var_names])
+                return BatchVarDec(declarations=[VarDec(var, value, False, scope) for var in var_names])
 
         self.current_token = self.get_next_token() # eat :
-        self.skip_whitespace() 
+        self.skip_spaces()
         value = self.parse_expr()
         values_table = {name: {"values": value}}
         self.skip_spaces()
@@ -198,7 +200,7 @@ class Semantic:
                 if var.symbol in self.var_list["global"] or var.symbol in self.var_list[scope]:
                     raise SemanticError(f"Variable '{var.symbol}' is already defined.")   
                 self.var_list[scope].append(var.symbol)
-            return BatchVarDec(declarations=[VarDec(var, values_table[var.symbol]['values'], scope) for var in var_names])
+            return BatchVarDec(declarations=[VarDec(var, values_table[var.symbol]['values'], False, scope) for var in var_names])
         else:
             var = var_names[0]
             if name in self.var_list["global"]:
@@ -208,7 +210,7 @@ class Semantic:
             if name in self.var_list[scope]:
                 return VarAssignment(left=var, operator=':', right=value)
             self.var_list[scope].append(name)
-            return VarDec(var, value, scope) 
+            return VarDec(var, value, False, scope) 
         
     def parse_var_dec(self, datatype, scope) -> Union[VarDec, BatchVarDec]:
         var_names = []
@@ -250,22 +252,20 @@ class Semantic:
                     raise SemanticError(f"Variable '{var.symbol}' is already defined.")   
                 self.var_list[scope].append(var.symbol)
             if value != None:
-                return BatchVarDec([VarDec(var, value, scope) for var in var_names])
+                return BatchVarDec([VarDec(var, value, False, scope) for var in var_names])
             else:
-                return BatchVarDec([VarDec(var, DeadLiteral(value, datatype), scope) for var in var_names])
+                return BatchVarDec([VarDec(var, DeadLiteral(value, datatype), False, scope) for var in var_names])
         else:
             var = var_names[0]
-            if var.symbol in self.var_list["global"]:
-                scope = "global"
             if scope not in self.var_list:
                 self.var_list[scope] = []
-            if var.symbol in self.var_list[scope]:
-                return VarAssignment(left=var, operator=':', right=value)
+            if var.symbol in self.var_list["global"] or var.symbol in self.var_list[scope]:
+                raise SemanticError(f"Variable '{var.symbol}' is already defined.")  
             self.var_list[scope].append(var.symbol)
             if value != None:
-                return VarDec(var, value, scope)
+                return VarDec(var, value, False, scope)
             else:
-                return VarDec(var, DeadLiteral(value, datatype), scope)
+                return VarDec(var, DeadLiteral(value, datatype), False, scope)
 
     def parse_empty_array(self, datatype,scope) -> ArrayDec:
         arr_name = Identifier(symbol=self.current_token.lexeme)
@@ -319,7 +319,7 @@ class Semantic:
             if scope not in self.arr_list:
                 self.arr_list[scope] = []
             self.arr_list[scope].append(name)
-            return ArrayDec(arr_name, dimensions, values)
+            return ArrayDec(arr_name, dimensions, values, False)
         elif self.current_token and self.current_token.token == ':':
             self.current_token = self.get_next_token() #eat :
             self.skip_spaces()
@@ -342,7 +342,7 @@ class Semantic:
                 "type": datatype,
                 "dimensions": dimensions
             }
-            return ArrayDec(arr_name, dimensions, values)      
+            return ArrayDec(arr_name, dimensions, values, False)      
     
     def parse_array(self, scope) -> Union[ArrayDec, ArrAssignment]:
         arr_name = Identifier(symbol=self.current_token.lexeme)
@@ -393,7 +393,7 @@ class Semantic:
             if scope not in self.arr_list:
                 self.arr_list[scope] = []
             self.arr_list[scope].append(name)
-            return ArrayDec(arr_name, dimensions, values)
+            return ArrayDec(arr_name, dimensions, values, False)
         
         if name in self.arr_list["global"]:
             scope = "global"
@@ -413,7 +413,7 @@ class Semantic:
                 else:  
                     dimensions = [len(values)]
             self.arr_list[scope].append(arr_name.symbol)
-            return ArrayDec(arr_name, dimensions, values)
+            return ArrayDec(arr_name, dimensions, values, False)
 
     def parse_array_values(self, expected_dims, depth, scope):
         values = []
@@ -551,6 +551,130 @@ class Semantic:
         value = self.parse_expr()
         return InstAssignment(left, ':', value)
 
+    ########## IMMO ############
+    def parse_immo(self, scope):
+        self.current_token = self.get_next_token() # eat immo
+        self.skip_spaces()
+        if self.current_token.token == 'access':
+            immo_inst = self.parse_immo_inst(scope)
+            return immo_inst
+        else:
+            if not self.current_token or not re.match(r'^id\d+$', self.current_token.token):
+                raise SemanticError("Expected identifier or 'access' after 'immo'.")
+            la_token = self.look_ahead()
+            if la_token is not None and la_token.token in [':',',']:  
+                immo_var = self.parse_immo_var(scope)  
+                return immo_var
+            elif la_token is not None and la_token.token == '[':  
+                immo_arr = self.parse_immo_arr(scope)
+                return immo_arr
+            else:
+                raise SemanticError(f"Unexpected token found during parsing: {la_token}")  
+            
+    def parse_immo_var(self, scope) -> Union[VarDec, BatchVarDec]:
+        var_names = [Identifier(symbol=self.current_token.lexeme)]  
+        name = self.current_token.lexeme
+        self.current_token = self.get_next_token() # eat id
+        self.skip_spaces()
+        while self.current_token and self.current_token.token == ",":
+            self.current_token = self.get_next_token()  # eat ,
+            self.skip_spaces()
+
+            if not self.current_token or not re.match(r'^id\d+$', self.current_token.token):
+                raise SemanticError("Expected variable name after ','.")
+            
+            var_names.append(Identifier(symbol=self.current_token.lexeme))
+            self.current_token = self.get_next_token() # eat id
+            self.skip_spaces()
+
+            if self.current_token and self.current_token.token == ":":
+                self.current_token = self.get_next_token() # eat :
+                self.skip_spaces()
+                value = self.parse_expr()
+                if scope not in self.var_list:
+                    self.var_list[scope] = []
+                for var in var_names:
+                    if var.symbol in self.var_list["global"] or var.symbol in self.var_list[scope]:
+                        raise SemanticError(f"Variable '{var.symbol}' is already defined.")  
+                    self.var_list[scope].append(var.symbol)
+                self.skip_spaces()
+                return BatchVarDec(declarations=[VarDec(var, value, True, scope) for var in var_names])
+            
+        self.current_token = self.get_next_token() # eat :
+        self.skip_spaces()
+        value = self.parse_expr()
+        values_table = {name: {"values": value}}
+        self.skip_spaces()
+
+        while self.current_token and self.current_token.token == ",":
+            self.current_token = self.get_next_token()  # eat ,
+            self.skip_spaces()
+
+            if not self.current_token or not re.match(r'^id\d+$', self.current_token.token):
+                raise SemanticError("Expected variable name after ','.")
+            
+            var_names.append(Identifier(symbol=self.current_token.lexeme))
+            variable_name = self.current_token.lexeme
+            self.current_token = self.get_next_token() # eat id
+            self.skip_spaces()
+
+            if not self.current_token or self.current_token.token != ":":
+                raise SemanticError("Expected ':' in variable initialization.")
+            
+            self.current_token = self.get_next_token() # eat :
+            self.skip_spaces()
+
+            value = self.parse_expr()
+            values_table[variable_name] = {"values": value}
+        
+        self.skip_spaces()
+        if len(var_names) > 1:
+            if scope not in self.var_list:
+                self.var_list[scope] = []
+            for var in var_names:
+                if var.symbol in self.var_list["global"] or var.symbol in self.var_list[scope]:
+                    raise SemanticError(f"Variable '{var.symbol}' is already defined.") 
+                self.var_list[scope].append(var.symbol)
+            return BatchVarDec(declarations=[VarDec(var, values_table[var.symbol]['values'], True, scope) for var in var_names])
+        else:
+            var = var_names[0]
+            if scope not in self.var_list:
+                self.var_list[scope] = []
+            if var.symbol in self.var_list["global"] or var.symbol in self.var_list[scope]:
+                    raise SemanticError(f"Variable '{var.symbol}' is already defined.")
+            self.var_list[scope].append(name)
+            return VarDec(var, value, True, scope)
+
+    def parse_immo_arr(self, scope) -> ArrayDec:
+        arr_name = Identifier(self.current_token.lexeme)
+        name=arr_name.symbol
+        if name in self.dead_arr_list.get(scope, {}) or name in self.dead_arr_list.get("global", {}):
+            raise SemanticError(f"Array '{name}' is already defined.")
+        if name in self.arr_list.get(scope, {}) or name in self.arr_list.get("global", {}):
+            raise SemanticError(f"Array '{name}' is already defined.")
+        self.current_token = self.get_next_token() # eat id
+        self.skip_spaces()
+        dimensions = []
+        while self.current_token and self.current_token.token == '[':
+            self.current_token = self.get_next_token() #eat [
+            self.skip_spaces
+            dim = int(self.current_token.lexeme)
+            if dim < 2:
+                raise SemanticError(f"ArraySizeError: Expected array size to be greater than 1, but got {dim}.")
+            dimensions.append(dim)
+            self.current_token = self.get_next_token() # eat hp_ltr
+            self.skip_spaces()
+            self.expect("]","Expected ']' to close immutable array declaration.")
+            self.skip_spaces()
+            
+        self.expect(":", "Expected ':' in array initialization or modification.")
+        self.skip_spaces()
+        values = self.parse_array_values(expected_dims=dimensions, depth=0, scope=scope)
+        if scope not in self.arr_list:
+            self.arr_list[scope] = []
+        self.arr_list[scope].append(name)
+        return ArrayDec(arr_name, dimensions, values, True)
+    
     ########## EXPR ############
     def parse_expr(self) -> Expr:
         self.skip_spaces()

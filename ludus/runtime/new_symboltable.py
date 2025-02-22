@@ -8,16 +8,18 @@ class SymbolTable:
     def define(self, name: str, value):
         self.symbols[name] = value
 
-    def define_var(self, name: str, value, datatype):
+    def define_var(self, name: str, value, datatype, immo):
         self.symbols[name] = {
             "type": datatype,
-            "value": value
+            "value": value,
+            "immo": immo
         }
 
-    def define_arr(self, name: str, dimensions, values):
+    def define_arr(self, name: str, dimensions, values, immo):
         self.symbols[name] = {
             "dimensions": dimensions,
-            "elements": values
+            "elements": values,
+            "immo": immo
         }
 
     def define_structinst(self, name: str, parent: str, values):

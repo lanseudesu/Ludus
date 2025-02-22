@@ -44,7 +44,7 @@ class ASTVisitor:
         values = []
         
         if node.elements is None:
-            self.symbol_table.define_arr(node.name.symbol, node.dimensions, None)
+            self.symbol_table.define_arr(node.name.symbol, node.dimensions, None, node.immo)
         else:
             if len(node.dimensions) == 1:
                 for val in node.elements:
@@ -62,7 +62,7 @@ class ASTVisitor:
             
             if len(declared_types) > 1:
                 raise SemanticError(f"All variables in a batch declaration must have the same type. Found types: {declared_types}")
-            self.symbol_table.define_arr(node.name.symbol, node.dimensions, values)
+            self.symbol_table.define_arr(node.name.symbol, node.dimensions, values, node.immo)
     
     def visit_StructDec(self, node: StructDec):
         default_values = {
@@ -118,7 +118,7 @@ class SemanticAnalyzer(ASTVisitor):
             val_type = node.value.datatype
         else:
             val_type = self.TYPE_MAP.get(type(value), str(type(value)))
-        self.symbol_table.define_var(node.name.symbol, value, val_type)
+        self.symbol_table.define_var(node.name.symbol, value, val_type, node.immo)
 
     def visit_VarAssignmentStmt(self, node: VarAssignment):
         new_val = evaluate(node.right, self.symbol_table)
@@ -126,9 +126,13 @@ class SemanticAnalyzer(ASTVisitor):
         value = self.symbol_table.lookup(node.left.symbol)
         value_type = value["type"]
 
+        if value["immo"]==True:
+            raise SemanticError(f"AssignmentError: '{node.left.symbol}' is declared as an immutable variable.")
+
         if new_val_type != value_type:
             raise SemanticError(f"TypeMismatchError: Type mismatch for variable '{node.left.symbol}'. Expected '{value_type}', got '{new_val_type}'.")
-        self.symbol_table.define_var(node.left.symbol, new_val, new_val_type)
+        
+        self.symbol_table.define_var(node.left.symbol, new_val, new_val_type, value["immo"])
 
     def visit_BatchVarDec(self, node: BatchVarDec):
         declared_types = set() 
@@ -144,6 +148,9 @@ class SemanticAnalyzer(ASTVisitor):
 
     def visit_ArrayAssignmentStmt(self, node: ArrAssignment):
         array_info = self.symbol_table.lookup(node.left.symbol)
+        array_immo = array_info["immo"]
+        if array_immo==True:
+            raise SemanticError(f"ArrayAssignmentError: '{node.left.symbol}' is declared as an immutable array.")
         array_data = array_info["elements"]
         array_dim = array_info["dimensions"]
         value = evaluate(node.right, self.symbol_table)
@@ -168,7 +175,7 @@ class SemanticAnalyzer(ASTVisitor):
 
         target[final_idx] = value
         
-        self.symbol_table.define_arr(node.left.symbol, array_dim, array_data)
+        self.symbol_table.define_arr(node.left.symbol, array_dim, array_data, array_immo)
     
     def visit_StructInst(self, node: StructInst):
         structinst = self.symbol_table.lookup(node.name.symbol)

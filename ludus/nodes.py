@@ -149,10 +149,11 @@ class BlockStmt(Stmt):
         self.statements = statements
 
 class VarDec(Stmt):
-    def __init__(self, name: Identifier, value: Expr, scope: str):
+    def __init__(self, name: Identifier, value: Expr, immo: bool, scope: str):
         super().__init__(NodeType.VAR_DEC)
         self.name = name
         self.value = value
+        self.immo = immo
         self.scope = scope
 
 class BatchVarDec(Stmt):
@@ -161,11 +162,13 @@ class BatchVarDec(Stmt):
         self.declarations = declarations
 
 class ArrayDec(Stmt):
-    def __init__(self, name: Identifier, dimensions: List[Optional[int]], elements: List[Expr]):
+    def __init__(self, name: Identifier, dimensions: List[Optional[int]], 
+                 elements: List[Expr], immo: bool):
         super().__init__(NodeType.ARRAY_DEC)
         self.name = name
         self.dimensions = dimensions
         self.elements = elements
+        self.immo = immo
 
 class AssignmentStmt(Stmt):
     def __init__(self, kind: str):
@@ -219,24 +222,6 @@ class InstAssignment(AssignmentStmt):
         self.left = left
         self.operator = operator
         self.right = right
-
-class ImmoVarDec(Stmt):
-    def __init__(self, name: Identifier, value: Expr):
-        super().__init__(NodeType.IMMO_VAR_DEC)
-        self.name = name
-        self.value = value
-
-class BatchImmoVarDec(Stmt):
-    def __init__(self, declarations: list[ImmoVarDec]):
-        super().__init__(NodeType.BATCH_IMMO_VAR_DEC)
-        self.declarations = declarations
-
-class ImmoArrayDec(Stmt):
-    def __init__(self, name: Identifier, dimensions: List[Optional[int]], elements: List[Expr]):
-        super().__init__(NodeType.IMMO_ARRAY_DEC)
-        self.name = name
-        self.dimensions = dimensions
-        self.elements = elements
 
 class ImmoInstDec(Stmt):
     def __init__(self, name: Identifier, parent: str, body: List[StructFields]):

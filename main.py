@@ -1,5 +1,5 @@
 import eel
-from ludus import ast, lexer, parser, new_ast
+from ludus import lexer, parser, new_ast
 
 eel.init('web')  
 
