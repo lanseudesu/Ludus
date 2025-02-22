@@ -149,10 +149,11 @@ class BlockStmt(Stmt):
         self.statements = statements
 
 class VarDec(Stmt):
-    def __init__(self, name: Identifier, value: Expr):
+    def __init__(self, name: Identifier, value: Expr, scope: str):
         super().__init__(NodeType.VAR_DEC)
         self.name = name
         self.value = value
+        self.scope = scope
 
 class BatchVarDec(Stmt):
     def __init__(self, declarations: list[VarDec]):

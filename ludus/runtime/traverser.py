@@ -32,6 +32,31 @@ class ASTVisitor:
     def visit_VarAssignment(self, node: VarAssignment):
         self.symbol_table.define(node.left.symbol, node.right)
 
+    def visit_ArrayDec(self, node: ArrayDec):
+        declared_types = set()
+        values = []
+        
+        if node.elements is None:
+            self.symbol_table.define_arr(node.name.symbol, node.dimensions, None)
+        else:
+            if len(node.dimensions) == 1:
+                for val in node.elements:
+                    declared_types.add(val.kind)
+                    value = evaluate(val, self.symbol_table)
+                    values.append(value)
+            else:
+                for row in node.elements:
+                    inner_values = []
+                    for val in row:
+                        declared_types.add(val.kind)
+                        value = evaluate(val, self.symbol_table)
+                        inner_values.append(value)
+                    values.append(inner_values)
+            
+            if len(declared_types) > 1:
+                raise SemanticError(f"All variables in a batch declaration must have the same type. Found types: {declared_types}")
+            self.symbol_table.define_arr(node.name.symbol, node.dimensions, values)
+    
     def visit_FunctionDec(self, node: FunctionDec):
         self.symbol_table.define(node.name.symbol, {
             "params": [param.symbol for param in node.parameters],

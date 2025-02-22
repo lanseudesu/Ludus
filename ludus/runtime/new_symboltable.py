@@ -14,6 +14,12 @@ class SymbolTable:
             "value": value,
         }
 
+    def define_arr(self, name: str, dimensions, values):
+        self.symbols[name] = {
+            "dimensions": dimensions,
+            "elements": values,
+        }
+
     def lookup(self, name: str):
         if name in self.symbols:
             value = self.symbols.get(name)
