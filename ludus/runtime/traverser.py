@@ -44,7 +44,7 @@ class ASTVisitor:
         values = []
         
         if node.elements is None:
-            self.symbol_table.define_arr(node.name.symbol, node.dimensions, None, node.immo)
+            self.symbol_table.define_arr(node.name.symbol, node.dimensions, None, node.immo, node.scope)
         else:
             if len(node.dimensions) == 1:
                 for val in node.elements:

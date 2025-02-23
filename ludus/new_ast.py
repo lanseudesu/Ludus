@@ -137,17 +137,24 @@ class Semantic:
     ######### ARRAYS AND VARIABLES #########    
     def var_or_arr(self, scope) -> Union[VarDec, ArrayDec]:
         datatype = self.current_token.token  
-
         self.current_token = self.get_next_token()
         self.skip_spaces()
 
         if not self.current_token or not re.match(r'^id\d+$', self.current_token.token):
             raise SemanticError("Expected variable name.")
-        
+    
         la_token = self.look_ahead()
         if la_token is not None and la_token.token == '[':  
+            name = self.current_token.lexeme
+            if scope == 'global':
+                if name in self.dead_arr_list.get("global", {}) or name in self.arr_list.get("global", {}):
+                    raise SemanticError("DeclarationError: Global array "
+                                        f"'{name}' was already declared.")
             return self.parse_empty_array(datatype, scope)
         else:
+            if scope == 'global' and self.current_token.lexeme in self.var_list["global"]:
+                raise SemanticError(f"DeclarationError: Global variable "
+                                    f"'{self.current_token.lexeme}' was already declared.")
             return self.parse_var_dec(datatype, scope)
     
     def parse_var_init(self, scope) -> Union[VarDec, BatchVarDec, VarAssignment]:
@@ -336,7 +343,7 @@ class Semantic:
             if scope not in self.arr_list:
                 self.arr_list[scope] = []
             self.arr_list[scope].append(name)
-            return ArrayDec(arr_name, dimensions, values, False)
+            return ArrayDec(arr_name, dimensions, values, False, scope)
         elif self.current_token and self.current_token.token == ':':
             self.current_token = self.get_next_token() #eat :
             self.skip_spaces()
@@ -359,7 +366,7 @@ class Semantic:
                 "type": datatype,
                 "dimensions": dimensions
             }
-            return ArrayDec(arr_name, dimensions, values, False)      
+            return ArrayDec(arr_name, dimensions, values, False, scope)      
     
     def parse_array(self, scope) -> Union[ArrayDec, ArrAssignment]:
         arr_name = Identifier(symbol=self.current_token.lexeme)
