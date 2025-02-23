@@ -13,7 +13,7 @@ cfg = {
     "<arr_tail1>": [[":", "<value>", ",", "<value>", "<elems_recur>"],
                     ["[", "hp_ltr", "]", ":", "[", "<value>", ",", "<value>", "<elems_recur>", "]", ",", "[", "<value>", ",", "<value>", "<elems_recur>", "]", "<row_recur2>"]],
     "<arr_tail2>": [[":", "<value>", "<elems_recur>"],
-                    ["[", "<arr_size>", "]", ":", "[", "<value>", ",", "<elems_recur>", "]", "<row_recur>"]],
+                    ["[", "<arr_size>", "]", ":", "[", "<value>", "<elems_recur>", "]", "<row_recur>"]],
     "<arr_tail3>": [["<dead_dec>"],
                     ["[", "<arr_size>", "]", "<dead_dec>"]],
     "<const_tail>": [[",", "id", "<id_recur>", ":", "<value>"],

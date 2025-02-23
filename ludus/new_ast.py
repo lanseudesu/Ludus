@@ -60,7 +60,24 @@ class Semantic:
         try:
             while self.current_token and self.current_token.token != 'gameOver':
                 self.skip_whitespace()
-                if self.current_token and self.current_token.token == 'play':
+                if self.current_token and re.match(r'^id\d+$', self.current_token.token):
+                    la_token = self.look_ahead()
+                    if la_token is not None and la_token.token in [':',',']: 
+                        if self.current_token.lexeme in self.var_list["global"]:
+                            raise SemanticError(f"DeclarationError: Global variable "
+                                                f"'{self.current_token.lexeme}' was already declared.")
+                        program.body.append(self.parse_var_init("global"))
+                    elif la_token is not None and la_token.token == '[':  
+                        name = self.current_token.lexeme
+                        if name in self.dead_arr_list.get("global", {}) or name in self.arr_list.get("global", {}):
+                            raise SemanticError("DeclarationError: Global array "
+                                                f"'{name}' was already declared.")
+                        program.body.append(self.parse_array("global"))
+                    else:
+                        raise SemanticError(f"Unexpected token found during parsing: {la_token.token}")
+                elif self.current_token and self.current_token.token in ['hp','xp','comms','flag']:
+                    program.body.append(self.var_or_arr("global"))
+                elif self.current_token and self.current_token.token == 'play':
                     program.body.append(self.parse_func())
                     self.current_token = self.get_next_token()
                 else:
@@ -393,7 +410,7 @@ class Semantic:
             if scope not in self.arr_list:
                 self.arr_list[scope] = []
             self.arr_list[scope].append(name)
-            return ArrayDec(arr_name, dimensions, values, False)
+            return ArrayDec(arr_name, dimensions, values, False, scope)
         
         if name in self.arr_list["global"]:
             scope = "global"
@@ -413,7 +430,7 @@ class Semantic:
                 else:  
                     dimensions = [len(values)]
             self.arr_list[scope].append(arr_name.symbol)
-            return ArrayDec(arr_name, dimensions, values, False)
+            return ArrayDec(arr_name, dimensions, values, False, scope)
 
     def parse_array_values(self, expected_dims, depth, scope):
         values = []

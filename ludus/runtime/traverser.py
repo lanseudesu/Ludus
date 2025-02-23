@@ -62,7 +62,7 @@ class ASTVisitor:
             
             if len(declared_types) > 1:
                 raise SemanticError(f"All variables in a batch declaration must have the same type. Found types: {declared_types}")
-            self.symbol_table.define_arr(node.name.symbol, node.dimensions, values, node.immo)
+            self.symbol_table.define_arr(node.name.symbol, node.dimensions, values, node.immo, node.scope)
     
     def visit_StructDec(self, node: StructDec):
         default_values = {
@@ -118,7 +118,7 @@ class SemanticAnalyzer(ASTVisitor):
             val_type = node.value.datatype
         else:
             val_type = self.TYPE_MAP.get(type(value), str(type(value)))
-        self.symbol_table.define_var(node.name.symbol, value, val_type, node.immo)
+        self.symbol_table.define_var(node.name.symbol, value, val_type, node.immo, node.scope)
 
     def visit_VarAssignmentStmt(self, node: VarAssignment):
         new_val = evaluate(node.right, self.symbol_table)
@@ -132,7 +132,7 @@ class SemanticAnalyzer(ASTVisitor):
         if new_val_type != value_type:
             raise SemanticError(f"TypeMismatchError: Type mismatch for variable '{node.left.symbol}'. Expected '{value_type}', got '{new_val_type}'.")
         
-        self.symbol_table.define_var(node.left.symbol, new_val, new_val_type, value["immo"])
+        self.symbol_table.define_var(node.left.symbol, new_val, new_val_type, value["immo"], value["scope"])
 
     def visit_BatchVarDec(self, node: BatchVarDec):
         declared_types = set() 
@@ -149,6 +149,7 @@ class SemanticAnalyzer(ASTVisitor):
     def visit_ArrayAssignmentStmt(self, node: ArrAssignment):
         array_info = self.symbol_table.lookup(node.left.symbol)
         array_immo = array_info["immo"]
+        array_scope = array_info["scope"]
         if array_immo==True:
             raise SemanticError(f"ArrayAssignmentError: '{node.left.symbol}' is declared as an immutable array.")
         array_data = array_info["elements"]
@@ -175,7 +176,7 @@ class SemanticAnalyzer(ASTVisitor):
 
         target[final_idx] = value
         
-        self.symbol_table.define_arr(node.left.symbol, array_dim, array_data, array_immo)
+        self.symbol_table.define_arr(node.left.symbol, array_dim, array_data, array_immo, array_scope)
     
     def visit_StructInst(self, node: StructInst):
         structinst = self.symbol_table.lookup(node.name.symbol)

@@ -18,7 +18,7 @@ def evaluate(ast_node, symbol_table):
         value = symbol_table.lookup(ast_node.symbol)
         if value is None:
             raise SemanticError(f"Variable '{ast_node.symbol}' is not defined.")
-        return value
+        return value["value"]
     elif ast_node.kind == "DeadLiteral":
         return None
     

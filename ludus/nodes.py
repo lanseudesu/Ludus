@@ -163,12 +163,13 @@ class BatchVarDec(Stmt):
 
 class ArrayDec(Stmt):
     def __init__(self, name: Identifier, dimensions: List[Optional[int]], 
-                 elements: List[Expr], immo: bool):
+                 elements: List[Expr], immo: bool, scope: str):
         super().__init__(NodeType.ARRAY_DEC)
         self.name = name
         self.dimensions = dimensions
         self.elements = elements
         self.immo = immo
+        self.scope = scope
 
 class AssignmentStmt(Stmt):
     def __init__(self, kind: str):
