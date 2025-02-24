@@ -38,8 +38,8 @@ class Parser:
             if re.match(r'^id\d+$', self.current_token.token):
                 self.current_token.token= 'id'
 
-            # print(f"Current Top = {self.top}")
-            # print(f"Current Token = {self.current_token.token}")
+            print(f"Current Top = {self.top}")
+            print(f"Current Token = {self.current_token.token}")
 
             if self.top == self.current_token.token:
                 # print(f"Matched: {self.current_token.token} and {self.top}")

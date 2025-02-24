@@ -382,13 +382,19 @@ def gen_parse_table():
         
 parse_table = gen_parse_table()
 
-def display_parse_table(parse_table):
+def display_parse_table(parse_table, lines_per_page=10):
     print()
+    line_count = 0
     for non_terminal, rules in parse_table.items():
         print(f"Non-terminal: {non_terminal}")
+        line_count += 1
         for terminal, production in rules.items():
             print(f"  Terminal: {terminal} -> Production: {production}")
-        print()  
+            line_count += 1
+            if line_count >= lines_per_page:
+                input("Press Enter to continue...")
+                line_count = 0
+        print()
 
 # display_parse_table(parse_table)
 
