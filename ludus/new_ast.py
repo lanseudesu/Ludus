@@ -16,6 +16,7 @@ class Semantic:
         self.dead_arr_list = {"global": {}} 
         self.struct_list = {"global": []}
         self.struct_inst_list = {}
+        self.globalstruct = []
     
     TYPE_MAP = {
         int: "hp",
@@ -77,11 +78,17 @@ class Semantic:
                         raise SemanticError(f"Unexpected token found during parsing: {la_token.token}")
                 elif self.current_token and self.current_token.token in ['hp','xp','comms','flag']:
                     program.body.append(self.var_or_arr("global"))
+                elif self.current_token and self.current_token.token == 'build':
+                    program.body.append(self.parse_globalstruct())
                 elif self.current_token and self.current_token.token == 'play':
                     program.body.append(self.parse_func())
-                    self.current_token = self.get_next_token()
+                elif self.current_token and self.current_token.token == 'gameOver':
+                    break
                 else:
                     raise SemanticError(f"Unexpected token found during parsing: {self.current_token.token}")
+            if self.globalstruct:
+                raise SemanticError(f"StructError: Global struct '{self.globalstruct[0]}' was declared but not initialized.")
+        
         except SemanticError as e:
             return e
         return program
@@ -468,6 +475,27 @@ class Semantic:
         return values
 
     ########## STRUCTS ##########
+    def parse_globalstruct(self) -> Union[StructDec, GlobalStructDec]:
+        self.current_token = self.get_next_token() # eat build
+        self.skip_spaces()
+        if not self.current_token or not re.match(r'^id\d+$', self.current_token.token):
+                raise SemanticError("Expected struct name after 'build'.")
+        struct_name = Identifier(self.current_token.lexeme)
+        self.current_token = self.get_next_token() # eat id
+        self.skip_spaces()
+        if self.current_token.token == '{':
+            for item in self.globalstruct:
+                if item == struct_name.symbol:
+                    self.globalstruct.remove(item)
+                    return self.create_struct(struct_name, "global")
+                
+            raise SemanticError(f"StructError: Global struct '{struct_name.symbol}' was not declared.")
+        else:
+            if struct_name.symbol in self.globalstruct:
+                raise SemanticError(f"StructError: Global struct '{struct_name.symbol}' was already declared.")
+            self.globalstruct.append(struct_name.symbol)
+            return GlobalStructDec(struct_name)
+
     def parse_struct(self, scope) -> StructDec:
         self.current_token = self.get_next_token() # eat build
         self.skip_spaces()
@@ -512,12 +540,14 @@ class Semantic:
                 self.skip_whitespace()
         self.current_token = self.get_next_token() # eat }
         self.skip_whitespace()
+        if name in self.globalstruct:
+            raise SemanticError(f"DeclarationError: Global struct '{name}' already exists.")
         if name in self.struct_list.get(scope, {}) or name in self.struct_list.get("global", {}):
             raise SemanticError(f"DeclarationError: Struct '{name}' already exists.")
         if scope not in self.struct_list:
             self.struct_list[scope] = []
         self.struct_list[scope].append(name)
-        return StructDec(struct_name, fields)
+        return StructDec(struct_name, fields, scope)
 
     def parse_struct_inst(self, scope) -> StructInst:
         self.current_token = self.get_next_token()  # eat 'access'
@@ -525,8 +555,11 @@ class Semantic:
         if not self.current_token or not re.match(r'^id\d+$', self.current_token.token):
             raise SemanticError("Expected struct name after 'access'.")
         struct_parent = self.current_token.lexeme
-        if struct_parent not in self.struct_list.get(scope, []) and struct_parent not in self.struct_list.get("global", []):
-            raise SemanticError(f"DeclarationError: Struct '{struct_parent}' is not defined.")
+        if struct_parent not in self.struct_list.get(scope, []):
+            if struct_parent in self.globalstruct:
+                pass
+            else:
+                raise SemanticError(f"DeclarationError: Struct '{struct_parent}' is not defined.")
         self.current_token = self.get_next_token()  # eat id
         self.skip_spaces()
         if not self.current_token or not re.match(r'^id\d+$', self.current_token.token):
@@ -705,8 +738,11 @@ class Semantic:
         if not self.current_token or not re.match(r'^id\d+$', self.current_token.token):
             raise SemanticError("Expected struct name after 'access'.")
         struct_parent = self.current_token.lexeme
-        if struct_parent not in self.struct_list.get(scope, []) and struct_parent not in self.struct_list.get("global", []):
-            raise SemanticError(f"DeclarationError: Struct '{struct_parent}' is not defined.")
+        if struct_parent not in self.struct_list.get(scope, []):
+            if struct_parent in self.globalstruct:
+                pass
+            else:
+                raise SemanticError(f"DeclarationError: Struct '{struct_parent}' is not defined.")
         self.current_token = self.get_next_token()  # eat id
         self.skip_spaces()
         if not self.current_token or not re.match(r'^id\d+$', self.current_token.token):
@@ -838,7 +874,9 @@ def check(fn, text):
     try:
         visitor = ASTVisitor()
         visitor.visit(result)
-        
+        table = visitor.symbol_table
+        print(table)
+
         analyzer = SemanticAnalyzer(visitor.symbol_table)
         analyzer.visit(result)
         table = analyzer.symbol_table

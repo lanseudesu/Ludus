@@ -2,6 +2,7 @@ from ..nodes import *
 from .new_symboltable import SymbolTable
 from .new_interpreter import evaluate
 from ..error import SemanticError
+import traceback
 
 class ASTVisitor:
     TYPE_MAP = {
@@ -86,6 +87,10 @@ class ASTVisitor:
                 "value": value,
                 "datatype": field.datatype
             }
+        self.symbol_table.define(node.name.symbol, fields)
+
+    def visit_GlobalStructDec(self, node: GlobalStructDec):
+        fields = {}
         self.symbol_table.define(node.name.symbol, fields)
 
     def visit_StructInst(self, node: StructInst):
@@ -188,7 +193,7 @@ class SemanticAnalyzer(ASTVisitor):
 
         if len(fields) > len(field_names):
             raise SemanticError(f"Too many values provided for struct '{structinst["parent"]}'." 
-                                f"Expected {len(structparent)}, got {len(structinst["fields"])}.")
+                                f" Expected {len(structparent)}, got {len(structinst["fields"])}.")
         
         for i, field in enumerate(field_names):
             default_value = structparent[field]["value"]
@@ -212,6 +217,9 @@ class SemanticAnalyzer(ASTVisitor):
                 })
             
         self.symbol_table.define_structinst(node.name.symbol, node.parent, struct_fields, node.immo)
+
+    def visit_GlobalStructDec(self, node: GlobalStructDec):
+        pass
 
     def visit_InstAssignmentStmt(self, node: InstAssignment):
         structinst = self.symbol_table.lookup(node.left.instance.symbol)

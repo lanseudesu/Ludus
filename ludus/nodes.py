@@ -199,10 +199,11 @@ class StructFields(Stmt):
         self.datatype = datatype
 
 class StructDec(Stmt):
-    def __init__(self, name: Identifier, body: List[StructFields]):
+    def __init__(self, name: Identifier, body: List[StructFields], scope: str):
         super().__init__(NodeType.STRUCT_DEC)
         self.name = name
         self.body = body
+        self.scope = scope
 
 class StructInst(Stmt):
     def __init__(self, name: Identifier, parent: str, body: List[Expr], immo: bool):
