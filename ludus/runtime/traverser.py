@@ -121,6 +121,9 @@ class SemanticAnalyzer(ASTVisitor):
         value = evaluate(node.value, self.symbol_table)
         if isinstance(node.value, DeadLiteral):
             val_type = node.value.datatype
+        elif isinstance(node.value, Identifier) and value == None:
+            id_val = self.symbol_table.lookup(node.value.symbol)
+            val_type = id_val["type"]
         else:
             val_type = self.TYPE_MAP.get(type(value), str(type(value)))
         self.symbol_table.define_var(node.name.symbol, value, val_type, node.immo, node.scope)

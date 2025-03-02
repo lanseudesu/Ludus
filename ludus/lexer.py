@@ -46,9 +46,7 @@ valid_lhs = ALPHANUM + '_)]'
 
 # literals:
 TT_HP	      = 'hp_ltr'
-TT_NHP        = 'nhp_ltr'
 TT_XP         = 'xp_ltr'
-TT_NXP        = 'nxp_ltr'
 TT_COMMS      = 'comms_ltr'
 TT_FLAG       = 'flag_ltr'
 

@@ -774,8 +774,47 @@ class Semantic:
     ########## EXPR ############
     def parse_expr(self) -> Expr:
         self.skip_spaces()
-        return self.parse_additive_expr()
+        return self.parse_or_expr()
+    
+    def parse_or_expr(self) -> Expr:
+        self.skip_spaces()
+        left = self.parse_and_expr()
+        while self.current_token and self.current_token.token in ['OR', '||']:
+            operator = self.current_token.token
+            self.current_token = self.get_next_token()
+            self.skip_spaces()
+            right = self.parse_and_expr()
+            left = BinaryExpr(left=left, right=right, operator=operator)
+        return left
+    
+    def parse_and_expr(self) -> Expr:
+        self.skip_spaces()
+        left = self.parse_relat_expr()
+        while self.current_token and self.current_token.token in ['AND', '&&']:
+            operator = self.current_token.token
+            self.current_token = self.get_next_token()
+            self.skip_spaces()
+            right = self.parse_relat_expr()
+            left = BinaryExpr(left=left, right=right, operator=operator)
+        return left
+    
+    def parse_relat_expr(self) -> Expr:
+        self.skip_spaces()
+        left = self.parse_additive_expr()
+        if not self.current_token or self.current_token.token not in ['<', '>', '<=', '>=', '==', '!=']:
+            return left
 
+        expr = []
+        while self.current_token and self.current_token.token in ['<', '>', '<=', '>=', '==', '!=']:
+            operator = self.current_token.token
+            self.current_token = self.get_next_token()
+            self.skip_spaces()
+            right = self.parse_additive_expr()
+            expr.append(BinaryExpr(left=left, right=right, operator=operator))
+            left = right
+
+        return ChainRelatExpr(expr)
+    
     def parse_additive_expr(self) -> Expr:
         self.skip_spaces()
         left = self.parse_multiplicative_expr()
@@ -790,16 +829,41 @@ class Semantic:
 
     def parse_multiplicative_expr(self) -> Expr:
         self.skip_spaces()
-        left = self.parse_primary_expr()
+        left = self.parse_not_expr()
 
-        while self.current_token and self.current_token.token in ["/", "*", "%"]:
+        while self.current_token and self.current_token.token in "/*%":
             operator = self.current_token.token
             self.current_token = self.get_next_token()
             self.skip_spaces()
-            right = self.parse_primary_expr()
+            right = self.parse_not_expr()
             left = BinaryExpr(left=left, right=right, operator=operator)  
 
         return left  
+    
+    def parse_not_expr(self) -> Expr:
+        self.skip_spaces()
+
+        if self.current_token and self.current_token.token == '!':
+            operator = self.current_token.token
+            self.current_token = self.get_next_token()
+            self.skip_spaces()
+            operand = self.parse_exp_expr()
+            return UnaryExpr(operator=operator, operand=operand)
+
+        return self.parse_exp_expr()
+    
+    def parse_exp_expr(self) -> Expr:
+        self.skip_spaces()
+        left = self.parse_primary_expr()
+
+        while self.current_token and self.current_token.token == '^':
+            operator = self.current_token.token
+            self.current_token = self.get_next_token()
+            self.skip_spaces()
+            right = self.parse_exp_expr()
+            left = BinaryExpr(left=left, right=right, operator=operator)  
+
+        return left 
 
     def parse_primary_expr(self) -> Expr:
         self.skip_spaces()
@@ -850,6 +914,22 @@ class Semantic:
             self.expect(')', "Unexpected token found inside parenthesised expression. Expected closing parenthesis.")
             self.skip_spaces()
             return value
+        elif tk == '-':
+            self.current_token = self.get_next_token()
+            self.skip_spaces()
+            if self.current_token and self.current_token.token == '(':
+                self.current_token = self.get_next_token()
+                self.skip_spaces()
+                expr = self.parse_expr()
+                self.expect(')', "Unexpected token found inside parenthesized expression. Expected closing parenthesis.")
+                self.skip_spaces()
+                return UnaryExpr(operator='-', operand=expr)
+            elif re.match(r'^id\d+$', self.current_token.token):
+                identifier = Identifier(symbol=self.current_token.lexeme)
+                self.current_token = self.get_next_token()
+                self.skip_spaces()
+                return UnaryExpr(operator='-', operand=identifier)
+
         else:
             raise SemanticError(f"Unexpected token found during parsing: {tk}")
         
@@ -874,8 +954,6 @@ def check(fn, text):
     try:
         visitor = ASTVisitor()
         visitor.visit(result)
-        table = visitor.symbol_table
-        print(table)
 
         analyzer = SemanticAnalyzer(visitor.symbol_table)
         analyzer.visit(result)
@@ -884,4 +962,6 @@ def check(fn, text):
         return str(e), {}
 
     return result, table
+
+    # return result, {}
         

@@ -34,7 +34,7 @@ class SymbolTable:
     def lookup(self, name: str):
         if name in self.symbols:
             value = self.symbols.get(name)
-            if value is isinstance(value, Expr): 
+            if isinstance(value, Expr): 
                 raise SemanticError(f"Variable '{name}' is not defined before use.")
         else:
             raise SemanticError(f"Variable '{name}' is not defined.")

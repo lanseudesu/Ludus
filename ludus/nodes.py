@@ -8,7 +8,9 @@ class NodeType:
     FLAG_LITERAL        = "FlagLiteral"
     DEAD_LITERAL        = "DeadLiteral"
     IDENTIFIER          = "Identifier"
+    UNARY_EXPR          = "UnaryExpr"
     BINARY_EXPR         = "BinaryExpr"
+    CHAIN_RELAT_EXPR    = "ChainRelatExpr"
     FUNCTION_DEC        = "FunctionDec"
     BLOCK_STMT          = "BlockStmt"
     PLAY_FUNC           = "PlayFunc"
@@ -129,6 +131,17 @@ class DeadLiteral(Expr):
             "flag": bool
         }
         return type_map.get(self.datatype, None)
+
+class UnaryExpr(Expr):
+    def __init__(self, operator: str, operand: Expr):
+        super().__init__(NodeType.UNARY_EXPR)
+        self.operator = operator
+        self.operand = operand
+
+class ChainRelatExpr(Expr):
+    def __init__(self, expressions: List[Expr]):
+        super().__init__(NodeType.CHAIN_RELAT_EXPR)
+        self.expressions = expressions
 
 class PlayFunc(Stmt):
     def __init__(self, body: 'BlockStmt'):
