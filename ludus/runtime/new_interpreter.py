@@ -21,6 +21,31 @@ def evaluate(ast_node, symbol_table):
         if value is None:
             raise SemanticError(f"Variable '{ast_node.symbol}' is not defined.")
         return value["value"]
+    elif ast_node.kind == 'StructInstField':
+        structinst = symbol_table.lookup(ast_node.instance.symbol)
+        for fld in structinst["fields"]:
+            if fld["name"] == ast_node.field.symbol:
+                return fld["value"]
+            else:
+                raise SemanticError(f"FieldError: Field '{ast_node.field.symbol}' does not exist "
+                                f"in struct instance '{ast_node.instance.symbol}'.")
+    elif ast_node.kind == 'ArrayElement':
+        arr_name = ast_node.left.symbol
+        arr = symbol_table.lookup(arr_name)
+        if len(ast_node.index) != len(arr["dimensions"]):
+            raise SemanticError(f"ArrayIndexError: Incorrect number of dimensions for {arr_name}.")
+        target = arr["elements"]
+        for i, idx in enumerate(ast_node.index[:-1]):
+            idx = evaluate(idx, symbol_table)
+            if idx < 0 or idx >= len(target):
+                raise SemanticError(f"ArrayIndexError: Index {idx} out of bounds for dimension {i} of array '{arr_name}'.")
+            target = target[idx]
+        final_idx = ast_node.index[-1]
+        final_idx = evaluate(final_idx, symbol_table)
+        if final_idx < 0 or final_idx >= len(target):
+            raise SemanticError(f"ArrayIndexError: Index {final_idx} out of bounds for final dimension of array '{arr_name}'.")
+        
+        return target[final_idx]
     elif ast_node.kind == "DeadLiteral":
         return None
     elif ast_node.kind == "UnaryExpr":

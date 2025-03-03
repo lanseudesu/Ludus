@@ -189,7 +189,7 @@ class Semantic:
             if self.current_token and self.current_token.token == ":":
                 self.current_token = self.get_next_token() # eat :
                 self.skip_spaces()
-                value = self.parse_expr()
+                value = self.parse_expr(scope)
 
                 if scope not in self.var_list:
                     self.var_list[scope] = []
@@ -203,7 +203,7 @@ class Semantic:
 
         self.current_token = self.get_next_token() # eat :
         self.skip_spaces()
-        value = self.parse_expr()
+        value = self.parse_expr(scope)
         values_table = {name: {"values": value}}
         self.skip_spaces()
 
@@ -225,7 +225,7 @@ class Semantic:
             self.current_token = self.get_next_token() # eat :
             self.skip_whitespace()
 
-            value = self.parse_expr()
+            value = self.parse_expr(scope)
             values_table[variable_name] = {"values": value}
 
         self.skip_spaces()
@@ -391,7 +391,7 @@ class Semantic:
                     raise SemanticError("AssignmentError: Index must not be blank for array index assignment.")
                 dimensions.append(None)
             else:
-                dim = self.parse_expr()
+                dim = self.parse_expr(scope)
                 if arr_exist:
                     dimensions.append(dim)
                 else:
@@ -410,7 +410,7 @@ class Semantic:
             if arr_exist:
                 raise SemanticError(f"DeclarationError: Array '{name}' was already declared.")
             else:
-                values = self.parse_array_values(dimensions)
+                values = self.parse_array_values(dimensions, scope)
                 if scope not in self.arr_list:
                     self.arr_list[scope] = {}
                     
@@ -423,7 +423,7 @@ class Semantic:
                 if name in self.arr_list.get("global", {}):
                     scope = "global"
                 if all(dim is not None for dim in dimensions):
-                    value = self.parse_expr()
+                    value = self.parse_expr(scope)
                     lhs = ArrElement(arr_name, dimensions)
                     return ArrAssignment(lhs, ':', value)
                 else:
@@ -431,14 +431,14 @@ class Semantic:
             else:
                 raise SemanticError(f"AssignmentError: Array '{arr_name.symbol}' does not exist.")
 
-    def parse_array_values(self, expected_dims):
+    def parse_array_values(self, expected_dims, scope):
         values = []
         self.skip_spaces()
         if len(expected_dims) == 2:
             while self.current_token and self.current_token.token != 'newline':
                 self.expect("[", "Expected '[' for array values.")
                 self.skip_spaces()
-                inner_values = self.parse_inner_arr_values()
+                inner_values = self.parse_inner_arr_values(scope)
                 values.append(inner_values)
                 self.expect("]", "Expected ']' to close array values.")
                 self.skip_spaces()
@@ -459,7 +459,7 @@ class Semantic:
         else:
             self.expect("[", "Expected '[' for array values.")
             self.skip_spaces()
-            inner_values = self.parse_inner_arr_values()
+            inner_values = self.parse_inner_arr_values(scope)
             values = inner_values
             self.expect("]", "Expected ']' to close array values.")
             self.skip_spaces()
@@ -475,10 +475,10 @@ class Semantic:
         
         return values
 
-    def parse_inner_arr_values(self):
+    def parse_inner_arr_values(self, scope):
         inner_values = []
         while self.current_token and self.current_token.token != ']':
-            value = self.parse_expr()
+            value = self.parse_expr(scope)
             if value.kind not in ["HpLiteral", "XpLiteral", "CommsLiteral", "FlagLiteral"]:
                 raise SemanticError("Arrays can only be initialied with literal values.")
             inner_values.append(value)
@@ -501,7 +501,7 @@ class Semantic:
         elif dimensions == 2:
             dimensions = [None, None]
         if self.current_token and self.current_token.token == '[':
-            values = self.parse_array_values(dimensions)
+            values = self.parse_array_values(dimensions, scope)
             return ArrayRedec(name, dimensions, values, False, scope)
         else:
             raise SemanticError(f"RedeclarationError: Array '{name}' is being redeclared with"
@@ -556,7 +556,7 @@ class Semantic:
             if self.current_token.token == ':':
                 self.current_token = self.get_next_token()  # eat :
                 self.skip_spaces()
-                value = self.parse_expr() 
+                value = self.parse_expr(scope) 
                 fields.append(StructFields(field_name, value, datatype))
                 if field_name.symbol in fields_table:
                     raise SemanticError(f"FieldError: Duplicate field name detected: '{field_name.symbol}'.")
@@ -605,7 +605,7 @@ class Semantic:
             self.current_token = self.get_next_token()  # eat ':'
             self.skip_spaces()
             while self.current_token.token != ',':
-                value = self.parse_expr()
+                value = self.parse_expr(scope)
                 values.append(value)
                 self.skip_spaces()
                 if self.current_token.token == ',':
@@ -638,7 +638,7 @@ class Semantic:
         self.skip_spaces()
         self.expect(":","Expected ':' after struct instance field name.")
         self.skip_spaces()
-        value = self.parse_expr()
+        value = self.parse_expr(scope)
         return InstAssignment(left, ':', value)
 
     ########## IMMO ############
@@ -680,7 +680,7 @@ class Semantic:
             if self.current_token and self.current_token.token == ":":
                 self.current_token = self.get_next_token() # eat :
                 self.skip_spaces()
-                value = self.parse_expr()
+                value = self.parse_expr(scope)
                 if scope not in self.var_list:
                     self.var_list[scope] = []
                 for var in var_names:
@@ -692,7 +692,7 @@ class Semantic:
             
         self.current_token = self.get_next_token() # eat :
         self.skip_spaces()
-        value = self.parse_expr()
+        value = self.parse_expr(scope)
         values_table = {name: {"values": value}}
         self.skip_spaces()
 
@@ -714,7 +714,7 @@ class Semantic:
             self.current_token = self.get_next_token() # eat :
             self.skip_spaces()
 
-            value = self.parse_expr()
+            value = self.parse_expr(scope)
             values_table[variable_name] = {"values": value}
         
         self.skip_spaces()
@@ -757,7 +757,7 @@ class Semantic:
             
         self.expect(":", "Expected ':' in array initialization or modification.")
         self.skip_spaces()
-        values = self.parse_array_values(dimensions)
+        values = self.parse_array_values(dimensions, scope)
         if scope not in self.arr_list:
             self.arr_list[scope] = {}
                     
@@ -788,7 +788,7 @@ class Semantic:
         self.expect(":","Expected ':' after struct instance name.")
         self.skip_spaces()
         while self.current_token.token != ',':
-            value = self.parse_expr()
+            value = self.parse_expr(scope)
             values.append(value)
             self.skip_spaces()
             if self.current_token.token == ',':
@@ -806,35 +806,35 @@ class Semantic:
         return StructInst(inst_name, struct_parent, values, True)
 
     ########## EXPR ############
-    def parse_expr(self) -> Expr:
+    def parse_expr(self, scope) -> Expr:
         self.skip_spaces()
-        return self.parse_or_expr()
+        return self.parse_or_expr(scope)
     
-    def parse_or_expr(self) -> Expr:
+    def parse_or_expr(self, scope) -> Expr:
         self.skip_spaces()
-        left = self.parse_and_expr()
+        left = self.parse_and_expr(scope)
         while self.current_token and self.current_token.token in ['OR', '||']:
             operator = self.current_token.token
             self.current_token = self.get_next_token()
             self.skip_spaces()
-            right = self.parse_and_expr()
+            right = self.parse_and_expr(scope)
             left = BinaryExpr(left=left, right=right, operator=operator)
         return left
     
-    def parse_and_expr(self) -> Expr:
+    def parse_and_expr(self, scope) -> Expr:
         self.skip_spaces()
-        left = self.parse_relat_expr()
+        left = self.parse_relat_expr(scope)
         while self.current_token and self.current_token.token in ['AND', '&&']:
             operator = self.current_token.token
             self.current_token = self.get_next_token()
             self.skip_spaces()
-            right = self.parse_relat_expr()
+            right = self.parse_relat_expr(scope)
             left = BinaryExpr(left=left, right=right, operator=operator)
         return left
     
-    def parse_relat_expr(self) -> Expr:
+    def parse_relat_expr(self, scope) -> Expr:
         self.skip_spaces()
-        left = self.parse_additive_expr()
+        left = self.parse_additive_expr(scope)
         if not self.current_token or self.current_token.token not in ['<', '>', '<=', '>=', '==', '!=']:
             return left
 
@@ -843,38 +843,38 @@ class Semantic:
             operator = self.current_token.token
             self.current_token = self.get_next_token()
             self.skip_spaces()
-            right = self.parse_additive_expr()
+            right = self.parse_additive_expr(scope)
             expr.append(BinaryExpr(left=left, right=right, operator=operator))
             left = right
 
         return ChainRelatExpr(expr)
     
-    def parse_additive_expr(self) -> Expr:
+    def parse_additive_expr(self, scope) -> Expr:
         self.skip_spaces()
-        left = self.parse_multiplicative_expr()
+        left = self.parse_multiplicative_expr(scope)
 
         while self.current_token and self.current_token.token in '+-':
             operator = self.current_token.token
             self.current_token = self.get_next_token()
             self.skip_spaces()
-            right = self.parse_multiplicative_expr()
+            right = self.parse_multiplicative_expr(scope)
             left = BinaryExpr(left=left, right=right, operator=operator)
         return left
 
-    def parse_multiplicative_expr(self) -> Expr:
+    def parse_multiplicative_expr(self, scope) -> Expr:
         self.skip_spaces()
-        left = self.parse_not_expr()
+        left = self.parse_not_expr(scope)
 
         while self.current_token and self.current_token.token in "/*%":
             operator = self.current_token.token
             self.current_token = self.get_next_token()
             self.skip_spaces()
-            right = self.parse_not_expr()
+            right = self.parse_not_expr(scope)
             left = BinaryExpr(left=left, right=right, operator=operator)  
 
         return left  
     
-    def parse_not_expr(self) -> Expr:
+    def parse_not_expr(self, scope) -> Expr:
         self.skip_spaces()
 
         if self.current_token and self.current_token.token == '!':
@@ -884,22 +884,22 @@ class Semantic:
             operand = self.parse_exp_expr()
             return UnaryExpr(operator=operator, operand=operand)
 
-        return self.parse_exp_expr()
+        return self.parse_exp_expr(scope)
     
-    def parse_exp_expr(self) -> Expr:
+    def parse_exp_expr(self, scope) -> Expr:
         self.skip_spaces()
-        left = self.parse_primary_expr()
+        left = self.parse_primary_expr(scope)
 
         while self.current_token and self.current_token.token == '^':
             operator = self.current_token.token
             self.current_token = self.get_next_token()
             self.skip_spaces()
-            right = self.parse_exp_expr()
+            right = self.parse_exp_expr(scope)
             left = BinaryExpr(left=left, right=right, operator=operator)  
 
         return left 
 
-    def parse_primary_expr(self) -> Expr:
+    def parse_primary_expr(self, scope) -> Expr:
         self.skip_spaces()
         if not self.current_token:
             raise SemanticError("Unexpected end of input during parsing!")
@@ -913,13 +913,41 @@ class Semantic:
             identifier = Identifier(symbol=self.current_token.lexeme)
             self.current_token = self.get_next_token()
             self.skip_spaces()
+            if self.current_token.token == '.':
+                if identifier.symbol not in self.struct_inst_list.get(scope, {}):
+                    raise SemanticError(f"NameError: Struct instance '{identifier.symbol}' does not exist.")
+                self.current_token = self.get_next_token()
+                self.skip_spaces()
+                if not re.match(r'^id\d+$', self.current_token.token):
+                    raise SemanticError("Expected 'id' after '.' in accesisng a struct instance field.")
+                field = Identifier(symbol=self.current_token.lexeme)
+                identifier = StructInstField(identifier, field)
+                self.current_token = self.get_next_token()
+                self.skip_spaces()
+            elif self.current_token.token == '[':
+                dimensions = []
+                if identifier.symbol not in self.arr_list.get(scope, {}) and identifier.symbol not in self.arr_list.get("global", {}):
+                    raise SemanticError(f"NameError: Array '{identifier.symbol}' does not exist.")
+                while self.current_token and self.current_token.token == '[':
+                    self.current_token = self.get_next_token() #eat [
+                    self.skip_spaces
+                    if self.current_token and self.current_token.token == ']':
+                        raise SemanticError("IndexError: Index cannot be empty.")
+                    else:
+                        dim = self.parse_expr(scope)
+                        dimensions.append(dim)
+                        self.skip_spaces()
+                        self.expect("]", "Expected ']' to close array dimension.")
+                        self.skip_spaces()
+                
+                identifier = ArrElement(identifier, dimensions)
             return identifier
-        elif tk == 'hp_ltr' or tk == 'nhp_ltr':
+        elif tk == 'hp_ltr':
             literal = HpLiteral(value=self.current_token.lexeme)
             self.current_token = self.get_next_token()
             self.skip_spaces()
             return literal
-        elif tk == 'xp_ltr' or tk == 'nxp_ltr':
+        elif tk == 'xp_ltr':
             literal = XpLiteral(value=self.current_token.lexeme)
             self.current_token = self.get_next_token()
             self.skip_spaces()
@@ -943,7 +971,7 @@ class Semantic:
         elif tk == '(':
             self.current_token = self.get_next_token()
             self.skip_spaces()
-            value = self.parse_expr()  
+            value = self.parse_expr(scope)  
             
             self.expect(')', "Unexpected token found inside parenthesised expression. Expected closing parenthesis.")
             self.skip_spaces()
@@ -954,7 +982,7 @@ class Semantic:
             if self.current_token and self.current_token.token == '(':
                 self.current_token = self.get_next_token()
                 self.skip_spaces()
-                expr = self.parse_expr()
+                expr = self.parse_expr(scope)
                 self.expect(')', "Unexpected token found inside parenthesized expression. Expected closing parenthesis.")
                 self.skip_spaces()
                 return UnaryExpr(operator='-', operand=expr)
@@ -963,7 +991,6 @@ class Semantic:
                 self.current_token = self.get_next_token()
                 self.skip_spaces()
                 return UnaryExpr(operator='-', operand=identifier)
-
         else:
             raise SemanticError(f"Unexpected token found during parsing: {tk}")
         
