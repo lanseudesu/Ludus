@@ -149,10 +149,7 @@ class SemanticAnalyzer(ASTVisitor):
 
             if isinstance(new_val, str) and node.operator != '+=':
                 raise SemanticError("TypeError: Only valid assignment operator between comms is '+='.")
-
-            if node.operator in ['/=', '%='] and new_val == 0:
-                raise SemanticError("ZeroDivisionError: Division or modulo by zero is not allowed")
-
+            
             operations = {
                 '+=': lambda x, y: x + y,
                 '-=': lambda x, y: x - y,
@@ -161,7 +158,24 @@ class SemanticAnalyzer(ASTVisitor):
                 '%=': lambda x, y: x % y
             }
 
-            new_val = operations[node.operator](value["value"], new_val)   
+            if node.operator == '/=': 
+                if isinstance(value["value"], int) and isinstance(new_val, int):
+                    if new_val == 0:
+                        raise SemanticError("ZeroDivisionError: Division by zero is not allowed")
+                    new_val = int(operations[node.operator](value["value"], new_val)) 
+                else:
+                    if new_val == 0 or new_val == 0.0:
+                        raise SemanticError("ZeroDivisionError: Division by zero is not allowed")
+                    new_val = operations[node.operator](value["value"], new_val)
+            elif node.operator == '%=':
+                if isinstance(value["value"], int) and isinstance(new_val, int):
+                    if new_val == 0:
+                        raise SemanticError("ZeroDivisionError: Modulo by zero is not allowed.")
+                    new_val = operations[node.operator](value["value"], new_val)
+                else:
+                    raise SemanticError("ModuloError: Only hp values can be used in modulo operation.")
+            else:
+                new_val = operations[node.operator](value["value"], new_val)  
         else:
             new_val = new_val
 
@@ -221,10 +235,7 @@ class SemanticAnalyzer(ASTVisitor):
 
             if isinstance(target[final_idx], str) and node.operator != '+=':
                 raise SemanticError("TypeError: Only valid assignment operator between comms is '+='.")
-
-            if node.operator in ['/=', '%='] and value == 0:
-                raise SemanticError("ZeroDivisionError: Division or modulo by zero is not allowed")
-
+            
             operations = {
                 '+=': lambda x, y: x + y,
                 '-=': lambda x, y: x - y,
@@ -232,12 +243,29 @@ class SemanticAnalyzer(ASTVisitor):
                 '/=': lambda x, y: x / y,
                 '%=': lambda x, y: x % y
             }
-
-            new_val = operations[node.operator](target[final_idx], value)
-            target[final_idx] = new_val
+            
+            if node.operator == '/=':
+                if isinstance(target[final_idx], int) and isinstance(value, int):
+                    if value == 0:
+                        raise SemanticError("ZeroDivisionError: Division by zero is not allowed")
+                    value = int(operations[node.operator](target[final_idx], value)) 
+                else:
+                    if value == 0 or value == 0.0:
+                        raise SemanticError("ZeroDivisionError: Division by zero is not allowed")
+                    value = operations[node.operator](target[final_idx], value)
+            elif node.operator == '%=':
+                if isinstance(target[final_idx], int) and isinstance(value, int):
+                    if value == 0:
+                        raise SemanticError("ZeroDivisionError: Modulo by zero is not allowed.")
+                    value = operations[node.operator](target[final_idx], value)
+                else:
+                    raise SemanticError("ModuloError: Only hp values can be used in modulo operation.")
+            else:
+                value = operations[node.operator](target[final_idx], value)
+            target[final_idx] = value
         else:
             target[final_idx] = value
-        new_val_type = self.TYPE_MAP.get(type(new_val), str(type(new_val)))
+        new_val_type = self.TYPE_MAP.get(type(value), str(type(value)))
         if new_val_type != lhs_type:
             raise SemanticError(f"TypeMismatchError: Array '{lhs_name}' expects '{lhs_type}' data type, not '{new_val_type}'.")
         
@@ -340,9 +368,6 @@ class SemanticAnalyzer(ASTVisitor):
                     if isinstance(new_val, str) and node.operator != '+=':
                         raise SemanticError("TypeError: Only valid assignment operator between comms is '+='.")
 
-                    if node.operator in ['/=', '%='] and new_val == 0:
-                        raise SemanticError("ZeroDivisionError: Division or modulo by zero is not allowed")
-
                     operations = {
                         '+=': lambda x, y: x + y,
                         '-=': lambda x, y: x - y,
@@ -351,7 +376,24 @@ class SemanticAnalyzer(ASTVisitor):
                         '%=': lambda x, y: x % y
                     }
 
-                    new_val = operations[node.operator](field["value"], new_val)   
+                    if node.operator == '/=': 
+                        if isinstance(field["value"], int) and isinstance(new_val, int):
+                            if new_val == 0:
+                                raise SemanticError("ZeroDivisionError: Division by zero is not allowed")
+                            new_val = int(operations[node.operator](field["value"], new_val)) 
+                        else:
+                            if new_val == 0 or new_val == 0.0:
+                                raise SemanticError("ZeroDivisionError: Division by zero is not allowed")
+                            new_val = operations[node.operator](field["value"], new_val)
+                    elif node.operator == '%=':
+                        if isinstance(field["value"], int) and isinstance(new_val, int):
+                            if new_val == 0:
+                                raise SemanticError("ZeroDivisionError: Modulo by zero is not allowed.")
+                            new_val = operations[node.operator](field["value"], new_val)
+                        else:
+                            raise SemanticError("ModuloError: Only hp values can be used in modulo operation.")
+                    else:
+                        new_val = operations[node.operator](field["value"], new_val)
                 else:
                     new_val = new_val
                 

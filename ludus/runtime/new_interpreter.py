@@ -103,13 +103,21 @@ def eval_numeric_binary_expr(lhs, rhs, operator):
         elif operator == "*":
             result = lhs * rhs
         elif operator == "/":
-            if rhs == 0:
-                raise SemanticError("ZeroDivisionError: Division by zero is not allowed")
-            result = lhs / rhs
+            if isinstance(lhs, int) and isinstance(rhs, int):
+                if rhs == 0:
+                    raise SemanticError("ZeroDivisionError: Division by zero is not allowed")
+                result = int(lhs / rhs)
+            else:
+                if rhs == 0 or rhs == 0.0:
+                    raise SemanticError("ZeroDivisionError: Division by zero is not allowed")
+                result = lhs / rhs
         else:
-            if rhs == 0:
-                raise SemanticError("ZeroDivisionError: Modulo by zero is not allowed.")
-            result = lhs % rhs
+            if isinstance(lhs, int) and isinstance(rhs, int):
+                if rhs == 0:
+                    raise SemanticError("ZeroDivisionError: Modulo by zero is not allowed.")
+                result = lhs % rhs
+            else:
+                raise SemanticError("ModuloError: Only hp values can be used in modulo operation.")
         return result
     except TypeError:
         raise SemanticError("TypeError: 'dead' types cannot be used as an operand.")
