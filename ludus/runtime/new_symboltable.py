@@ -16,12 +16,13 @@ class SymbolTable:
             "scope": scope
         }
 
-    def define_arr(self, name: str, dimensions, values, immo, scope):
+    def define_arr(self, name: str, dimensions, values, immo, scope, datatype):
         self.symbols[name] = {
             "dimensions": dimensions,
             "elements": values,
             "immo": immo,
-            "scope": scope
+            "scope": scope,
+            "type": datatype
         }
 
     def define_structinst(self, name: str, parent: str, values, immo):

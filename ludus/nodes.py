@@ -17,6 +17,8 @@ class NodeType:
     VAR_DEC             = "VarDec"
     BATCH_VAR_DEC       = "BatchVarDec"
     ARRAY_DEC           = "ArrayDec"
+    ARRAY_REDEC         = "ArrayRedec"
+    ARR_ELEMENT         = "ArrayElement"
     ASS_STMT            = "AssignmentStmt"
     ARR_ASS_STMT        = "ArrayAssignmentStmt"
     VAR_ASS_STMT        = "VarAssignmentStmt"
@@ -176,8 +178,19 @@ class BatchVarDec(Stmt):
 
 class ArrayDec(Stmt):
     def __init__(self, name: Identifier, dimensions: List[Optional[int]], 
-                 elements: List[Expr], immo: bool, scope: str):
+                 elements: List[Expr], immo: bool, scope: str, datatype=None):
         super().__init__(NodeType.ARRAY_DEC)
+        self.name = name
+        self.dimensions = dimensions
+        self.elements = elements
+        self.immo = immo
+        self.scope = scope
+        self.datatype = datatype
+
+class ArrayRedec(Stmt):
+    def __init__(self, name: Identifier, dimensions: List[Optional[int]], 
+                 elements: List[Expr], immo: bool, scope: str):
+        super().__init__(NodeType.ARRAY_REDEC)
         self.name = name
         self.dimensions = dimensions
         self.elements = elements
@@ -189,11 +202,16 @@ class AssignmentStmt(Stmt):
         super().__init__(NodeType.ASS_STMT)
         self.kind = kind
 
-class ArrAssignment(AssignmentStmt):
-    def __init__(self, left: Identifier, index, operator: str, right: Expr):
-        super().__init__(NodeType.ARR_ASS_STMT)
+class ArrElement(Expr):
+    def __init__(self, left: Identifier, index: Expr):
+        super().__init__(NodeType.ARR_ELEMENT)
         self.left = left
         self.index = index
+
+class ArrAssignment(AssignmentStmt):
+    def __init__(self, left: ArrElement, operator: str, right: Expr):
+        super().__init__(NodeType.ARR_ASS_STMT)
+        self.left = left
         self.operator = operator
         self.right = right
 
@@ -226,7 +244,7 @@ class StructInst(Stmt):
         self.body = body
         self.immo = immo
 
-class StructInstField(Stmt):
+class StructInstField(Expr):
     def __init__(self, instance: Identifier, field: Identifier):
         super().__init__(NodeType.STRUCT_INST_FIELD)
         self.instance = instance
@@ -250,3 +268,4 @@ class GlobalStructDec(Stmt):
     def __init__(self, name: Identifier):
         super().__init__(NodeType.GLOBAL_STRUCT_DEC)
         self.name = name
+

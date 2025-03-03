@@ -12,8 +12,7 @@ class Semantic:
         self.current_token_index = 0
         self.current_token = self.get_next_token()
         self.var_list = {"global": []} 
-        self.arr_list = {"global": []} 
-        self.dead_arr_list = {"global": {}} 
+        self.arr_list = {"global": {}} 
         self.struct_list = {"global": []}
         self.struct_inst_list = {}
         self.globalstruct = []
@@ -70,7 +69,7 @@ class Semantic:
                         program.body.append(self.parse_var_init("global"))
                     elif la_token is not None and la_token.token == '[':  
                         name = self.current_token.lexeme
-                        if name in self.dead_arr_list.get("global", {}) or name in self.arr_list.get("global", {}):
+                        if self.current_token.lexeme in self.arr_list["global"]:
                             raise SemanticError("DeclarationError: Global array "
                                                 f"'{name}' was already declared.")
                         program.body.append(self.parse_array("global"))
@@ -78,6 +77,9 @@ class Semantic:
                         raise SemanticError(f"Unexpected token found during parsing: {la_token.token}")
                 elif self.current_token and self.current_token.token in ['hp','xp','comms','flag']:
                     program.body.append(self.var_or_arr("global"))
+                elif self.current_token and self.current_token.token == 'immo':
+                    program.body.append(self.parse_immo("global"))
+                    self.current_token = self.get_next_token()
                 elif self.current_token and self.current_token.token == 'build':
                     program.body.append(self.parse_globalstruct())
                 elif self.current_token and self.current_token.token == 'play':
@@ -154,7 +156,7 @@ class Semantic:
         if la_token is not None and la_token.token == '[':  
             name = self.current_token.lexeme
             if scope == 'global':
-                if name in self.dead_arr_list.get("global", {}) or name in self.arr_list.get("global", {}):
+                if name in self.arr_list.get("global", {}):
                     raise SemanticError("DeclarationError: Global array "
                                         f"'{name}' was already declared.")
             return self.parse_empty_array(datatype, scope)
@@ -167,6 +169,9 @@ class Semantic:
     def parse_var_init(self, scope) -> Union[VarDec, BatchVarDec, VarAssignment]:
         var_names = [Identifier(symbol=self.current_token.lexeme)]  
         name = self.current_token.lexeme
+        if name in self.arr_list.get(scope, {}) or name in self.arr_list.get("global", {}):
+            return self.parse_arr_redec(name, scope)
+
         self.current_token = self.get_next_token() # eat id
         self.skip_spaces()
 
@@ -298,11 +303,14 @@ class Semantic:
             else:
                 return VarDec(var, DeadLiteral(value, datatype), False, scope)
 
-    def parse_empty_array(self, datatype,scope) -> ArrayDec:
+    def parse_empty_array(self, datatype, scope) -> ArrayDec:
         arr_name = Identifier(symbol=self.current_token.lexeme)
         name = arr_name.symbol
         self.current_token = self.get_next_token()
         self.skip_spaces()
+        arr_exist = name in self.arr_list.get(scope, {}) or name in self.arr_list.get("global", {})
+        if arr_exist:
+            raise SemanticError(f"DeclarationError: Array '{name}' is already defined.")
         dimensions = []
         values = []
 
@@ -317,12 +325,6 @@ class Semantic:
             self.skip_spaces()
             self.expect("]", "Expected ']' to close array dimension declaration.")
             self.skip_spaces()
-
-        if name in self.arr_list.get(scope, []) or name in self.arr_list.get("global", []):
-            raise SemanticError(f"DeclarationError: Array '{name}' is already defined.")
-        
-        if name in self.dead_arr_list.get(scope, {}) or name in self.dead_arr_list.get("global", {}):
-            raise SemanticError(f"DeclarationError: Array '{name}' is already defined.")
         
         if self.current_token and self.current_token.token == 'newline':
             default_value = {
@@ -334,13 +336,11 @@ class Semantic:
 
             if len(dimensions) == 2:
                 if dimensions[0] is None and dimensions[1] is None:
-                    values = []  # arr[][]
-                elif dimensions[0] is None and dimensions[1] is not None:
-                    values = [default_value] * dimensions[1]  # arr[][int]
-                elif dimensions[0] is not None and dimensions[1] is None:
-                    values = [[] for _ in range(dimensions[0])]  # arr[int][]
+                    values = [[],[]]  # arr[][]
                 elif dimensions[0] is not None and dimensions[1] is not None:
                     values = [[default_value] * dimensions[1] for _ in range(dimensions[0])]  # arr[int][int]
+                else:
+                    raise SemanticError("DeclarationError: Row and column sizes must both be empty or specified.")
             else:
                 if dimensions[0] is None:
                     values = []  # arr[]
@@ -348,9 +348,11 @@ class Semantic:
                     values = [default_value] * dimensions[0]
 
             if scope not in self.arr_list:
-                self.arr_list[scope] = []
-            self.arr_list[scope].append(name)
-            return ArrayDec(arr_name, dimensions, values, False, scope)
+                self.arr_list[scope] = {}
+            self.arr_list[scope][name] = {
+                "dimensions": len(dimensions)
+            }
+            return ArrayDec(arr_name, dimensions, values, False, scope, datatype)
         elif self.current_token and self.current_token.token == ':':
             self.current_token = self.get_next_token() #eat :
             self.skip_spaces()
@@ -366,113 +368,144 @@ class Semantic:
                 else:
                     raise SemanticError("NullPointerError: Null arrays cannot be initialized with specific size.")
                 
-            if scope not in self.dead_arr_list:
-                self.dead_arr_list[scope] = {}
-
-            self.dead_arr_list[scope][name] = {
-                "type": datatype,
-                "dimensions": dimensions
+            if scope not in self.arr_list:
+                self.arr_list[scope] = {}
+            self.arr_list[scope][name] = {
+                "dimensions": len(dimensions)
             }
-            return ArrayDec(arr_name, dimensions, values, False, scope)      
+            return ArrayDec(arr_name, dimensions, values, False, scope, datatype)      
     
     def parse_array(self, scope) -> Union[ArrayDec, ArrAssignment]:
         arr_name = Identifier(symbol=self.current_token.lexeme)
-        name=arr_name.symbol
+        name= arr_name.symbol
         self.current_token = self.get_next_token() # eat id
         self.skip_spaces()
+        arr_exist = name in self.arr_list.get(scope, {}) or name in self.arr_list.get("global", {})
         dimensions = []
-
+        
         while self.current_token and self.current_token.token == '[':
             self.current_token = self.get_next_token() #eat [
             self.skip_spaces
-            if self.current_token and self.current_token.token == 'hp_ltr':
-                dimensions.append(int(self.current_token.lexeme))
-                self.current_token = self.get_next_token()
-            else:
+            if self.current_token and self.current_token.token == ']':
+                if arr_exist:
+                    raise SemanticError("AssignmentError: Index must not be blank for array index assignment.")
                 dimensions.append(None)
+            else:
+                dim = self.parse_expr()
+                if arr_exist:
+                    dimensions.append(dim)
+                else:
+                    if isinstance(dim, HpLiteral):
+                        dimensions.append(dim.value)
+                    else:
+                        raise SemanticError("DeclarationError: Array size must be an hp literal only.")
+                
             self.skip_spaces()
             self.expect("]", "Expected ']' to close array dimension declaration.")
             self.skip_spaces()
             
         self.expect(":", "Expected ':' in array initialization or modification.")
         self.skip_spaces()
-        
-        if name in self.dead_arr_list.get(scope, {}) or name in self.dead_arr_list.get("global", {}):
-            if name in self.dead_arr_list.get("global", {}):
-                scope = "global"
-            existing_dimensions = self.dead_arr_list[scope][name]["dimensions"]
-            if len(existing_dimensions) != len(dimensions):
-                    raise SemanticError(f"ArrayIndexError: Incorrect number of dimensions for '{arr_name.symbol}'.")
-            expected_type = self.dead_arr_list[scope][name]["type"]
-            values = self.parse_array_values(expected_dims=dimensions, depth=0, scope=scope)
-            if all(dim is None for dim in dimensions):
-                if isinstance(values[0], list):
-                    for row in values:
-                        for val in row:
-                            val_type = self.TYPE_MAP.get(type(val.value), None)
-                            if val_type != expected_type:
-                                raise SemanticError(f"TypeMismatchError: Array '{name}' expects '{expected_type}' data type.")
-                    dimensions = [len(values), len(values[0])]    
-                else:
-                    for val in values:
-                        val_type = self.TYPE_MAP.get(type(val.value), None)
-                        if val_type != expected_type:
-                            raise SemanticError(f"TypeMismatchError: Array '{name}' expects '{expected_type}' data type.")
-                    dimensions = [len(values)]
-            
-            self.dead_arr_list[scope].pop(name, None)
-            if scope not in self.arr_list:
-                self.arr_list[scope] = []
-            self.arr_list[scope].append(name)
-            return ArrayDec(arr_name, dimensions, values, False, scope)
-        
-        if name in self.arr_list["global"]:
-            scope = "global"
-        if scope not in self.arr_list:
-            self.arr_list[scope] = []
-        if name in self.arr_list[scope]:
-            if all(dim is not None for dim in dimensions):
-                value = self.parse_expr()
-                return ArrAssignment(arr_name, dimensions, ':', value)
+        if self.current_token and self.current_token.token == '[':
+            if arr_exist:
+                raise SemanticError(f"DeclarationError: Array '{name}' was already declared.")
             else:
-                raise SemanticError(f"AssignmentError: Index must not be blank for array index assignment for array name '{arr_name.symbol}'.")
+                values = self.parse_array_values(dimensions)
+                if scope not in self.arr_list:
+                    self.arr_list[scope] = {}
+                    
+                self.arr_list[scope][name] = {
+                    "dimensions": len(dimensions)
+                }
+                return ArrayDec(arr_name, dimensions, values, False, scope)
         else:
-            values = self.parse_array_values(expected_dims=dimensions, depth=0, scope=scope)
-            if all(dim is None for dim in dimensions):
-                if isinstance(values[0], list):  
-                    dimensions = [len(values), len(values[0])]
-                else:  
-                    dimensions = [len(values)]
-            self.arr_list[scope].append(arr_name.symbol)
-            return ArrayDec(arr_name, dimensions, values, False, scope)
-
-    def parse_array_values(self, expected_dims, depth, scope):
-        values = []
-        if expected_dims[depth] is None or isinstance(expected_dims[depth], int):
-            while self.current_token and self.current_token.token != 'newline':
-                if depth + 1 < len(expected_dims):  # 2d array
-                    self.expect("[", "Expected '[' for nested array values.")
-                    self.skip_spaces()
-                    res_val = self.parse_array_values(expected_dims, depth + 1, scope)
-                    values.append(res_val)
-                    self.expect("]", "Expected ']' to close nested array values.")
-                else:
+            if arr_exist:
+                if name in self.arr_list.get("global", {}):
+                    scope = "global"
+                if all(dim is not None for dim in dimensions):
                     value = self.parse_expr()
-                    if value.kind not in ["HpLiteral", "XpLiteral", "CommsLiteral", "FlagLiteral"]:
-                        raise SemanticError("Arrays can only be initialied with literal values.")
-                    values.append(value)
+                    lhs = ArrElement(arr_name, dimensions)
+                    return ArrAssignment(lhs, ':', value)
+                else:
+                    raise SemanticError(f"AssignmentError: Index must not be blank for array index assignment for array name '{arr_name.symbol}'.")
+            else:
+                raise SemanticError(f"AssignmentError: Array '{arr_name.symbol}' does not exist.")
 
+    def parse_array_values(self, expected_dims):
+        values = []
+        self.skip_spaces()
+        if len(expected_dims) == 2:
+            while self.current_token and self.current_token.token != 'newline':
+                self.expect("[", "Expected '[' for array values.")
+                self.skip_spaces()
+                inner_values = self.parse_inner_arr_values()
+                values.append(inner_values)
+                self.expect("]", "Expected ']' to close array values.")
                 self.skip_spaces()
                 if self.current_token.token == ',':
                     self.current_token = self.get_next_token()  # eat ,
                     self.skip_spaces()
                 else:
                     break
-        if expected_dims[depth] is not None and len(values) != expected_dims[depth]:
-            raise SemanticError(
-                f"ArraySizeError: Expected {expected_dims[depth]} elements, but got {len(values)}."
-            )
+            if expected_dims[0] is not None and len(values) != expected_dims[0]:     
+                raise SemanticError(
+                    f"ArraySizeError: Expected {expected_dims[0]} elements, but got {len(values)}."
+                )
+            for row in values:
+                if expected_dims[1] is not None and len(row) != expected_dims[1]:
+                    raise SemanticError(
+                        f"ArraySizeError: Expected {expected_dims[1]} elements, but got {len(row)}."
+                    )
+        else:
+            self.expect("[", "Expected '[' for array values.")
+            self.skip_spaces()
+            inner_values = self.parse_inner_arr_values()
+            values = inner_values
+            self.expect("]", "Expected ']' to close array values.")
+            self.skip_spaces()
+            if self.current_token.token == ',':
+                raise SemanticError(
+                    f"ArraySizeError: Redeclaring a one-dimensional array with more than one rows."
+                )
+            
+            if expected_dims[0] is not None and len(values) != expected_dims[0]:
+                raise SemanticError(
+                    f"ArraySizeError: Expected {expected_dims[0]} elements, but got {len(values)}."
+                )
+        
         return values
+
+    def parse_inner_arr_values(self):
+        inner_values = []
+        while self.current_token and self.current_token.token != ']':
+            value = self.parse_expr()
+            if value.kind not in ["HpLiteral", "XpLiteral", "CommsLiteral", "FlagLiteral"]:
+                raise SemanticError("Arrays can only be initialied with literal values.")
+            inner_values.append(value)
+            self.skip_spaces()
+            if self.current_token.token == ',':
+                self.current_token = self.get_next_token()  # eat ,
+                self.skip_spaces()
+        return inner_values
+   
+    def parse_arr_redec(self, name, scope):
+        if name in self.arr_list.get("global", {}):
+            scope = "global"
+        dimensions=self.arr_list[scope][name]["dimensions"] 
+        self.current_token = self.get_next_token() # eat id
+        self.skip_spaces()
+        self.expect(":", "Expected ':' after array name for array re-decleration.")
+        self.skip_spaces()
+        if dimensions == 1:
+            dimensions = [None]
+        elif dimensions == 2:
+            dimensions = [None, None]
+        if self.current_token and self.current_token.token == '[':
+            values = self.parse_array_values(dimensions)
+            return ArrayRedec(name, dimensions, values, False, scope)
+        else:
+            raise SemanticError(f"RedeclarationError: Array '{name}' is being redeclared with"
+                                " non-array element.")
 
     ########## STRUCTS ##########
     def parse_globalstruct(self) -> Union[StructDec, GlobalStructDec]:
@@ -705,8 +738,6 @@ class Semantic:
     def parse_immo_arr(self, scope) -> ArrayDec:
         arr_name = Identifier(self.current_token.lexeme)
         name=arr_name.symbol
-        if name in self.dead_arr_list.get(scope, {}) or name in self.dead_arr_list.get("global", {}):
-            raise SemanticError(f"Array '{name}' is already defined.")
         if name in self.arr_list.get(scope, {}) or name in self.arr_list.get("global", {}):
             raise SemanticError(f"Array '{name}' is already defined.")
         self.current_token = self.get_next_token() # eat id
@@ -726,11 +757,14 @@ class Semantic:
             
         self.expect(":", "Expected ':' in array initialization or modification.")
         self.skip_spaces()
-        values = self.parse_array_values(expected_dims=dimensions, depth=0, scope=scope)
+        values = self.parse_array_values(dimensions)
         if scope not in self.arr_list:
-            self.arr_list[scope] = []
-        self.arr_list[scope].append(name)
-        return ArrayDec(arr_name, dimensions, values, True)
+            self.arr_list[scope] = {}
+                    
+        self.arr_list[scope][name] = {
+            "dimensions": len(dimensions)
+        }
+        return ArrayDec(arr_name, dimensions, values, True, scope)
     
     def parse_immo_inst(self, scope) -> ImmoInstDec:
         self.current_token = self.get_next_token()  # eat 'access'
@@ -963,5 +997,5 @@ def check(fn, text):
 
     return result, table
 
-    # return result, {}
+    return result, {}
         

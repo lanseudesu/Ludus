@@ -2,7 +2,6 @@ from ..nodes import *
 from .new_symboltable import SymbolTable
 from .new_interpreter import evaluate
 from ..error import SemanticError
-import traceback
 
 class ASTVisitor:
     TYPE_MAP = {
@@ -43,27 +42,36 @@ class ASTVisitor:
     def visit_ArrayDec(self, node: ArrayDec):
         declared_types = set()
         values = []
+        is_empty = False
         
         if node.elements is None:
-            self.symbol_table.define_arr(node.name.symbol, node.dimensions, None, node.immo, node.scope)
+            self.symbol_table.define_arr(node.name.symbol, node.dimensions, None, node.immo, node.scope, node.datatype)
         else:
             if len(node.dimensions) == 1:
+                is_empty = node.dimensions == [None]
                 for val in node.elements:
-                    declared_types.add(val.kind)
                     value = evaluate(val, self.symbol_table)
+                    val_type = self.TYPE_MAP.get(type(value), str(type(value)))
+                    declared_types.add(val_type)
                     values.append(value)
             else:
+                is_empty = node.dimensions == [None, None]
                 for row in node.elements:
                     inner_values = []
                     for val in row:
-                        declared_types.add(val.kind)
                         value = evaluate(val, self.symbol_table)
+                        val_type = self.TYPE_MAP.get(type(value), str(type(value)))
+                        declared_types.add(val_type)
                         inner_values.append(value)
                     values.append(inner_values)
             
             if len(declared_types) > 1:
-                raise SemanticError(f"All variables in a batch declaration must have the same type. Found types: {declared_types}")
-            self.symbol_table.define_arr(node.name.symbol, node.dimensions, values, node.immo, node.scope)
+                raise SemanticError(f"All elements in an array declaration must have the same type. Found types: {declared_types}")
+            if is_empty:
+                datatype = node.datatype
+            else:
+                datatype = declared_types.pop() if declared_types else None
+            self.symbol_table.define_arr(node.name.symbol, node.dimensions, values, node.immo, node.scope, datatype)
     
     def visit_StructDec(self, node: StructDec):
         default_values = {
@@ -155,36 +163,74 @@ class SemanticAnalyzer(ASTVisitor):
             raise SemanticError(f"All variables in a batch declaration must have the same type. Found types: {declared_types}")
 
     def visit_ArrayAssignmentStmt(self, node: ArrAssignment):
-        array_info = self.symbol_table.lookup(node.left.symbol)
-        array_immo = array_info["immo"]
-        array_scope = array_info["scope"]
-        if array_immo==True:
-            raise SemanticError(f"ArrayAssignmentError: '{node.left.symbol}' is declared as an immutable array.")
-        array_data = array_info["elements"]
-        array_dim = array_info["dimensions"]
+        lhs_name = node.left.left.symbol
+        lhs_info = self.symbol_table.lookup(lhs_name)
+        lhs_immo = lhs_info["immo"]
+        lhs_scope = lhs_info["scope"]
+        lhs_type = lhs_info["type"]
+        if lhs_immo==True:
+            raise SemanticError(f"ArrayAssignmentError: '{lhs_name}' is declared as an immutable array.")
+        lhs_data = lhs_info["elements"]
+        if lhs_data == None:
+            raise SemanticError(f"ArrayAssignmentError: Array '{lhs_name}' is a dead array.")
+        lhs_dim = lhs_info["dimensions"]
         value = evaluate(node.right, self.symbol_table)
         val_type = self.TYPE_MAP.get(type(value), str(type(value)))
 
-        if len(array_dim) != len(node.index):
-            raise SemanticError(f"ArrayIndexError: Incorrect number of dimensions for '{node.left.symbol}'.")
+        if len(lhs_dim) != len(node.left.index):
+            raise SemanticError(f"ArrayIndexError: Incorrect number of dimensions for '{lhs_name}'.")
         
-        target = array_data
-        for i, idx in enumerate(node.index[:-1]):
+        target = lhs_data
+        for i, idx in enumerate(node.left.index[:-1]):
+            idx = evaluate(idx, self.symbol_table)
             if idx < 0 or idx >= len(target):
-                raise SemanticError(f"ArrayIndexError: Index {idx} out of bounds for dimension {i} of array '{node.left.symbol}'.")
+                raise SemanticError(f"ArrayIndexError: Index {idx} out of bounds for dimension {i} of array '{lhs_name}'.")
             target = target[idx]
 
-        final_idx = node.index[-1]
+        final_idx = node.left.index[-1]
+        final_idx = evaluate(final_idx, self.symbol_table)
         if final_idx < 0 or final_idx >= len(target):
-            raise SemanticError(f"ArrayIndexError: Index {final_idx} out of bounds for final dimension of array '{node.left.symbol}'.")
+            raise SemanticError(f"ArrayIndexError: Index {final_idx} out of bounds for final dimension of array '{lhs_name}'.")
 
-        expected_type = self.TYPE_MAP.get(type(target[final_idx]), str(type(target[final_idx])))
-        if val_type != expected_type:
-            raise SemanticError(f"TypeMismatchError: Array '{node.left.symbol}' expects '{expected_type}' data type, not '{val_type}'.")
+        if val_type != lhs_type:
+            raise SemanticError(f"TypeMismatchError: Array '{lhs_name}' expects '{lhs_type}' data type, not '{val_type}'.")
 
         target[final_idx] = value
         
-        self.symbol_table.define_arr(node.left.symbol, array_dim, array_data, array_immo, array_scope)
+        self.symbol_table.define_arr(lhs_name, lhs_dim, lhs_data, lhs_immo, lhs_scope, lhs_type)
+    
+    def visit_ArrayRedec(self, node: ArrayRedec):
+        declared_types = []
+        values = []
+        arr_name = node.name
+        arr_info = self.symbol_table.lookup(arr_name)
+        arr_immo = arr_info["immo"]
+        arr_type = arr_info["type"]
+        arr_dimensions = arr_info["dimensions"]
+        if arr_immo==True:
+            raise SemanticError(f"RedeclerationError: '{arr_name}' is declared as an immutable array.")
+        if len(node.dimensions) != len(arr_dimensions):
+            raise SemanticError(f"RedeclerationError: Incorrect number of dimensions.")
+        if len(node.dimensions) == 1:
+            for val in node.elements:
+                value = evaluate(val, self.symbol_table)
+                val_type = self.TYPE_MAP.get(type(value), str(type(value)))
+                declared_types.append(val_type)
+                values.append(value)
+        else:
+            for row in node.elements:
+                inner_values = []
+                for val in row:
+                    value = evaluate(val, self.symbol_table)
+                    val_type = self.TYPE_MAP.get(type(value), str(type(value)))
+                    declared_types.append(val_type)
+                    inner_values.append(value)
+                values.append(inner_values)
+
+        for elem_type in declared_types:
+            if elem_type != arr_type:
+                raise SemanticError(f"TypeError: Array {arr_name} expects '{arr_type}' datatype. Found '{elem_type}'")
+        self.symbol_table.define_arr(arr_name, node.dimensions, values, node.immo, node.scope, arr_type)
     
     def visit_StructInst(self, node: StructInst):
         structinst = self.symbol_table.lookup(node.name.symbol)
