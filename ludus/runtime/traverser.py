@@ -36,9 +36,6 @@ class ASTVisitor:
     def visit_VarDec(self, node: VarDec):
         self.symbol_table.define(node.name.symbol, node.value)
 
-    def visit_VarAssignment(self, node: VarAssignment):
-        self.symbol_table.define(node.left.symbol, node.right)
-
     def visit_ArrayDec(self, node: ArrayDec):
         declared_types = set()
         values = []
@@ -48,14 +45,14 @@ class ASTVisitor:
             self.symbol_table.define_arr(node.name.symbol, node.dimensions, None, node.immo, node.scope, node.datatype)
         else:
             if len(node.dimensions) == 1:
-                is_empty = node.dimensions == [None]
+                is_empty = node.elements == []
                 for val in node.elements:
                     value = evaluate(val, self.symbol_table)
                     val_type = self.TYPE_MAP.get(type(value), str(type(value)))
                     declared_types.add(val_type)
                     values.append(value)
             else:
-                is_empty = node.dimensions == [None, None]
+                is_empty = node.elements == [[], []]
                 for row in node.elements:
                     inner_values = []
                     for val in row:
@@ -137,14 +134,39 @@ class SemanticAnalyzer(ASTVisitor):
         self.symbol_table.define_var(node.name.symbol, value, val_type, node.immo, node.scope)
 
     def visit_VarAssignmentStmt(self, node: VarAssignment):
-        new_val = evaluate(node.right, self.symbol_table)
-        new_val_type = self.TYPE_MAP.get(type(new_val), str(type(new_val)))
         value = self.symbol_table.lookup(node.left.symbol)
         value_type = value["type"]
-
         if value["immo"]==True:
             raise SemanticError(f"AssignmentError: '{node.left.symbol}' is declared as an immutable variable.")
+        new_val = evaluate(node.right, self.symbol_table)
 
+        if node.operator in ['+=', '-=', '*=', '/=', '%=']:
+            if (isinstance(new_val, str) and isinstance(value["value"], bool)) or (isinstance(new_val, bool) and isinstance(value["value"], str)):
+                raise SemanticError("TypeError: Cannot mix comms and flags in an expression.")
+
+            if isinstance(new_val, str) != isinstance(value["value"], str):
+                raise SemanticError("TypeError: Cannot mix comms and numeric types in an expression.")
+
+            if isinstance(new_val, str) and node.operator != '+=':
+                raise SemanticError("TypeError: Only valid assignment operator between comms is '+='.")
+
+            if node.operator in ['/=', '%='] and new_val == 0:
+                raise SemanticError("ZeroDivisionError: Division or modulo by zero is not allowed")
+
+            operations = {
+                '+=': lambda x, y: x + y,
+                '-=': lambda x, y: x - y,
+                '*=': lambda x, y: x * y,
+                '/=': lambda x, y: x / y,
+                '%=': lambda x, y: x % y
+            }
+
+            new_val = operations[node.operator](value["value"], new_val)   
+        else:
+            new_val = new_val
+
+        new_val_type = self.TYPE_MAP.get(type(new_val), str(type(new_val)))
+        
         if new_val_type != value_type:
             raise SemanticError(f"TypeMismatchError: Type mismatch for variable '{node.left.symbol}'. Expected '{value_type}', got '{new_val_type}'.")
         
@@ -174,9 +196,6 @@ class SemanticAnalyzer(ASTVisitor):
         if lhs_data == None:
             raise SemanticError(f"ArrayAssignmentError: Array '{lhs_name}' is a dead array.")
         lhs_dim = lhs_info["dimensions"]
-        value = evaluate(node.right, self.symbol_table)
-        val_type = self.TYPE_MAP.get(type(value), str(type(value)))
-
         if len(lhs_dim) != len(node.left.index):
             raise SemanticError(f"ArrayIndexError: Incorrect number of dimensions for '{lhs_name}'.")
         
@@ -192,10 +211,35 @@ class SemanticAnalyzer(ASTVisitor):
         if final_idx < 0 or final_idx >= len(target):
             raise SemanticError(f"ArrayIndexError: Index {final_idx} out of bounds for final dimension of array '{lhs_name}'.")
 
-        if val_type != lhs_type:
-            raise SemanticError(f"TypeMismatchError: Array '{lhs_name}' expects '{lhs_type}' data type, not '{val_type}'.")
+        value = evaluate(node.right, self.symbol_table)
+        if node.operator in ['+=', '-=', '*=', '/=', '%=']:
+            if (isinstance(value, str) and isinstance(target[final_idx], bool)) or (isinstance(value, bool) and isinstance(target[final_idx], str)):
+                raise SemanticError("TypeError: Cannot mix comms and flags in an expression.")
 
-        target[final_idx] = value
+            if isinstance(value, str) != isinstance(target[final_idx], str):
+                raise SemanticError("TypeError: Cannot mix comms and numeric types in an expression.")
+
+            if isinstance(target[final_idx], str) and node.operator != '+=':
+                raise SemanticError("TypeError: Only valid assignment operator between comms is '+='.")
+
+            if node.operator in ['/=', '%='] and value == 0:
+                raise SemanticError("ZeroDivisionError: Division or modulo by zero is not allowed")
+
+            operations = {
+                '+=': lambda x, y: x + y,
+                '-=': lambda x, y: x - y,
+                '*=': lambda x, y: x * y,
+                '/=': lambda x, y: x / y,
+                '%=': lambda x, y: x % y
+            }
+
+            new_val = operations[node.operator](target[final_idx], value)
+            target[final_idx] = new_val
+        else:
+            target[final_idx] = value
+        new_val_type = self.TYPE_MAP.get(type(new_val), str(type(new_val)))
+        if new_val_type != lhs_type:
+            raise SemanticError(f"TypeMismatchError: Array '{lhs_name}' expects '{lhs_type}' data type, not '{new_val_type}'.")
         
         self.symbol_table.define_arr(lhs_name, lhs_dim, lhs_data, lhs_immo, lhs_scope, lhs_type)
     
@@ -281,15 +325,40 @@ class SemanticAnalyzer(ASTVisitor):
             raise SemanticError(f"FieldError: Field '{new_field}' does not exist "
                                 f"in struct instance '{node.left.instance.symbol}'.")
         
-        value = evaluate(node.right, self.symbol_table)
-        new_type = self.TYPE_MAP.get(type(value), None)
+        new_val = evaluate(node.right, self.symbol_table)
 
         for field in structinst["fields"]:
             if new_field == field["name"]:
                 old_type = self.TYPE_MAP.get(type(field["value"]), None)
+                if node.operator in ['+=', '-=', '*=', '/=', '%=']:
+                    if (isinstance(new_val, str) and isinstance(field["value"], bool)) or (isinstance(new_val, bool) and isinstance(field["value"], str)):
+                        raise SemanticError("TypeError: Cannot mix comms and flags in an expression.")
+
+                    if isinstance(new_val, str) != isinstance(field["value"], str):
+                        raise SemanticError("TypeError: Cannot mix comms and numeric types in an expression.")
+
+                    if isinstance(new_val, str) and node.operator != '+=':
+                        raise SemanticError("TypeError: Only valid assignment operator between comms is '+='.")
+
+                    if node.operator in ['/=', '%='] and new_val == 0:
+                        raise SemanticError("ZeroDivisionError: Division or modulo by zero is not allowed")
+
+                    operations = {
+                        '+=': lambda x, y: x + y,
+                        '-=': lambda x, y: x - y,
+                        '*=': lambda x, y: x * y,
+                        '/=': lambda x, y: x / y,
+                        '%=': lambda x, y: x % y
+                    }
+
+                    new_val = operations[node.operator](field["value"], new_val)   
+                else:
+                    new_val = new_val
+                
+                new_type = self.TYPE_MAP.get(type(new_val), None)
                 if old_type != new_type:
                     raise SemanticError(f"FieldTypeError: Type mismatch for field '{field["name"]}'."
                                         f" Expected '{old_type}', but got '{new_type}'.")
-                field["value"] = value
+                field["value"] = new_val
         
         self.symbol_table.define_structinst(node.left.instance.symbol, structinst["parent"], structinst["fields"], structinst["immo"])

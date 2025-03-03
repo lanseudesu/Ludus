@@ -126,6 +126,8 @@ class Semantic:
             la_token = self.look_ahead()
             if la_token is not None and la_token.token in [':',',']:  
                 return self.parse_var_init(scope)
+            elif la_token is not None and la_token.token in ['+=','-=','*=', '/=', '%=']: 
+                return self.parse_var_ass(scope)
             elif la_token is not None and la_token.token == '[':  
                 return self.parse_array(scope)
             elif la_token is not None and la_token.token == '.':  
@@ -404,32 +406,49 @@ class Semantic:
             self.expect("]", "Expected ']' to close array dimension declaration.")
             self.skip_spaces()
             
-        self.expect(":", "Expected ':' in array initialization or modification.")
-        self.skip_spaces()
-        if self.current_token and self.current_token.token == '[':
-            if arr_exist:
-                raise SemanticError(f"DeclarationError: Array '{name}' was already declared.")
-            else:
-                values = self.parse_array_values(dimensions, scope)
-                if scope not in self.arr_list:
-                    self.arr_list[scope] = {}
-                    
-                self.arr_list[scope][name] = {
-                    "dimensions": len(dimensions)
-                }
-                return ArrayDec(arr_name, dimensions, values, False, scope)
-        else:
-            if arr_exist:
-                if name in self.arr_list.get("global", {}):
-                    scope = "global"
-                if all(dim is not None for dim in dimensions):
-                    value = self.parse_expr(scope)
-                    lhs = ArrElement(arr_name, dimensions)
-                    return ArrAssignment(lhs, ':', value)
+        if self.current_token.token == ':':
+            self.current_token = self.get_next_token() #eat :
+            self.skip_spaces()
+            if self.current_token and self.current_token.token == '[':
+                if arr_exist:
+                    raise SemanticError(f"DeclarationError: Array '{name}' was already declared.")
                 else:
-                    raise SemanticError(f"AssignmentError: Index must not be blank for array index assignment for array name '{arr_name.symbol}'.")
+                    values = self.parse_array_values(dimensions, scope)
+                    if scope not in self.arr_list:
+                        self.arr_list[scope] = {}
+                        
+                    self.arr_list[scope][name] = {
+                        "dimensions": len(dimensions)
+                    }
+                    return ArrayDec(arr_name, dimensions, values, False, scope)
+            else:
+                if arr_exist:
+                    if name in self.arr_list.get("global", {}):
+                        scope = "global"
+                    if all(dim is not None for dim in dimensions):
+                        value = self.parse_expr(scope)
+                        lhs = ArrElement(arr_name, dimensions)
+                        return ArrAssignment(lhs, ':', value)
+                    else:
+                        raise SemanticError(f"AssignmentError: Index must not be blank for array index assignment for array name '{arr_name.symbol}'.")
+                else:
+                    raise SemanticError(f"AssignmentError: Array '{arr_name.symbol}' does not exist.")
+        else:
+            operator = self.current_token.token
+            self.current_token = self.get_next_token() #eat operator
+            self.skip_spaces()
+            if arr_exist:
+                    if name in self.arr_list.get("global", {}):
+                        scope = "global"
+                    if all(dim is not None for dim in dimensions):
+                        value = self.parse_expr(scope)
+                        lhs = ArrElement(arr_name, dimensions)
+                        return ArrAssignment(lhs, operator, value)
+                    else:
+                        raise SemanticError(f"AssignmentError: Index must not be blank for array index assignment for array name '{arr_name.symbol}'.")
             else:
                 raise SemanticError(f"AssignmentError: Array '{arr_name.symbol}' does not exist.")
+
 
     def parse_array_values(self, expected_dims, scope):
         values = []
@@ -636,10 +655,11 @@ class Semantic:
         left = StructInstField(struct_inst_name, inst_field_name)
         self.current_token = self.get_next_token() # eat id
         self.skip_spaces()
-        self.expect(":","Expected ':' after struct instance field name.")
+        operator = self.current_token.token
+        self.current_token = self.get_next_token() # eat operator
         self.skip_spaces()
         value = self.parse_expr(scope)
-        return InstAssignment(left, ':', value)
+        return InstAssignment(left, operator, value)
 
     ########## IMMO ############
     def parse_immo(self, scope):
@@ -804,6 +824,22 @@ class Semantic:
             self.struct_inst_list[scope] = []
         self.struct_inst_list[scope].append(inst_name.symbol)
         return StructInst(inst_name, struct_parent, values, True)
+
+    ########## ASS #############
+    def parse_var_ass(self, scope) -> VarAssignment:
+        var_name = Identifier(symbol=self.current_token.lexeme)
+        name = self.current_token.lexeme
+        if name not in self.var_list.get(scope, []) and name not in self.var_list.get("global",  []):
+            raise SemanticError(f"NameError: Variable '{name}' does not exist.")
+        self.current_token = self.get_next_token() # eat id
+        self.skip_spaces()
+        operator = self.current_token.token
+        self.current_token = self.get_next_token() # eat operator
+        self.skip_spaces()
+        value = self.parse_expr(scope)
+        if name in self.var_list["global"]:
+            scope = "global"
+        return VarAssignment(var_name, operator, value)
 
     ########## EXPR ############
     def parse_expr(self, scope) -> Expr:

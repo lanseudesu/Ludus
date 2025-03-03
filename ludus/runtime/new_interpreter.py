@@ -85,7 +85,6 @@ def eval_binary_expr(binop, symbol_table):
     if isinstance(lhs, str) and isinstance(rhs, str):
         return eval_concat(lhs, rhs, binop.operator)
 
-
     return eval_numeric_binary_expr(lhs, rhs, binop.operator)
 
 def eval_concat(lhs, rhs, operator):
