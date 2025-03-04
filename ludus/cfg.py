@@ -85,7 +85,7 @@ cfg = {
                        ["[", "<index>", "]", "<arr2d_rhs>"], 
                        [".", "<inner_bracket_tail>"]], 
     "<arr_rhs_tail>": [["[", "<value>", "<elems_recur>", "]"],
-                       ["<expr>"]], 
+                       ["<expr>", "<expr_recur>"]], 
     "<inner_bracket_tail>": [["drop", "(", "<index>", ")"], 
                              ["join", "(", "<append>", "<append_recur>", ")"]],
     "<index>": [["hp_ltr", "<arith_tail>"], 
@@ -95,7 +95,7 @@ cfg = {
                     [",", "id", "<id_tail>", "<id_tail_recur>", ":", "<expr>"], 
                     ["<assign_op>", "<expr>"]],
     "<arr2d_rhs_tail>": [["[", "<value>", "<elems_recur>", "]", "<row_recur>"], 
-                         ["<expr>"]], 
+                         ["<expr>", "<expr_recur>"]], 
     "<join_tail>": [["<append>", "<append_recur>"], 
                     ["[", "<append>", "<append_recur>", "]"]], 
     "<append>": [["<value>"], 
@@ -357,6 +357,14 @@ first_set = compute_first_set(cfg)
 # for non_terminal, first in first_set.items():
 #     print(f"{non_terminal} -> {first}")
 
+# terminal_list = list()
+# for non_terminal, first in first_set.items():
+#     terminal_list.extend(first) 
+
+# unique_terminals = list(dict.fromkeys(terminal_list))
+
+# print(unique_terminals)
+
 follow_set = compute_follow_set(cfg, "<program>", first_set)
 # print("\nFollow Sets:")
 # for non_terminal, follow in follow_set.items():
@@ -384,21 +392,24 @@ def gen_parse_table():
         
 parse_table = gen_parse_table()
 
-def display_parse_table(parse_table, lines_per_page=10):
-    print()
-    line_count = 0
-    for non_terminal, rules in parse_table.items():
-        print(f"Non-terminal: {non_terminal}")
-        line_count += 1
-        for terminal, production in rules.items():
-            print(f"  Terminal: {terminal} -> Production: {production}")
-            line_count += 1
-            if line_count >= lines_per_page:
-                input("Press Enter to continue...")
-                line_count = 0
-        print()
+# def save_parse_table(parse_table, filename="parse_table.txt"):
+#     with open(filename, "w", encoding="utf-8") as file:  
+#         terminals = {}
+#         for non_terminal, rules in parse_table.items():
+#             for terminal, production in rules.items():
+#                 if terminal not in terminals:
+#                     terminals[terminal] = []
+#                 terminals[terminal].append(f"    Non-terminal: {non_terminal} -> Production: {production}")
 
-# display_parse_table(parse_table)
+#         for terminal, productions in terminals.items():
+#             file.write(f"Terminal: {terminal}\n")
+#             for production in productions:
+#                 file.write(f"{production}\n")
+#             file.write("\n")
+
+
+# save_parse_table(parse_table)
+# print("Parse table saved to file.")
 
 def check_ambiguity(cfg, predict_set):
     ambiguous_productions = []

@@ -26,7 +26,7 @@ lcurly_delim   = ALPHANUM + whitespace + '_{(-!'
 comma_delim    = ALPHANUM + whitespace + '_.["-(!'
 period_delim   = ALPHA + '_'  
 rparen_delim   = whitespace + arith_op + relat_op + '{})],.'
-rcurly_delim   = whitespace 
+rcurly_delim   = whitespace + '}' # add sa docs
 rbracket_delim = whitespace + arith_op + relat_op + ',.[:)}'
 
 nl_delim       = ALPHA + whitespace + '_{}`\t'
@@ -1439,6 +1439,8 @@ class Lexer:
 ### RUN ###
 
 def run(fn, text):
+    if text == "":
+        return [], ["No code in the module."]
     lexer = Lexer(fn, text)
     tokens, error = lexer.make_tokens()
 

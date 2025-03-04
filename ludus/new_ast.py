@@ -142,6 +142,8 @@ class Semantic:
             return self.parse_struct_inst(scope)
         elif self.current_token and self.current_token.token == 'immo':
             return self.parse_immo(scope)
+        elif self.current_token and self.current_token.token == 'if':
+            return self.parse_if(scope)
         else:
             raise SemanticError(f"Unexpected token found during parsing: {self.current_token.token}")
 
@@ -1030,8 +1032,68 @@ class Semantic:
         else:
             raise SemanticError(f"Unexpected token found during parsing: {tk}")
         
+    ########### IF #############
+    def parse_if(self, scope) -> IfStmt:
+        self.current_token = self.get_next_token()  # eat if
+        self.skip_spaces()
+        condition = self.parse_expr(scope)
+        self.skip_whitespace()
+        self.expect("{", "Expected '{' to open if statement's body.")
+        self.skip_whitespace()
+        then_branch = []
+
+        while self.current_token and self.current_token.token != "}":
+            stmt = self.parse_stmt(scope)
+            then_branch.append(stmt)
+            self.skip_whitespace()
+
+        self.expect("}", "Expected '}' to close if statement's body.")
+        self.skip_whitespace()
+
+        elif_branches = []
+        while self.current_token and self.current_token.token == 'elif':
+            self.current_token = self.get_next_token()  # eat elif
+            self.skip_spaces()
+            elif_condition = self.parse_expr(scope)
+            self.skip_whitespace()
+            self.expect("{", "Expected '{' to open elif statement's body.")
+            self.skip_whitespace()
+            elif_body = []
+
+            while self.current_token and self.current_token.token != "}":
+                stmt = self.parse_stmt(scope)
+                elif_body.append(stmt)
+                self.skip_whitespace()
+
+            self.expect("}", "Expected '}' to close elif statement's body.")
+            self.skip_whitespace()
+            elif_branches.append(ElifStmt(elif_condition, elif_body))
+
+        else_branch = None
+        if self.current_token and self.current_token.token == 'else':
+            self.current_token = self.get_next_token()  # eat else
+            self.skip_whitespace()
+            self.expect("{", "Expected '{' to open else statement's body.")
+            self.skip_whitespace()
+            else_branch = []
+
+            while self.current_token and self.current_token.token != "}":
+                stmt = self.parse_stmt(scope)
+                else_branch.append(stmt)
+                self.skip_whitespace()
+
+            self.expect("}", "Expected '}' to close else statement's body.")
+            self.skip_whitespace()
+
+        if not elif_branches:
+            elif_branches = None
+        return IfStmt(condition, then_branch, elif_branches, else_branch)
+
+
 def check(fn, text):
     lexer = Lexer(fn, text)
+    if text == "":
+        return "No code in the module.", {}
     tokens, error = lexer.make_tokens()
 
     if error:
@@ -1045,20 +1107,20 @@ def check(fn, text):
     semantic = Semantic(tokens)
     result = semantic.produce_ast()
 
-    if isinstance(result, SemanticError):
-        return str(result), {}
+    # if isinstance(result, SemanticError):
+    #     return str(result), {}
 
-    try:
-        visitor = ASTVisitor()
-        visitor.visit(result)
+    # try:
+    #     visitor = ASTVisitor()
+    #     visitor.visit(result)
 
-        analyzer = SemanticAnalyzer(visitor.symbol_table)
-        analyzer.visit(result)
-        table = analyzer.symbol_table
-    except SemanticError as e:
-        return str(e), {}
+    #     analyzer = SemanticAnalyzer(visitor.symbol_table)
+    #     analyzer.visit(result)
+    #     table = analyzer.symbol_table
+    # except SemanticError as e:
+    #     return str(e), {}
 
-    return result, table
+    # return result, table
 
     return result, {}
         

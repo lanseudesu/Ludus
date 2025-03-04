@@ -64,8 +64,10 @@ class Parser:
                                 next_top = self.stack[-1]  
                                 if next_top in parse_table:
                                     expected_tokens.extend(parse_table[next_top].keys())  
+                                else:
+                                    expected_tokens.append(next_top)
 
-                        expected_tokens = list(set(expected_tokens))
+                        expected_tokens = list(dict.fromkeys(expected_tokens))
                     
                     return (f"Syntax Error: Unexpected token '{self.current_token.token}' at line {self.current_token.line} and column {self.current_token.column}."
                             f" Expected tokens: {', '.join(expected_tokens)}.")
@@ -83,10 +85,13 @@ class Parser:
 
 def parse(fn, text):
     lexer = Lexer(fn, text)
+    if text == "":
+        return "No code in the module."
     tokens, error = lexer.make_tokens()
 
     if error:
         return 'Lexical errors found, cannot continue with syntax analyzing. Please check lexer tab.' 
+     
 
     syntax = Parser(tokens)
     result = syntax.parser() 

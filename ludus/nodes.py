@@ -32,6 +32,8 @@ class NodeType:
     IMMO_ARRAY_DEC      = "ImmoArrayDec"
     IMMO_INST           = "ImmoStructInst"
     GLOBAL_STRUCT_DEC   = "GlobalStructDec"
+    IF_STMT             = "IfStmt"
+    ELIF_STMT           = "ElifStmt"
 
 class Stmt:
     def __init__(self, kind: str):
@@ -269,3 +271,16 @@ class GlobalStructDec(Stmt):
         super().__init__(NodeType.GLOBAL_STRUCT_DEC)
         self.name = name
 
+class IfStmt(Stmt):
+    def __init__(self, condition, then_branch, elif_branches=None, else_branch=None):
+        super().__init__(NodeType.IF_STMT)
+        self.condition = condition         
+        self.then_branch = then_branch     
+        self.elif_branches = elif_branches  
+        self.else_branch = else_branch
+
+class ElifStmt(Stmt):
+    def __init__(self, condition, body):
+        super().__init__(NodeType.ELIF_STMT)
+        self.condition = condition         
+        self.body = body     
