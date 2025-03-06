@@ -42,7 +42,7 @@ class ASTVisitor:
         is_empty = False
         
         if node.elements is None:
-            self.symbol_table.define_arr(node.name.symbol, node.dimensions, None, node.immo, node.scope, node.datatype)
+            self.symbol_table.define_arr(node.name.symbol, node.dimensions, None, node.immo, node.datatype)
         else:
             if len(node.dimensions) == 1:
                 is_empty = node.elements == []
@@ -68,7 +68,7 @@ class ASTVisitor:
                 datatype = node.datatype
             else:
                 datatype = declared_types.pop() if declared_types else None
-            self.symbol_table.define_arr(node.name.symbol, node.dimensions, values, node.immo, node.scope, datatype)
+            self.symbol_table.define_arr(node.name.symbol, node.dimensions, values, node.immo, datatype)
     
     def visit_StructDec(self, node: StructDec):
         default_values = {
@@ -105,12 +105,35 @@ class ASTVisitor:
             fields.append(value)
             
         self.symbol_table.define_structinst(node.name.symbol, node.parent, fields, node.immo)
-
+    
     def visit_BlockStmt(self, node: BlockStmt):
+        self.symbol_table.enter_scope()
         for stmt in node.statements:
             self.visit(stmt)
+        self.symbol_table.exit_scope()
+
+    def visit_IfStmt(self, node: IfStmt):
+        self.symbol_table.enter_scope()
+        for stmt in node.then_branch:
+            self.visit(stmt)
+        self.symbol_table.exit_scope()
+        
+        if node.elif_branches:
+            for branch in node.elif_branches:
+                self.symbol_table.enter_scope()
+                for stmt in branch.body:
+                    self.visit(stmt)
+                self.symbol_table.exit_scope()
+
+        if node.else_branch:
+            self.symbol_table.enter_scope()
+            for stmt in node.else_branch:
+                self.visit(stmt)
+            self.symbol_table.exit_scope()
 
 class SemanticAnalyzer(ASTVisitor):
+    i = 1
+
     TYPE_MAP = {
         int: "hp",
         float: "xp",
@@ -131,7 +154,7 @@ class SemanticAnalyzer(ASTVisitor):
             val_type = id_val["type"]
         else:
             val_type = self.TYPE_MAP.get(type(value), str(type(value)))
-        self.symbol_table.define_var(node.name.symbol, value, val_type, node.immo, node.scope)
+        self.symbol_table.define_var(node.name.symbol, value, val_type, node.immo)
 
     def visit_VarAssignmentStmt(self, node: VarAssignment):
         value = self.symbol_table.lookup(node.left.symbol)
@@ -184,7 +207,7 @@ class SemanticAnalyzer(ASTVisitor):
         if new_val_type != value_type:
             raise SemanticError(f"TypeMismatchError: Type mismatch for variable '{node.left.symbol}'. Expected '{value_type}', got '{new_val_type}'.")
         
-        self.symbol_table.define_var(node.left.symbol, new_val, new_val_type, value["immo"], value["scope"])
+        self.symbol_table.define_var(node.left.symbol, new_val, new_val_type, value["immo"])
 
     def visit_BatchVarDec(self, node: BatchVarDec):
         declared_types = set() 
@@ -202,7 +225,6 @@ class SemanticAnalyzer(ASTVisitor):
         lhs_name = node.left.left.symbol
         lhs_info = self.symbol_table.lookup(lhs_name)
         lhs_immo = lhs_info["immo"]
-        lhs_scope = lhs_info["scope"]
         lhs_type = lhs_info["type"]
         if lhs_immo==True:
             raise SemanticError(f"ArrayAssignmentError: '{lhs_name}' is declared as an immutable array.")
@@ -269,7 +291,7 @@ class SemanticAnalyzer(ASTVisitor):
         if new_val_type != lhs_type:
             raise SemanticError(f"TypeMismatchError: Array '{lhs_name}' expects '{lhs_type}' data type, not '{new_val_type}'.")
         
-        self.symbol_table.define_arr(lhs_name, lhs_dim, lhs_data, lhs_immo, lhs_scope, lhs_type)
+        self.symbol_table.define_arr(lhs_name, lhs_dim, lhs_data, lhs_immo, lhs_type)
     
     def visit_ArrayRedec(self, node: ArrayRedec):
         declared_types = []
@@ -301,8 +323,8 @@ class SemanticAnalyzer(ASTVisitor):
 
         for elem_type in declared_types:
             if elem_type != arr_type:
-                raise SemanticError(f"TypeError: Array {arr_name} expects '{arr_type}' datatype. Found '{elem_type}'")
-        self.symbol_table.define_arr(arr_name, node.dimensions, values, node.immo, node.scope, arr_type)
+                raise SemanticError(f"TypeError: Array '{arr_name}' expects '{arr_type}' datatype. Found '{elem_type}'")
+        self.symbol_table.define_arr(arr_name, node.dimensions, values, node.immo, arr_type)
     
     def visit_StructInst(self, node: StructInst):
         structinst = self.symbol_table.lookup(node.name.symbol)
@@ -404,3 +426,42 @@ class SemanticAnalyzer(ASTVisitor):
                 field["value"] = new_val
         
         self.symbol_table.define_structinst(node.left.instance.symbol, structinst["parent"], structinst["fields"], structinst["immo"])
+
+    def visit_IfStmt(self, node: IfStmt):
+        conditions = []
+        if_condition = evaluate(node.condition, self.symbol_table)
+        if not isinstance(if_condition, bool):
+            raise SemanticError("TypeError: The condition used does not evaluate to a flag value.")
+        conditions.append([if_condition, node.then_branch])
+        if node.elif_branches is not None:
+            for cond in node.elif_branches:
+                elif_condition = evaluate(cond.condition, self.symbol_table)
+                if not isinstance(elif_condition, bool):
+                    raise SemanticError("TypeError: The condition used does not evaluate to a flag value.")
+                conditions.append([elif_condition, cond.body])
+        
+        for cond in conditions:
+            if cond[0] == True:
+                self.symbol_table.restore_scope(self.i)
+                for stmt in cond[1]:
+                    self.visit(stmt)
+                self.symbol_table.exit_scope()
+                self.i += 1
+                return
+            self.symbol_table.restore_scope(self.i)
+            self.symbol_table.exit_scope()
+            self.i += 1
+        
+        if node.else_branch is not None:
+            self.symbol_table.restore_scope(self.i)
+            for stmt in node.else_branch:
+                self.visit(stmt)
+            self.symbol_table.exit_scope()
+            self.i += 1
+        
+
+    def visit_BlockStmt(self, node: BlockStmt):
+        self.symbol_table.restore_scope(self.i)
+        for stmt in node.statements:
+            self.visit(stmt)
+        

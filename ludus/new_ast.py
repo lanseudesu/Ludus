@@ -16,6 +16,7 @@ class Semantic:
         self.struct_list = {"global": []}
         self.struct_inst_list = {}
         self.globalstruct = []
+        self.scope_stack = [{}]
     
     TYPE_MAP = {
         int: "hp",
@@ -23,6 +24,62 @@ class Semantic:
         str: "comms",
         bool: "flag"
     }
+
+    def push_scope(self):
+        self.scope_stack.append({})
+
+    def pop_scope(self):
+        if len(self.scope_stack) > 1:  
+            self.scope_stack.pop()
+        else:
+            raise SemanticError("Attempted to pop global scope")
+
+    def declare_id(self, name, type, dimensions=0):
+        current_scope = self.scope_stack[-1]
+        if name in current_scope:
+            raise SemanticError(f"NameError: Identifier '{name}' is already defined in this scope.")
+        current_scope[name] = {
+            "type": type,
+            "dimensions": dimensions
+        } 
+    
+    def lookup_identifier(self, name):
+        for scope in reversed(self.scope_stack):
+            if name  in scope:
+                return True
+        return False
+    
+    def lookup_id_type(self, name, id_type):
+        for scope in reversed(self.scope_stack):
+            if name  in scope:
+                info = self.get_identifier_info(name)
+                if info["type"] == id_type:
+                    return True
+                else:
+                    raise SemanticError(f"NameError: Identifier '{name}' is already declared as {info["type"]}.")
+        return False
+    
+    def get_identifier_info(self, name):
+        for scope in reversed(self.scope_stack):
+            if name in scope:
+                return scope[name]  
+        raise SemanticError(f"Identifier '{name}' not declared")
+    
+    def is_array(self, name):
+        if self.lookup_identifier(name):
+            info = self.get_identifier_info(name)
+            if info["type"] == "an array":
+                return True
+            else:
+                return False
+        else:
+            return False
+    
+    def get_dimensions(self, name):
+        info = self.get_identifier_info(name)
+        if info["type"] != "an array":
+            raise SemanticError(f"Identifier '{name}' is not an array")
+        return info["dimensions"]
 
     def get_next_token(self):
         if self.current_token_index < len(self.tokens):
@@ -62,16 +119,18 @@ class Semantic:
                 self.skip_whitespace()
                 if self.current_token and re.match(r'^id\d+$', self.current_token.token):
                     la_token = self.look_ahead()
+                    name = self.current_token.lexeme
                     if la_token is not None and la_token.token in [':',',']: 
-                        if self.current_token.lexeme in self.var_list["global"]:
-                            raise SemanticError(f"DeclarationError: Global variable "
-                                                f"'{self.current_token.lexeme}' was already declared.")
+                        if self.lookup_identifier(name):
+                            info = self.get_identifier_info(name)
+                            raise SemanticError(f"NameError: Identifier {name}' was "
+                                                f"already declared as {info["type"]}.")
                         program.body.append(self.parse_var_init("global"))
                     elif la_token is not None and la_token.token == '[':  
-                        name = self.current_token.lexeme
-                        if self.current_token.lexeme in self.arr_list["global"]:
-                            raise SemanticError("DeclarationError: Global array "
-                                                f"'{name}' was already declared.")
+                        if self.lookup_identifier(name):
+                            info = self.get_identifier_info(name)
+                            raise SemanticError(f"NameError: Identifier {name}' was "
+                                                f"already declared as {info["type"]}.")
                         program.body.append(self.parse_array("global"))
                     else:
                         raise SemanticError(f"Unexpected token found during parsing: {la_token.token}")
@@ -97,7 +156,7 @@ class Semantic:
                 
     def parse_func(self) -> PlayFunc:
         self.skip_whitespace()
-
+        self.push_scope()
         if not self.current_token or self.current_token.token != "play":
             raise SemanticError("Expected function declaration keyword 'play'.")
 
@@ -116,7 +175,7 @@ class Semantic:
             self.skip_whitespace()
 
         self.expect("}", "Expected '}' to close function body.")
-
+        self.pop_scope()
         return PlayFunc(body=BlockStmt(statements=body))
     
     def parse_stmt(self, scope) -> Stmt:
@@ -157,23 +216,24 @@ class Semantic:
             raise SemanticError("Expected variable name.")
     
         la_token = self.look_ahead()
+        name = self.current_token.lexeme
         if la_token is not None and la_token.token == '[':  
-            name = self.current_token.lexeme
-            if scope == 'global':
-                if name in self.arr_list.get("global", {}):
-                    raise SemanticError("DeclarationError: Global array "
-                                        f"'{name}' was already declared.")
+            if self.lookup_identifier(name):
+                info = self.get_identifier_info(name)
+                raise SemanticError(f"NameError: Identifier {name}' was "
+                                    f"already declared as {info["type"]}.")
             return self.parse_empty_array(datatype, scope)
         else:
-            if scope == 'global' and self.current_token.lexeme in self.var_list["global"]:
-                raise SemanticError(f"DeclarationError: Global variable "
-                                    f"'{self.current_token.lexeme}' was already declared.")
+            if self.lookup_identifier(name):
+                info = self.get_identifier_info(name)
+                raise SemanticError(f"NameError: Identifier {name}' was "
+                                    f"already declared as {info["type"]}.")
             return self.parse_var_dec(datatype, scope)
     
     def parse_var_init(self, scope) -> Union[VarDec, BatchVarDec, VarAssignment]:
         var_names = [Identifier(symbol=self.current_token.lexeme)]  
         name = self.current_token.lexeme
-        if name in self.arr_list.get(scope, {}) or name in self.arr_list.get("global", {}):
+        if self.is_array(name): 
             return self.parse_arr_redec(name, scope)
 
         self.current_token = self.get_next_token() # eat id
@@ -195,12 +255,12 @@ class Semantic:
                 self.skip_spaces()
                 value = self.parse_expr(scope)
 
-                if scope not in self.var_list:
-                    self.var_list[scope] = []
                 for var in var_names:
-                    if var.symbol in self.var_list["global"] or var.symbol in self.var_list[scope]:
-                        raise SemanticError(f"Variable '{var.symbol}' is already defined.")   
-                    self.var_list[scope].append(var.symbol)
+                    if self.lookup_identifier(name):
+                        info = self.get_identifier_info(name)
+                        raise SemanticError(f"NameError: Identifier {name}' was "
+                                            f"already declared as {info["type"]}.")
+                    self.declare_id(var.symbol, "a variable")
 
                 self.skip_spaces()
                 return BatchVarDec(declarations=[VarDec(var, value, False, scope) for var in var_names])
@@ -234,22 +294,18 @@ class Semantic:
 
         self.skip_spaces()
         if len(var_names) > 1:
-            if scope not in self.var_list:
-                self.var_list[scope] = []
             for var in var_names:
-                if var.symbol in self.var_list["global"] or var.symbol in self.var_list[scope]:
-                    raise SemanticError(f"Variable '{var.symbol}' is already defined.")   
-                self.var_list[scope].append(var.symbol)
+                if self.lookup_identifier(name):
+                    info = self.get_identifier_info(name)
+                    raise SemanticError(f"NameError: Identifier {name}' was "
+                                        f"already declared as {info["type"]}.")
+                self.declare_id(var.symbol, "a variable")
             return BatchVarDec(declarations=[VarDec(var, values_table[var.symbol]['values'], False, scope) for var in var_names])
         else:
             var = var_names[0]
-            if name in self.var_list["global"]:
-                scope = "global"
-            if scope not in self.var_list:
-                self.var_list[scope] = []
-            if name in self.var_list[scope]:
+            if self.lookup_identifier(var.symbol):
                 return VarAssignment(left=var, operator=':', right=value)
-            self.var_list[scope].append(name)
+            self.declare_id(var.symbol, "a variable")
             return VarDec(var, value, False, scope) 
         
     def parse_var_dec(self, datatype, scope) -> Union[VarDec, BatchVarDec]:
@@ -285,23 +341,23 @@ class Semantic:
         self.skip_whitespace()
 
         if len(var_names) > 1:
-            if scope not in self.var_list:
-                self.var_list[scope] = []
             for var in var_names:
-                if var.symbol in self.var_list["global"] or var.symbol in self.var_list[scope]:
-                    raise SemanticError(f"Variable '{var.symbol}' is already defined.")   
-                self.var_list[scope].append(var.symbol)
+                if self.lookup_identifier(var.symbol):
+                    info = self.get_identifier_info(var.symbol)
+                    raise SemanticError(f"NameError: Identifier {var.symbol}' was "
+                                        f"already declared as {info["type"]}.")  
+                self.declare_id(var.symbol, "a variable")
             if value != None:
                 return BatchVarDec([VarDec(var, value, False, scope) for var in var_names])
             else:
                 return BatchVarDec([VarDec(var, DeadLiteral(value, datatype), False, scope) for var in var_names])
         else:
             var = var_names[0]
-            if scope not in self.var_list:
-                self.var_list[scope] = []
-            if var.symbol in self.var_list["global"] or var.symbol in self.var_list[scope]:
-                raise SemanticError(f"Variable '{var.symbol}' is already defined.")  
-            self.var_list[scope].append(var.symbol)
+            if self.lookup_identifier(var.symbol):
+                    info = self.get_identifier_info(var.symbol)
+                    raise SemanticError(f"NameError: Identifier {var.symbol}' was "
+                                        f"already declared as {info["type"]}.")    
+            self.declare_id(var.symbol, "a variable")
             if value != None:
                 return VarDec(var, value, False, scope)
             else:
@@ -312,9 +368,6 @@ class Semantic:
         name = arr_name.symbol
         self.current_token = self.get_next_token()
         self.skip_spaces()
-        arr_exist = name in self.arr_list.get(scope, {}) or name in self.arr_list.get("global", {})
-        if arr_exist:
-            raise SemanticError(f"DeclarationError: Array '{name}' is already defined.")
         dimensions = []
         values = []
 
@@ -351,11 +404,7 @@ class Semantic:
                 else:
                     values = [default_value] * dimensions[0]
 
-            if scope not in self.arr_list:
-                self.arr_list[scope] = {}
-            self.arr_list[scope][name] = {
-                "dimensions": len(dimensions)
-            }
+            self.declare_id(name, "an array", len(dimensions))
             return ArrayDec(arr_name, dimensions, values, False, scope, datatype)
         elif self.current_token and self.current_token.token == ':':
             self.current_token = self.get_next_token() #eat :
@@ -372,11 +421,7 @@ class Semantic:
                 else:
                     raise SemanticError("NullPointerError: Null arrays cannot be initialized with specific size.")
                 
-            if scope not in self.arr_list:
-                self.arr_list[scope] = {}
-            self.arr_list[scope][name] = {
-                "dimensions": len(dimensions)
-            }
+            self.declare_id(name, "an array", len(dimensions))
             return ArrayDec(arr_name, dimensions, values, False, scope, datatype)      
     
     def parse_array(self, scope) -> Union[ArrayDec, ArrAssignment]:
@@ -384,7 +429,7 @@ class Semantic:
         name= arr_name.symbol
         self.current_token = self.get_next_token() # eat id
         self.skip_spaces()
-        arr_exist = name in self.arr_list.get(scope, {}) or name in self.arr_list.get("global", {})
+        arr_exist = self.is_array(name)
         dimensions = []
         
         while self.current_token and self.current_token.token == '[':
@@ -416,17 +461,10 @@ class Semantic:
                     raise SemanticError(f"DeclarationError: Array '{name}' was already declared.")
                 else:
                     values = self.parse_array_values(dimensions, scope)
-                    if scope not in self.arr_list:
-                        self.arr_list[scope] = {}
-                        
-                    self.arr_list[scope][name] = {
-                        "dimensions": len(dimensions)
-                    }
+                    self.declare_id(name, "an array", len(dimensions))
                     return ArrayDec(arr_name, dimensions, values, False, scope)
             else:
                 if arr_exist:
-                    if name in self.arr_list.get("global", {}):
-                        scope = "global"
                     if all(dim is not None for dim in dimensions):
                         value = self.parse_expr(scope)
                         lhs = ArrElement(arr_name, dimensions)
@@ -440,17 +478,14 @@ class Semantic:
             self.current_token = self.get_next_token() #eat operator
             self.skip_spaces()
             if arr_exist:
-                    if name in self.arr_list.get("global", {}):
-                        scope = "global"
-                    if all(dim is not None for dim in dimensions):
-                        value = self.parse_expr(scope)
-                        lhs = ArrElement(arr_name, dimensions)
-                        return ArrAssignment(lhs, operator, value)
-                    else:
-                        raise SemanticError(f"AssignmentError: Index must not be blank for array index assignment for array name '{arr_name.symbol}'.")
+                if all(dim is not None for dim in dimensions):
+                    value = self.parse_expr(scope)
+                    lhs = ArrElement(arr_name, dimensions)
+                    return ArrAssignment(lhs, operator, value)
+                else:
+                    raise SemanticError(f"AssignmentError: Index must not be blank for array index assignment for array name '{arr_name.symbol}'.")
             else:
                 raise SemanticError(f"AssignmentError: Array '{arr_name.symbol}' does not exist.")
-
 
     def parse_array_values(self, expected_dims, scope):
         values = []
@@ -510,9 +545,7 @@ class Semantic:
         return inner_values
    
     def parse_arr_redec(self, name, scope):
-        if name in self.arr_list.get("global", {}):
-            scope = "global"
-        dimensions=self.arr_list[scope][name]["dimensions"] 
+        dimensions=self.get_dimensions(name)
         self.current_token = self.get_next_token() # eat id
         self.skip_spaces()
         self.expect(":", "Expected ':' after array name for array re-decleration.")
@@ -543,10 +576,10 @@ class Semantic:
                     self.globalstruct.remove(item)
                     return self.create_struct(struct_name, "global")
                 
-            raise SemanticError(f"StructError: Global struct '{struct_name.symbol}' was not declared.")
+            raise SemanticError(f"NameError: Global struct '{struct_name.symbol}' was not declared.")
         else:
             if struct_name.symbol in self.globalstruct:
-                raise SemanticError(f"StructError: Global struct '{struct_name.symbol}' was already declared.")
+                raise SemanticError(f"NameError: Global struct '{struct_name.symbol}' was already declared.")
             self.globalstruct.append(struct_name.symbol)
             return GlobalStructDec(struct_name)
 
@@ -564,7 +597,7 @@ class Semantic:
         name = struct_name.symbol
         fields_table = []
         fields = []
-        self.expect("{","StructDeclarationError: Struct fields must be enclosed in curly braces.")
+        self.expect("{","StructError: Struct fields must be enclosed in curly braces.")
         self.skip_whitespace()
         while self.current_token and self.current_token.token != '}':
             datatype = self.current_token.token
@@ -595,12 +628,12 @@ class Semantic:
         self.current_token = self.get_next_token() # eat }
         self.skip_whitespace()
         if name in self.globalstruct:
-            raise SemanticError(f"DeclarationError: Global struct '{name}' already exists.")
-        if name in self.struct_list.get(scope, {}) or name in self.struct_list.get("global", {}):
-            raise SemanticError(f"DeclarationError: Struct '{name}' already exists.")
-        if scope not in self.struct_list:
-            self.struct_list[scope] = []
-        self.struct_list[scope].append(name)
+            raise SemanticError(f"NameError: Global struct '{name}' already exists.")
+        if self.lookup_identifier(name):
+            info = self.get_identifier_info(name)
+            raise SemanticError(f"NameError: Identifier {name}' was "
+                                f"already declared as {info["type"]}.") 
+        self.declare_id(name, "a struct")
         return StructDec(struct_name, fields, scope)
 
     def parse_struct_inst(self, scope) -> StructInst:
@@ -609,11 +642,11 @@ class Semantic:
         if not self.current_token or not re.match(r'^id\d+$', self.current_token.token):
             raise SemanticError("Expected struct name after 'access'.")
         struct_parent = self.current_token.lexeme
-        if struct_parent not in self.struct_list.get(scope, []):
+        if not self.lookup_identifier(struct_parent):
             if struct_parent in self.globalstruct:
                 pass
             else:
-                raise SemanticError(f"DeclarationError: Struct '{struct_parent}' is not defined.")
+                raise SemanticError(f"NameError: Struct '{struct_parent}' is not defined.")
         self.current_token = self.get_next_token()  # eat id
         self.skip_spaces()
         if not self.current_token or not re.match(r'^id\d+$', self.current_token.token):
@@ -636,17 +669,17 @@ class Semantic:
                         raise SemanticError("Unexpected newline found after struct instance value.")
                 elif self.current_token.token == 'newline':
                     break
-        if inst_name.symbol in self.struct_inst_list.get(scope, []):
-            raise SemanticError(f"DeclarationError: Struct instance '{inst_name.symbol}' already exist.")
-        if scope not in self.struct_inst_list:
-            self.struct_inst_list[scope] = []
-        self.struct_inst_list[scope].append(inst_name.symbol)
+        if self.lookup_identifier(inst_name.symbol):
+            info = self.get_identifier_info(inst_name.symbol)
+            raise SemanticError(f"NameError: Identifier {inst_name.symbol}' was "
+                                f"already declared as {info["type"]}.") 
+        self.declare_id(inst_name.symbol, "a struct instance")
         return StructInst(inst_name, struct_parent, values, False)
 
     def parse_inst_ass(self, scope) -> InstAssignment:
         struct_inst_name = Identifier(self.current_token.lexeme)
-        if struct_inst_name.symbol not in self.struct_inst_list.get(scope, []):
-            raise SemanticError(f"DeclarationError: Struct instance '{struct_inst_name.symbol}' is not defined.")
+        if not self.lookup_id_type(struct_inst_name.symbol, "a struct instance"):
+            raise SemanticError(f"NameError: Struct instance '{struct_inst_name.symbol}' is not defined.")
         self.current_token = self.get_next_token() # eat id
         if self.current_token.token != '.':
             raise SemanticError("Expected '.' after struct instance name.")
@@ -706,9 +739,10 @@ class Semantic:
                 if scope not in self.var_list:
                     self.var_list[scope] = []
                 for var in var_names:
-                    if var.symbol in self.var_list["global"] or var.symbol in self.var_list[scope]:
-                        raise SemanticError(f"Variable '{var.symbol}' is already defined.")  
-                    self.var_list[scope].append(var.symbol)
+                    if self.lookup_identifier(var.symbol):
+                        info = self.get_identifier_info(var.symbol)
+                        raise SemanticError(f"NameError: Identifier '{var.symbol}' is already declared as {info["type"]}.")  
+                    self.declare_id(var.symbol, "a variable")
                 self.skip_spaces()
                 return BatchVarDec(declarations=[VarDec(var, value, True, scope) for var in var_names])
             
@@ -741,27 +775,26 @@ class Semantic:
         
         self.skip_spaces()
         if len(var_names) > 1:
-            if scope not in self.var_list:
-                self.var_list[scope] = []
             for var in var_names:
-                if var.symbol in self.var_list["global"] or var.symbol in self.var_list[scope]:
-                    raise SemanticError(f"Variable '{var.symbol}' is already defined.") 
-                self.var_list[scope].append(var.symbol)
+                if self.lookup_identifier(var.symbol):
+                    info = self.get_identifier_info(var.symbol)
+                    raise SemanticError(f"NameError: Identifier '{var.symbol}' is already declared as {info["type"]}.")  
+                self.declare_id(var.symbol, "a variable")
             return BatchVarDec(declarations=[VarDec(var, values_table[var.symbol]['values'], True, scope) for var in var_names])
         else:
             var = var_names[0]
-            if scope not in self.var_list:
-                self.var_list[scope] = []
-            if var.symbol in self.var_list["global"] or var.symbol in self.var_list[scope]:
-                    raise SemanticError(f"Variable '{var.symbol}' is already defined.")
-            self.var_list[scope].append(name)
+            if self.lookup_identifier(var.symbol):
+                info = self.get_identifier_info(var.symbol)
+                raise SemanticError(f"NameError: Identifier '{var.symbol}' is already declared as {info["type"]}.")    
+            self.declare_id(var.symbol, "a variable")
             return VarDec(var, value, True, scope)
 
     def parse_immo_arr(self, scope) -> ArrayDec:
         arr_name = Identifier(self.current_token.lexeme)
         name=arr_name.symbol
-        if name in self.arr_list.get(scope, {}) or name in self.arr_list.get("global", {}):
-            raise SemanticError(f"Array '{name}' is already defined.")
+        if self.lookup_identifier(name):
+            info = self.get_identifier_info(name)
+            raise SemanticError(f"NameError: Identifier '{name}' is already declared as {info["type"]}.")
         self.current_token = self.get_next_token() # eat id
         self.skip_spaces()
         dimensions = []
@@ -780,12 +813,7 @@ class Semantic:
         self.expect(":", "Expected ':' in array initialization or modification.")
         self.skip_spaces()
         values = self.parse_array_values(dimensions, scope)
-        if scope not in self.arr_list:
-            self.arr_list[scope] = {}
-                    
-        self.arr_list[scope][name] = {
-            "dimensions": len(dimensions)
-        }
+        self.declare_id(name, "an array", len(dimensions))
         return ArrayDec(arr_name, dimensions, values, True, scope)
     
     def parse_immo_inst(self, scope) -> ImmoInstDec:
@@ -794,11 +822,11 @@ class Semantic:
         if not self.current_token or not re.match(r'^id\d+$', self.current_token.token):
             raise SemanticError("Expected struct name after 'access'.")
         struct_parent = self.current_token.lexeme
-        if struct_parent not in self.struct_list.get(scope, []):
+        if not self.lookup_identifier(struct_parent):
             if struct_parent in self.globalstruct:
                 pass
             else:
-                raise SemanticError(f"DeclarationError: Struct '{struct_parent}' is not defined.")
+                raise SemanticError(f"NameError: Struct '{struct_parent}' is not defined.")
         self.current_token = self.get_next_token()  # eat id
         self.skip_spaces()
         if not self.current_token or not re.match(r'^id\d+$', self.current_token.token):
@@ -820,18 +848,17 @@ class Semantic:
                     raise SemanticError("Unexpected newline found after struct instance value.")
             elif self.current_token.token == 'newline':
                 break
-        if inst_name.symbol in self.struct_inst_list.get(scope, []):
-            raise SemanticError(f"DeclarationError: Struct instance '{inst_name.symbol}' already exist.")
-        if scope not in self.struct_inst_list:
-            self.struct_inst_list[scope] = []
-        self.struct_inst_list[scope].append(inst_name.symbol)
+        if self.lookup_identifier(inst_name.symbol):
+            info = self.get_identifier_info(inst_name.symbo)
+            raise SemanticError(f"NameError: Identifier '{inst_name.symbo}' is already declared as {info["type"]}.")
+        self.declare_id(inst_name.symbol, "a struct instance")
         return StructInst(inst_name, struct_parent, values, True)
 
     ########## ASS #############
     def parse_var_ass(self, scope) -> VarAssignment:
         var_name = Identifier(symbol=self.current_token.lexeme)
         name = self.current_token.lexeme
-        if name not in self.var_list.get(scope, []) and name not in self.var_list.get("global",  []):
+        if not self.lookup_identifier(name):
             raise SemanticError(f"NameError: Variable '{name}' does not exist.")
         self.current_token = self.get_next_token() # eat id
         self.skip_spaces()
@@ -839,8 +866,6 @@ class Semantic:
         self.current_token = self.get_next_token() # eat operator
         self.skip_spaces()
         value = self.parse_expr(scope)
-        if name in self.var_list["global"]:
-            scope = "global"
         return VarAssignment(var_name, operator, value)
 
     ########## EXPR ############
@@ -952,19 +977,19 @@ class Semantic:
             self.current_token = self.get_next_token()
             self.skip_spaces()
             if self.current_token.token == '.':
-                if identifier.symbol not in self.struct_inst_list.get(scope, {}):
+                if not self.lookup_id_type(identifier.symbol, "a struct instance"):
                     raise SemanticError(f"NameError: Struct instance '{identifier.symbol}' does not exist.")
                 self.current_token = self.get_next_token()
                 self.skip_spaces()
                 if not re.match(r'^id\d+$', self.current_token.token):
-                    raise SemanticError("Expected 'id' after '.' in accesisng a struct instance field.")
+                    raise SemanticError("Expected 'id' after '.' in accessing a struct instance field.")
                 field = Identifier(symbol=self.current_token.lexeme)
                 identifier = StructInstField(identifier, field)
                 self.current_token = self.get_next_token()
                 self.skip_spaces()
             elif self.current_token.token == '[':
                 dimensions = []
-                if identifier.symbol not in self.arr_list.get(scope, {}) and identifier.symbol not in self.arr_list.get("global", {}):
+                if not self.lookup_id_type(identifier.symbol, "an array"):
                     raise SemanticError(f"NameError: Array '{identifier.symbol}' does not exist.")
                 while self.current_token and self.current_token.token == '[':
                     self.current_token = self.get_next_token() #eat [
@@ -979,6 +1004,9 @@ class Semantic:
                         self.skip_spaces()
                 
                 identifier = ArrElement(identifier, dimensions)
+            else:
+                if not self.lookup_id_type(identifier.symbol, "a variable"):
+                    raise SemanticError(f"NameError: Variable '{identifier.symbol}' does not exist.")
             return identifier
         elif tk == 'hp_ltr':
             literal = HpLiteral(value=self.current_token.lexeme)
@@ -1041,7 +1069,7 @@ class Semantic:
         self.expect("{", "Expected '{' to open if statement's body.")
         self.skip_whitespace()
         then_branch = []
-
+        self.push_scope()
         while self.current_token and self.current_token.token != "}":
             stmt = self.parse_stmt(scope)
             then_branch.append(stmt)
@@ -1049,9 +1077,11 @@ class Semantic:
 
         self.expect("}", "Expected '}' to close if statement's body.")
         self.skip_whitespace()
-
+        self.pop_scope()
         elif_branches = []
+        
         while self.current_token and self.current_token.token == 'elif':
+            self.push_scope()
             self.current_token = self.get_next_token()  # eat elif
             self.skip_spaces()
             elif_condition = self.parse_expr(scope)
@@ -1068,9 +1098,10 @@ class Semantic:
             self.expect("}", "Expected '}' to close elif statement's body.")
             self.skip_whitespace()
             elif_branches.append(ElifStmt(elif_condition, elif_body))
-
+            self.pop_scope()
         else_branch = None
         if self.current_token and self.current_token.token == 'else':
+            self.push_scope()
             self.current_token = self.get_next_token()  # eat else
             self.skip_whitespace()
             self.expect("{", "Expected '{' to open else statement's body.")
@@ -1081,7 +1112,7 @@ class Semantic:
                 stmt = self.parse_stmt(scope)
                 else_branch.append(stmt)
                 self.skip_whitespace()
-
+            self.pop_scope()
             self.expect("}", "Expected '}' to close else statement's body.")
             self.skip_whitespace()
 
@@ -1107,20 +1138,20 @@ def check(fn, text):
     semantic = Semantic(tokens)
     result = semantic.produce_ast()
 
-    # if isinstance(result, SemanticError):
-    #     return str(result), {}
+    if isinstance(result, SemanticError):
+        return str(result), {}
 
-    # try:
-    #     visitor = ASTVisitor()
-    #     visitor.visit(result)
+    try:
+        visitor = ASTVisitor()
+        visitor.visit(result)
 
-    #     analyzer = SemanticAnalyzer(visitor.symbol_table)
-    #     analyzer.visit(result)
-    #     table = analyzer.symbol_table
-    # except SemanticError as e:
-    #     return str(e), {}
+        analyzer = SemanticAnalyzer(visitor.symbol_table)
+        analyzer.visit(result)
+        table = analyzer.symbol_table
+    except SemanticError as e:
+        return str(e), {}
 
-    # return result, table
+    return result, table
 
     return result, {}
         
