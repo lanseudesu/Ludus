@@ -472,16 +472,22 @@ class SemanticAnalyzer(ASTVisitor):
     def visit_FlankStmt(self, node: FlankStmt):
         expression = evaluate(node.expression, self.symbol_table)
         for choice in node.choices:
+            resume = False
             for choice_value in choice.values:
                 value = evaluate(choice_value, self.symbol_table)
                 if value == expression:
                     self.symbol_table.restore_scope(self.i)
                     for stmt in choice.body:
+                        if stmt.kind == "ResumeStmt":
+                            resume = True
                         self.visit(stmt)
                     self.symbol_table.exit_scope()
                     self.i += 1
-                    return
-            self.i += 1
+                    if not resume:  
+                        return
+                    break
+            else:
+                self.i += 1
 
         self.symbol_table.restore_scope(self.i)
         for stmt in node.backup_body:

@@ -36,6 +36,7 @@ class NodeType:
     ELIF_STMT           = "ElifStmt"
     FLANK_STMT          = "FlankStmt"
     CHOICE_STMT         = "ChoiceStmt"
+    RESUME_STMT         = "ResumeStmt"
 
 class Stmt:
     def __init__(self, kind: str):
@@ -300,4 +301,6 @@ class FlankStmt(Stmt):
         self.choices = choices
         self.backup_body = backup_body
 
-
+class ResumeStmt(Stmt):
+    def __init__(self):
+        super().__init__(NodeType.RESUME_STMT)

@@ -178,7 +178,7 @@ class Semantic:
         self.pop_scope()
         return PlayFunc(body=BlockStmt(statements=body))
     
-    def parse_stmt(self, scope) -> Stmt:
+    def parse_stmt(self, scope, is_flank=False) -> Stmt:
         self.skip_whitespace()
 
         if self.current_token and re.match(r'^id\d+$', self.current_token.token):
@@ -205,6 +205,13 @@ class Semantic:
             return self.parse_if(scope)
         elif self.current_token and self.current_token.token == 'flank':
             return self.parse_flank(scope)
+        elif self.current_token and self.current_token.token == 'resume':
+            if is_flank:
+                self.current_token = self.get_next_token()
+                self.skip_whitespace()
+                return ResumeStmt()
+            else:
+                raise SemanticError(f"ResumeError: Cannot use resume statement if not within a flank choice body.")
         else:
             raise SemanticError(f"Unexpected token found during parsing: {self.current_token.token}")
 
@@ -1151,7 +1158,7 @@ class Semantic:
             self.push_scope()
             choice_body = []
             while self.current_token and self.current_token.token not in ["choice", "backup", "}"]:
-                stmt = self.parse_stmt(scope)
+                stmt = self.parse_stmt(scope, True)
                 choice_body.append(stmt)
                 self.skip_whitespace()
             self.pop_scope()
