@@ -143,6 +143,12 @@ class ASTVisitor:
             self.visit(stmt)
         self.symbol_table.exit_scope()
 
+    def visit_ForStmt(self, node: ForStmt):
+        self.symbol_table.enter_scope()
+        for stmt in node.body:
+            self.visit(stmt)
+        self.symbol_table.exit_scope()
+
 class SemanticAnalyzer(ASTVisitor):
     i = 1
 
@@ -495,7 +501,32 @@ class SemanticAnalyzer(ASTVisitor):
         self.symbol_table.exit_scope()
         self.i += 1
 
-
+    def visit_ForStmt(self, node: ForStmt):
+        val_name = node.initialization.left
+        value = self.symbol_table.lookup(val_name)
+        value_type = value["type"]
+        if value["immo"]==True:
+            raise SemanticError(f"TypeError: '{val_name}' is declared as an immutable variable.")
+        new_val = evaluate(node.initialization.right, self.symbol_table)
+        if value_type != "hp" or not isinstance(new_val, int):
+            raise SemanticError(f"ForError: Only integer variables can be used for loop control.")
+        self.symbol_table.define_var(val_name, new_val, value_type, value["immo"])
+        
+        condition = evaluate(node.condition, self.symbol_table)
+        if not isinstance(condition, bool):
+            raise SemanticError(f"ForError: Loop condition does not evaluate to a flag value.")
+        
+        if evaluate(node.condition, self.symbol_table):
+            self.symbol_table.restore_scope(self.i)
+            while evaluate(node.condition, self.symbol_table):
+                for stmt in node.body:
+                    self.visit(stmt)
+                self.visit_VarAssignmentStmt(node.update)
+            self.symbol_table.exit_scope()
+            self.i += 1
+        self.symbol_table.define_var(val_name, value["value"], value_type, value["immo"])
+    
+    
     def visit_BlockStmt(self, node: BlockStmt):
         self.symbol_table.restore_scope(self.i)
         for stmt in node.statements:

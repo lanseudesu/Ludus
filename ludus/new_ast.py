@@ -212,6 +212,8 @@ class Semantic:
                 return ResumeStmt()
             else:
                 raise SemanticError(f"ResumeError: Cannot use resume statement if not within a flank choice body.")
+        elif self.current_token and self.current_token.token == 'for':
+             return self.parse_for(scope)
         else:
             raise SemanticError(f"Unexpected token found during parsing: {self.current_token.token}")
 
@@ -1069,7 +1071,7 @@ class Semantic:
         else:
             raise SemanticError(f"Unexpected token found during parsing: {tk}")
         
-    ########### IF #############
+    ########### CONDITIONALS #############
     def parse_if(self, scope) -> IfStmt:
         self.current_token = self.get_next_token()  # eat if
         self.skip_spaces()
@@ -1184,6 +1186,54 @@ class Semantic:
         self.skip_whitespace()
 
         return FlankStmt(expression, choices, backup_body)
+
+    ########## LOOPS #############
+    def parse_for(self,scope) -> ForStmt:
+        self.current_token = self.get_next_token() # eat for
+        self.skip_spaces()
+        if not self.current_token or not re.match(r'^id\d+$', self.current_token.token):
+                raise SemanticError("ForError: Expected variable name after for keyword.")
+        name = self.current_token.lexeme
+        if not self.lookup_id_type(name, "a variable"):
+            raise SemanticError(f"NameError: Variable '{name}' is not defined.")
+        self.current_token = self.get_next_token() # eat id
+        self.skip_spaces()
+        self.expect(":", "ForError: Expected ':' after identifier in loop control initialization.")
+        self.skip_spaces()
+        init_value = self.parse_expr(scope)
+        initialization = VarAssignment(name, ":", init_value)
+        self.skip_spaces()
+        self.expect(",", "ForError: Expected ',' after loop control initialization.")
+        self.skip_spaces()
+        condition = self.parse_expr(scope)
+        self.skip_spaces()
+        self.expect(",", "ForError: Expected ',' after loop condition.")
+        self.skip_spaces()
+        if not self.current_token or not re.match(r'^id\d+$', self.current_token.token):
+                raise SemanticError("ForError: Expected variable name after loop condition.")
+        upd_name = Identifier(self.current_token.lexeme)
+        if not self.lookup_id_type(upd_name.symbol, "a variable"):
+            raise SemanticError(f"NameError: Variable '{upd_name}' is not defined.")
+        self.current_token = self.get_next_token() # eat id
+        self.skip_spaces()
+        operator = self.current_token.token
+        self.current_token = self.get_next_token() # eat operator
+        self.skip_spaces()
+        upd_value = self.parse_expr(scope)
+        update = VarAssignment(upd_name, operator, upd_value)
+        self.skip_whitespace()
+        self.expect("{", "Expected '{' to open a for loop statement's body.")
+        self.skip_whitespace()
+        body = []
+        self.push_scope()
+        while self.current_token and self.current_token.token != "}":
+            stmt = self.parse_stmt(scope)
+            body.append(stmt)
+            self.skip_whitespace()
+        self.expect("}", "Expected '}' to close an if statement's body.")
+        self.skip_whitespace()
+        self.pop_scope()
+        return ForStmt(initialization, condition, update, body)
 
 def check(fn, text):
     lexer = Lexer(fn, text)

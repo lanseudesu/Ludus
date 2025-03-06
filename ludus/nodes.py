@@ -37,6 +37,7 @@ class NodeType:
     FLANK_STMT          = "FlankStmt"
     CHOICE_STMT         = "ChoiceStmt"
     RESUME_STMT         = "ResumeStmt"
+    FOR_STMT            = "ForStmt"
 
 class Stmt:
     def __init__(self, kind: str):
@@ -304,3 +305,12 @@ class FlankStmt(Stmt):
 class ResumeStmt(Stmt):
     def __init__(self):
         super().__init__(NodeType.RESUME_STMT)
+
+class ForStmt(Stmt):
+    def __init__(self, initialization: VarAssignment, condition: Expr, 
+                 update: VarAssignment, body: List[Stmt]):
+        super().__init__(NodeType.FOR_STMT)
+        self.initialization = initialization
+        self.condition = condition
+        self.update = update
+        self.body = body
