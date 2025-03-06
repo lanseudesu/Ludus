@@ -12,9 +12,9 @@ class SymbolTable:
         self.scope_stack.append(new_scope)
     
     def exit_scope(self):
-        print("Exit Scope:")
-        for scope in reversed(self.scope_stack):
-            print(scope)
+        # print("Exit Scope:")
+        # for scope in reversed(self.scope_stack):
+        #     print(scope)
         if self.scope_stack:
             current_scope = self.scope_stack.pop()
             self.saved_scopes.insert(1, current_scope.copy())
@@ -27,9 +27,9 @@ class SymbolTable:
             else:
                 restored_scope = self.saved_scopes.pop()  
             self.scope_stack.append(restored_scope)
-        print("Restore Scope:")
-        for scope in reversed(self.scope_stack):
-            print(scope)
+        # print("Restore Scope:")
+        # for scope in reversed(self.scope_stack):
+        #     print(scope)
     
     
     def define(self, name: str, value):

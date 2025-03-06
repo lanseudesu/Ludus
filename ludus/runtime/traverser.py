@@ -131,6 +131,18 @@ class ASTVisitor:
                 self.visit(stmt)
             self.symbol_table.exit_scope()
 
+    def visit_FlankStmt(self, node: FlankStmt):
+        for choice in node.choices:
+            self.symbol_table.enter_scope()
+            for stmt in choice.body:
+                self.visit(stmt)
+            self.symbol_table.exit_scope()
+
+        self.symbol_table.enter_scope()
+        for stmt in node.backup_body:
+            self.visit(stmt)
+        self.symbol_table.exit_scope()
+
 class SemanticAnalyzer(ASTVisitor):
     i = 1
 
@@ -448,8 +460,6 @@ class SemanticAnalyzer(ASTVisitor):
                 self.symbol_table.exit_scope()
                 self.i += 1
                 return
-            self.symbol_table.restore_scope(self.i)
-            self.symbol_table.exit_scope()
             self.i += 1
         
         if node.else_branch is not None:
@@ -458,7 +468,27 @@ class SemanticAnalyzer(ASTVisitor):
                 self.visit(stmt)
             self.symbol_table.exit_scope()
             self.i += 1
-        
+
+    def visit_FlankStmt(self, node: FlankStmt):
+        expression = evaluate(node.expression, self.symbol_table)
+        for choice in node.choices:
+            for choice_value in choice.values:
+                value = evaluate(choice_value, self.symbol_table)
+                if value == expression:
+                    self.symbol_table.restore_scope(self.i)
+                    for stmt in choice.body:
+                        self.visit(stmt)
+                    self.symbol_table.exit_scope()
+                    self.i += 1
+                    return
+            self.i += 1
+
+        self.symbol_table.restore_scope(self.i)
+        for stmt in node.backup_body:
+            self.visit(stmt)
+        self.symbol_table.exit_scope()
+        self.i += 1
+
 
     def visit_BlockStmt(self, node: BlockStmt):
         self.symbol_table.restore_scope(self.i)

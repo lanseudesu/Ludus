@@ -203,6 +203,8 @@ class Semantic:
             return self.parse_immo(scope)
         elif self.current_token and self.current_token.token == 'if':
             return self.parse_if(scope)
+        elif self.current_token and self.current_token.token == 'flank':
+            return self.parse_flank(scope)
         else:
             raise SemanticError(f"Unexpected token found during parsing: {self.current_token.token}")
 
@@ -1066,7 +1068,7 @@ class Semantic:
         self.skip_spaces()
         condition = self.parse_expr(scope)
         self.skip_whitespace()
-        self.expect("{", "Expected '{' to open if statement's body.")
+        self.expect("{", "Expected '{' to open an if statement's body.")
         self.skip_whitespace()
         then_branch = []
         self.push_scope()
@@ -1075,7 +1077,7 @@ class Semantic:
             then_branch.append(stmt)
             self.skip_whitespace()
 
-        self.expect("}", "Expected '}' to close if statement's body.")
+        self.expect("}", "Expected '}' to close an if statement's body.")
         self.skip_whitespace()
         self.pop_scope()
         elif_branches = []
@@ -1086,7 +1088,7 @@ class Semantic:
             self.skip_spaces()
             elif_condition = self.parse_expr(scope)
             self.skip_whitespace()
-            self.expect("{", "Expected '{' to open elif statement's body.")
+            self.expect("{", "Expected '{' to open an elif statement's body.")
             self.skip_whitespace()
             elif_body = []
 
@@ -1095,7 +1097,7 @@ class Semantic:
                 elif_body.append(stmt)
                 self.skip_whitespace()
 
-            self.expect("}", "Expected '}' to close elif statement's body.")
+            self.expect("}", "Expected '}' to close an elif statement's body.")
             self.skip_whitespace()
             elif_branches.append(ElifStmt(elif_condition, elif_body))
             self.pop_scope()
@@ -1104,7 +1106,7 @@ class Semantic:
             self.push_scope()
             self.current_token = self.get_next_token()  # eat else
             self.skip_whitespace()
-            self.expect("{", "Expected '{' to open else statement's body.")
+            self.expect("{", "Expected '{' to open an else statement's body.")
             self.skip_whitespace()
             else_branch = []
 
@@ -1113,13 +1115,68 @@ class Semantic:
                 else_branch.append(stmt)
                 self.skip_whitespace()
             self.pop_scope()
-            self.expect("}", "Expected '}' to close else statement's body.")
+            self.expect("}", "Expected '}' to close an else statement's body.")
             self.skip_whitespace()
 
         if not elif_branches:
             elif_branches = None
         return IfStmt(condition, then_branch, elif_branches, else_branch)
 
+    def parse_flank(self, scope) -> FlankStmt:
+        self.current_token = self.get_next_token()  # eat flank
+        self.skip_spaces()
+        expression = self.parse_expr(scope)
+        self.skip_whitespace()
+        self.expect("{", "Expected '{' to open a flank statement's body.")
+        self.skip_whitespace()
+        choices = []
+
+        if self.current_token.token != 'choice':
+            raise SyntaxError("FlankError: There must be at least one choice statement in a flank statement.")
+        
+        while self.current_token and self.current_token.token == "choice":
+            self.current_token = self.get_next_token()  # eat choice
+            self.skip_spaces()
+            values = [self.parse_expr(scope)]
+            self.skip_spaces()
+
+            while self.current_token and self.current_token.token == ',':
+                self.current_token = self.get_next_token()  # eat ,
+                values.append(self.parse_expr(scope))
+                self.skip_spaces()
+            
+            self.expect(":", "Expected ':' to open a choice statement's body.")
+            self.skip_whitespace()
+
+            self.push_scope()
+            choice_body = []
+            while self.current_token and self.current_token.token not in ["choice", "backup", "}"]:
+                stmt = self.parse_stmt(scope)
+                choice_body.append(stmt)
+                self.skip_whitespace()
+            self.pop_scope()
+            choices.append(ChoiceStmts(values, choice_body))
+        
+        if not self.current_token or self.current_token.token != 'backup':
+            raise SyntaxError("FlankError: A flank statement must include a backup statement.")
+
+        self.current_token = self.get_next_token()  # eat backup
+        self.skip_spaces()
+        self.expect(":", "Expected ':' to open backup statement's body.")
+        self.skip_whitespace()
+
+        self.push_scope()
+        backup_body = []
+        while self.current_token and self.current_token.token != "}":
+            stmt = self.parse_stmt(scope)
+            backup_body.append(stmt)
+            self.skip_whitespace()
+        self.pop_scope()
+
+        self.expect("}", "Expected '}' to close a flank statement's body.")
+        self.skip_whitespace()
+
+        return FlankStmt(expression, choices, backup_body)
 
 def check(fn, text):
     lexer = Lexer(fn, text)
@@ -1140,7 +1197,7 @@ def check(fn, text):
 
     if isinstance(result, SemanticError):
         return str(result), {}
-
+    
     try:
         visitor = ASTVisitor()
         visitor.visit(result)

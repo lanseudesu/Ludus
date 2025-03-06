@@ -34,6 +34,8 @@ class NodeType:
     GLOBAL_STRUCT_DEC   = "GlobalStructDec"
     IF_STMT             = "IfStmt"
     ELIF_STMT           = "ElifStmt"
+    FLANK_STMT          = "FlankStmt"
+    CHOICE_STMT         = "ChoiceStmt"
 
 class Stmt:
     def __init__(self, kind: str):
@@ -284,3 +286,18 @@ class ElifStmt(Stmt):
         super().__init__(NodeType.ELIF_STMT)
         self.condition = condition         
         self.body = body     
+
+class ChoiceStmts(Stmt):
+    def __init__(self, values: List[Expr], body):
+        super().__init__(NodeType.CHOICE_STMT)
+        self.values = values
+        self.body = body
+
+class FlankStmt(Stmt):
+    def __init__(self, expression, choices: List[ChoiceStmts], backup_body):
+        super().__init__(NodeType.FLANK_STMT)
+        self.expression = expression
+        self.choices = choices
+        self.backup_body = backup_body
+
+
