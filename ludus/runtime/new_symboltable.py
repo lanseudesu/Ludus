@@ -5,7 +5,6 @@ class SymbolTable:
     def __init__(self):
         self.scope_stack = [{}] 
         self.saved_scopes = [{}]
-        self.symbols = {}  
     
     def enter_scope(self):
         new_scope = {}
@@ -17,15 +16,17 @@ class SymbolTable:
         #     print(scope)
         if self.scope_stack:
             current_scope = self.scope_stack.pop()
+            if current_scope in self.saved_scopes:
+                self.saved_scopes[self.saved_scopes.index(current_scope)] = current_scope.copy()
             self.saved_scopes.insert(1, current_scope.copy())
         
     
     def restore_scope(self, scope_index=None):
         if len(self.saved_scopes) > 1:  
             if scope_index is not None:
-                restored_scope = self.saved_scopes.pop(scope_index)
+                restored_scope = self.saved_scopes[scope_index]
             else:
-                restored_scope = self.saved_scopes.pop()  
+                restored_scope = self.saved_scopes[1]  
             self.scope_stack.append(restored_scope)
         # print("Restore Scope:")
         # for scope in reversed(self.scope_stack):

@@ -17,6 +17,7 @@ class Parser:
         self.tokens = tokens
         self.current_token_index = 0
         self.current_token = self.get_next_token()
+        self.save_stack = []
 
     def get_next_token(self):
         if self.current_token_index < len(self.tokens):
@@ -28,6 +29,7 @@ class Parser:
     def parser(self):
         self.stack = ["<program>"]  
         self.tokens.append("$")  
+        null_flag = False
 
         while self.stack:
             self.top = self.stack.pop()
@@ -44,34 +46,75 @@ class Parser:
             if self.top == self.current_token.token:
                 # print(f"Matched: {self.current_token.token} and {self.top}")
                 self.current_token = self.get_next_token()
+                if null_flag:
+                    null_flag = False
+                    self.save_stack = []
             elif self.top in parse_table:
+                # print(f"Parse Table of current top: {parse_table[self.top]}")
                 if self.current_token.token in parse_table[self.top]:
                     production = parse_table[self.top][self.current_token.token]
                     # print(f"Expand: {self.top} → {' '.join(production)}")
 
                     if "λ" not in production:
                         self.stack.extend(reversed(production))
-                    # print(self.stack)
+                    else:
+                        if self.save_stack != []:
+                            pass
+                        else:
+                            self.save_top = self.top
+                            self.save_stack = self.stack.copy()
+                        null_flag = True
+                    # print(f"stack: {self.stack}")
+                    # print(f"save stack: {self.save_stack}")
                 else:
                     expected_tokens = list(parse_table[self.top].keys()) 
                     if self.current_token.token not in expected_tokens:
                         if self.top in first_set:  
                             expected_tokens = list(first_set[self.top]) 
-                            
-                        if "λ" in expected_tokens:
+                        
+                        i = 1
+                        while "λ" in expected_tokens:
                             expected_tokens.remove("λ")
                             if self.stack:
-                                next_top = self.stack[-1]  
+                                next_top = self.stack[-i]  
                                 if next_top in parse_table:
-                                    expected_tokens.extend(parse_table[next_top].keys())  
+                                    expected_tokens.extend(list(first_set[next_top]) )  
                                 else:
                                     expected_tokens.append(next_top)
+                                i += 1
 
-                        expected_tokens = list(dict.fromkeys(expected_tokens))
+
+                        expected_tokens = list(set(expected_tokens))
                     
                     return (f"Syntax Error: Unexpected token '{self.current_token.token}' at line {self.current_token.line} and column {self.current_token.column}."
                             f" Expected tokens: {', '.join(expected_tokens)}.")
             else:
+                if null_flag:
+                    # print(f"save stack: {self.save_stack}")
+                    # print(f"save top: {self.save_top}")
+                    expected_tokens = list(parse_table[self.save_top].keys()) 
+                    # print(f"yeppers: {expected_tokens}")
+                    if self.save_top in first_set:  
+                        expected_tokens = list(first_set[self.save_top]) 
+                        # print(f"yeppers2: {expected_tokens}")
+
+                    i = 1
+                    while "λ" in expected_tokens:
+                        expected_tokens.remove("λ")
+                        if self.save_stack:
+                            next_top = self.save_stack[-i]  
+                            if next_top in parse_table:
+                                expected_tokens.extend(list(first_set[next_top]) )  
+                            else:
+                                expected_tokens.append(next_top)
+                            i += 1
+
+
+                    expected_tokens = list(set(expected_tokens))
+
+                    return (f"Syntax Error: Unexpected token '{self.current_token.token}' at line {self.current_token.line} and column {self.current_token.column}."
+                            f" Expected tokens: {', '.join(expected_tokens)}.")
+
                 return (f"Syntax Error: Unexpected token '{self.current_token.token}' at line {self.current_token.line} and column {self.current_token.column}."
                         f" Expected token: {self.top}.")
 

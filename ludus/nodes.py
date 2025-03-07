@@ -37,7 +37,9 @@ class NodeType:
     FLANK_STMT          = "FlankStmt"
     CHOICE_STMT         = "ChoiceStmt"
     RESUME_STMT         = "ResumeStmt"
+    CHECKPOINT_STMT     = "CheckpointStmt"
     FOR_STMT            = "ForStmt"
+    GRINDWHILE_STMT     = "GrindWhileStmt"
 
 class Stmt:
     def __init__(self, kind: str):
@@ -306,6 +308,10 @@ class ResumeStmt(Stmt):
     def __init__(self):
         super().__init__(NodeType.RESUME_STMT)
 
+class CheckpointStmt(Stmt):
+    def __init__(self):
+        super().__init__(NodeType.CHECKPOINT_STMT)
+
 class ForStmt(Stmt):
     def __init__(self, initialization: VarAssignment, condition: Expr, 
                  update: VarAssignment, body: List[Stmt]):
@@ -314,3 +320,10 @@ class ForStmt(Stmt):
         self.condition = condition
         self.update = update
         self.body = body
+
+class GrindWhileStmt(Stmt):
+    def __init__(self, condition: Expr, body: List[Stmt], is_grind=False):
+        super().__init__(NodeType.GRINDWHILE_STMT)
+        self.condition = condition
+        self.body = body
+        self.is_grind = is_grind

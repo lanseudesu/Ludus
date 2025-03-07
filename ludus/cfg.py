@@ -191,7 +191,7 @@ cfg = {
     "<elif_stmt>": [["elif", "<expr>", "{", "<body>", "}", "<else_elif>"]],
     "<flank_stmt>": [["flank", "<expr>", "{", "choice", "<valdead>", "<valdead_recur>", ":", "<flank_body>", "}"]],
     "<flank_body>": [["<main_stmts>", "<flank_body>"],
-                     ["<loop_control>", "<choice_recur>"],
+                     ["resume", "<choice_recur>"],
                      ["<choice_recur>"]],
     "<valdead>": [["<value>"], ["dead"]],
     "<valdead_recur>": [[",", "<valdead>", "<valdead_recur>"], 

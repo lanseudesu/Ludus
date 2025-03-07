@@ -11,12 +11,10 @@ class Semantic:
         self.tokens = tokens
         self.current_token_index = 0
         self.current_token = self.get_next_token()
-        self.var_list = {"global": []} 
-        self.arr_list = {"global": {}} 
-        self.struct_list = {"global": []}
-        self.struct_inst_list = {}
         self.globalstruct = []
         self.scope_stack = [{}]
+        self.loop_flag = False
+        self.flank_flag = False
     
     TYPE_MAP = {
         int: "hp",
@@ -178,7 +176,7 @@ class Semantic:
         self.pop_scope()
         return PlayFunc(body=BlockStmt(statements=body))
     
-    def parse_stmt(self, scope, is_flank=False) -> Stmt:
+    def parse_stmt(self, scope, is_flank=False, is_loop=False) -> Stmt:
         self.skip_whitespace()
 
         if self.current_token and re.match(r'^id\d+$', self.current_token.token):
@@ -206,14 +204,25 @@ class Semantic:
         elif self.current_token and self.current_token.token == 'flank':
             return self.parse_flank(scope)
         elif self.current_token and self.current_token.token == 'resume':
-            if is_flank:
+            if self.flank_flag or self.loop_flag:
                 self.current_token = self.get_next_token()
                 self.skip_whitespace()
                 return ResumeStmt()
             else:
                 raise SemanticError(f"ResumeError: Cannot use resume statement if not within a flank choice body.")
+        elif self.current_token and self.current_token.token == 'checkpoint':
+            if self.loop_flag:
+                self.current_token = self.get_next_token()
+                self.skip_whitespace()
+                return CheckpointStmt()
+            else:
+                raise SemanticError(f"ResumeError: Cannot use checkpoint statement if not within a loop body.")
         elif self.current_token and self.current_token.token == 'for':
              return self.parse_for(scope)
+        elif self.current_token and self.current_token.token == 'grind':
+             return self.parse_grind_while(scope)
+        elif self.current_token and self.current_token.token == 'while':
+             return self.parse_while(scope)
         else:
             raise SemanticError(f"Unexpected token found during parsing: {self.current_token.token}")
 
@@ -1141,8 +1150,9 @@ class Semantic:
         choices = []
 
         if self.current_token.token != 'choice':
-            raise SyntaxError("FlankError: There must be at least one choice statement in a flank statement.")
+            raise SemanticError("FlankError: There must be at least one choice statement in a flank statement.")
         
+        self.flank_flag = True
         while self.current_token and self.current_token.token == "choice":
             self.current_token = self.get_next_token()  # eat choice
             self.skip_spaces()
@@ -1167,7 +1177,8 @@ class Semantic:
             choices.append(ChoiceStmts(values, choice_body))
         
         if not self.current_token or self.current_token.token != 'backup':
-            raise SyntaxError("FlankError: A flank statement must include a backup statement.")
+            self.flank_flag = False
+            raise SemanticError("FlankError: A flank statement must include a backup statement.")
 
         self.current_token = self.get_next_token()  # eat backup
         self.skip_spaces()
@@ -1184,7 +1195,7 @@ class Semantic:
 
         self.expect("}", "Expected '}' to close a flank statement's body.")
         self.skip_whitespace()
-
+        self.flank_flag = False
         return FlankStmt(expression, choices, backup_body)
 
     ########## LOOPS #############
@@ -1226,14 +1237,58 @@ class Semantic:
         self.skip_whitespace()
         body = []
         self.push_scope()
+        self.loop_flag = True
         while self.current_token and self.current_token.token != "}":
             stmt = self.parse_stmt(scope)
             body.append(stmt)
             self.skip_whitespace()
-        self.expect("}", "Expected '}' to close an if statement's body.")
+        self.expect("}", "Expected '}' to close a for loop statement's body.")
         self.skip_whitespace()
         self.pop_scope()
+        self.loop_flag = False
         return ForStmt(initialization, condition, update, body)
+    
+    def parse_while(self,scope) -> GrindWhileStmt:
+        self.current_token = self.get_next_token() # eat while
+        self.skip_spaces()
+        condition = self.parse_expr(scope)
+        self.skip_whitespace()
+        self.expect("{", "Expected '{' to open a while loop statement's body.")
+        self.skip_whitespace()
+        body = []
+        self.push_scope()
+        self.loop_flag = True
+        while self.current_token and self.current_token.token != "}":
+            stmt = self.parse_stmt(scope)
+            body.append(stmt)
+            self.skip_whitespace()
+        self.expect("}", "Expected '}' to close a while loop statement's body.")
+        self.skip_whitespace()
+        self.pop_scope()
+        self.loop_flag = False
+        return GrindWhileStmt(condition, body)
+    
+    def parse_grind_while(self,scope) -> GrindWhileStmt:
+        self.current_token = self.get_next_token() # eat grind
+        self.skip_spaces()
+        self.expect("{", "Expected '{' to open a grind while loop statement's body.")
+        self.skip_whitespace()
+        body = []
+        self.push_scope()
+        self.loop_flag = True
+        while self.current_token and self.current_token.token != "}":
+            stmt = self.parse_stmt(scope)
+            body.append(stmt)
+            self.skip_whitespace()
+        self.expect("}", "Expected '}' to close a grind while loop statement's body.")
+        self.skip_whitespace()
+        self.pop_scope()
+        self.loop_flag = False
+        self.expect("while", "Missing a while loop condition after a grind-while loop statement's body.")
+        self.skip_spaces()
+        condition = self.parse_expr(scope)
+        self.skip_whitespace()
+        return GrindWhileStmt(condition, body, True)
 
 def check(fn, text):
     lexer = Lexer(fn, text)

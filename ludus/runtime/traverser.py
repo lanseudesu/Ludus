@@ -1,3 +1,4 @@
+from ludus.nodes import GrindWhileStmt
 from ..nodes import *
 from .new_symboltable import SymbolTable
 from .new_interpreter import evaluate
@@ -149,9 +150,17 @@ class ASTVisitor:
             self.visit(stmt)
         self.symbol_table.exit_scope()
 
-class SemanticAnalyzer(ASTVisitor):
-    i = 1
+    def visit_GrindWhileStmt(self, node: GrindWhileStmt):
+        self.symbol_table.enter_scope()
+        for stmt in node.body:
+            self.visit(stmt)
+        self.symbol_table.exit_scope()
 
+########################################
+####### 2ND RUN OF TRAVERSER ###########
+########################################
+
+class SemanticAnalyzer(ASTVisitor):
     TYPE_MAP = {
         int: "hp",
         float: "xp",
@@ -161,7 +170,10 @@ class SemanticAnalyzer(ASTVisitor):
 
     def __init__(self, symbol_table):
         super().__init__()
-        self.symbol_table = symbol_table  
+        self.symbol_table = symbol_table 
+        self.i = 1 
+        self.checkpoint_flag = False
+        self.resume_flag = False
 
     def visit_VarDec(self, node: VarDec):
         value = evaluate(node.value, self.symbol_table)
@@ -460,46 +472,54 @@ class SemanticAnalyzer(ASTVisitor):
         
         for cond in conditions:
             if cond[0] == True:
-                self.symbol_table.restore_scope(self.i)
+                self.symbol_table.restore_scope(len(self.symbol_table.scope_stack))
                 for stmt in cond[1]:
                     self.visit(stmt)
+                    if self.checkpoint_flag:
+                        self.symbol_table.exit_scope()
+                        return
+
+                    if self.resume_flag:
+                        self.symbol_table.exit_scope()
+                        return
                 self.symbol_table.exit_scope()
-                self.i += 1
                 return
-            self.i += 1
+            
         
         if node.else_branch is not None:
-            self.symbol_table.restore_scope(self.i)
+            self.symbol_table.restore_scope(len(self.symbol_table.scope_stack))
             for stmt in node.else_branch:
                 self.visit(stmt)
+                if self.checkpoint_flag:
+                    self.symbol_table.exit_scope()
+                    return
+
+                if self.resume_flag:
+                    self.symbol_table.exit_scope()
+                    return
             self.symbol_table.exit_scope()
-            self.i += 1
 
     def visit_FlankStmt(self, node: FlankStmt):
         expression = evaluate(node.expression, self.symbol_table)
         for choice in node.choices:
-            resume = False
             for choice_value in choice.values:
                 value = evaluate(choice_value, self.symbol_table)
                 if value == expression:
-                    self.symbol_table.restore_scope(self.i)
+                    self.symbol_table.restore_scope(len(self.symbol_table.scope_stack))
                     for stmt in choice.body:
-                        if stmt.kind == "ResumeStmt":
-                            resume = True
                         self.visit(stmt)
+                    if self.resume_flag:  
+                        self.resume_flag = False
+                        self.symbol_table.exit_scope()
+                        break
                     self.symbol_table.exit_scope()
-                    self.i += 1
-                    if not resume:  
-                        return
-                    break
-            else:
-                self.i += 1
+                    return
 
-        self.symbol_table.restore_scope(self.i)
+        self.symbol_table.restore_scope(len(self.symbol_table.scope_stack))
         for stmt in node.backup_body:
             self.visit(stmt)
-        self.symbol_table.exit_scope()
         self.i += 1
+        self.symbol_table.exit_scope()
 
     def visit_ForStmt(self, node: ForStmt):
         val_name = node.initialization.left
@@ -514,21 +534,63 @@ class SemanticAnalyzer(ASTVisitor):
         
         condition = evaluate(node.condition, self.symbol_table)
         if not isinstance(condition, bool):
-            raise SemanticError(f"ForError: Loop condition does not evaluate to a flag value.")
+            raise SemanticError(f"LoopError: Loop condition does not evaluate to a flag value.")
         
-        if evaluate(node.condition, self.symbol_table):
-            self.symbol_table.restore_scope(self.i)
+        if condition:
+            self.symbol_table.restore_scope(len(self.symbol_table.scope_stack))
             while evaluate(node.condition, self.symbol_table):
                 for stmt in node.body:
                     self.visit(stmt)
+                    if self.checkpoint_flag:
+                        self.checkpoint_flag = False
+                        self.symbol_table.exit_scope()
+                        self.symbol_table.define_var(val_name, value["value"], value_type, value["immo"])
+                        return
+                    if self.resume_flag:
+                        self.resume_flag = False
+                        continue 
                 self.visit_VarAssignmentStmt(node.update)
             self.symbol_table.exit_scope()
-            self.i += 1
+            
         self.symbol_table.define_var(val_name, value["value"], value_type, value["immo"])
     
+    def visit_GrindWhileStmt(self, node: GrindWhileStmt):
+        condition = evaluate(node.condition, self.symbol_table)
+        if not isinstance(condition, bool):
+            raise SemanticError(f"LoopError: Loop condition does not evaluate to a flag value.")
+        
+        if node.is_grind:
+            self.symbol_table.restore_scope(len(self.symbol_table.scope_stack))
+            for stmt in node.body:
+                self.visit(stmt)
+                if self.checkpoint_flag:
+                    self.checkpoint_flag = False
+                    self.symbol_table.exit_scope()
+                    return
+                if self.resume_flag:
+                    self.resume_flag = False
+        elif not node.is_grind and condition:
+            self.symbol_table.restore_scope(len(self.symbol_table.scope_stack))
+            
+        while evaluate(node.condition, self.symbol_table):
+            for stmt in node.body:
+                self.visit(stmt)
+                if self.checkpoint_flag:
+                    self.checkpoint_flag = False
+                    self.symbol_table.exit_scope()
+                    return
+                if self.resume_flag:
+                    self.resume_flag = False
+                    continue 
+        self.symbol_table.exit_scope()
     
     def visit_BlockStmt(self, node: BlockStmt):
-        self.symbol_table.restore_scope(self.i)
+        self.symbol_table.restore_scope(len(self.symbol_table.scope_stack))
         for stmt in node.statements:
             self.visit(stmt)
-        
+
+    def visit_ResumeStmt(self, node: ResumeStmt):
+        self.resume_flag = True 
+
+    def visit_CheckpointStmt(self, node: CheckpointStmt):
+        self.checkpoint_flag = True   
