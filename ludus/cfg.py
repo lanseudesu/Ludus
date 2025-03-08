@@ -222,7 +222,7 @@ cfg = {
     "<func_stmts>": [["<common_stmts>"], ["<recall_stmt>"],
                      ["<if_stmt_func>"], ["<flank_func>"],
                      ["<looping_func>"]],
-    "<func_stmts_recur>": [["<func_stmts>"], ["λ"]],               
+    "<func_stmts_recur>": [["<func_stmts>", "<func_stmts_recur>"], ["λ"]],               
     "<flank_func>": [["flank", "<expr>", "{", "choice", "<valdead>", "<valdead_recur>",
                      ":", "<flank_func_body>", "}"]],
     "<flank_func_body>": [["<main_stmts>", "<flank_func_body>"], 
@@ -390,20 +390,20 @@ def gen_parse_table():
         
 parse_table = gen_parse_table()
 
-# def save_parse_table(parse_table, filename="parse_table.txt"):
-#     with open(filename, "w", encoding="utf-8") as file:  
-#         terminals = {}
-#         for non_terminal, rules in parse_table.items():
-#             for terminal, production in rules.items():
-#                 if terminal not in terminals:
-#                     terminals[terminal] = []
-#                 terminals[terminal].append(f"    Non-terminal: {non_terminal} -> Production: {production}")
+def save_parse_table(parse_table, filename="parse_table.txt"):
+    with open(filename, "w", encoding="utf-8") as file:  
+        terminals = {}
+        for non_terminal, rules in parse_table.items():
+            for terminal, production in rules.items():
+                if terminal not in terminals:
+                    terminals[terminal] = []
+                terminals[terminal].append(f"    Non-terminal: {non_terminal} -> Production: {production}")
 
-#         for terminal, productions in terminals.items():
-#             file.write(f"Terminal: {terminal}\n")
-#             for production in productions:
-#                 file.write(f"{production}\n")
-#             file.write("\n")
+        for terminal, productions in terminals.items():
+            file.write(f"Terminal: {terminal}\n")
+            for production in productions:
+                file.write(f"{production}\n")
+            file.write("\n")
 
 
 # save_parse_table(parse_table)

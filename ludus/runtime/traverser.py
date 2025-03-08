@@ -156,6 +156,20 @@ class ASTVisitor:
             self.visit(stmt)
         self.symbol_table.exit_scope()
 
+    def visit_GlobalFuncBody(self, node: GlobalFuncBody):
+        body=[]
+        self.symbol_table.enter_scope_func()
+        self.symbol_table.func_flag = True
+        for stmt in node.body:
+            self.visit(stmt)
+            body.append(stmt)
+        if node.params:
+            for param in node.params:
+                self.symbol_table.define(param.param, param.param_val)
+        self.symbol_table.define_func(node.name.symbol, node.params, body)
+        self.symbol_table.func_flag = False
+        self.symbol_table.exit_scope_func(node.name.symbol)
+
 ########################################
 ####### 2ND RUN OF TRAVERSER ###########
 ########################################
@@ -593,9 +607,42 @@ class SemanticAnalyzer(ASTVisitor):
         self.symbol_table.restore_scope(len(self.symbol_table.scope_stack))
         for stmt in node.statements:
             self.visit(stmt)
+        self.symbol_table.play_scope = self.symbol_table.scope_stack.copy()
+        self.symbol_table.exit_scope()  
 
     def visit_ResumeStmt(self, node: ResumeStmt):
         self.resume_flag = True 
 
     def visit_CheckpointStmt(self, node: CheckpointStmt):
         self.checkpoint_flag = True   
+
+    def visit_GlobalFuncBody(self, node: GlobalFuncBody):
+        pass
+
+    def visit_FuncCallStmt(self, node: FuncCallStmt):
+        prev_stack = [scope.copy() for scope in self.symbol_table.scope_stack]
+        prev_saved_stack = [scope.copy() for scope in self.symbol_table.saved_scopes_func]
+
+        # loop through func scope names then compare if it matches with prev_stack[1] names (global),
+        # if it does, define the one in func scope names with the value from prev_stack[1] names
+        # then update global scope
+
+        self.symbol_table.restore_scope_func(node.name.symbol)
+        info = self.symbol_table.lookup(node.name.symbol)
+        
+        global_scope = prev_stack[0]  
+        func_global_scope = self.symbol_table.scope_stack[0]  
+
+        for name, value in global_scope.items():
+            if name in func_global_scope:
+                func_global_scope[name] = value  
+        
+        for stmt in info["body"]:
+            self.visit(stmt)
+
+        for name, value in func_global_scope.items():
+            if name in global_scope:  
+                global_scope[name] = value
+        
+        self.symbol_table.scope_stack = prev_stack
+        self.symbol_table.saved_scopes_func = prev_saved_stack

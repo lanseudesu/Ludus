@@ -5,21 +5,43 @@ class SymbolTable:
     def __init__(self):
         self.scope_stack = [{}] 
         self.saved_scopes = [{}]
+        self.function_scopes = {}
+        self.play_scope = []
+        self.func_flag = False
     
     def enter_scope(self):
         new_scope = {}
         self.scope_stack.append(new_scope)
     
+    def enter_scope_func(self):
+        new_scope = {}
+        self.scope_stack.append(new_scope)
+        self.saved_scopes_func = [{}]
+    
     def exit_scope(self):
         # print("Exit Scope:")
         # for scope in reversed(self.scope_stack):
         #     print(scope)
-        if self.scope_stack:
-            current_scope = self.scope_stack.pop()
-            if current_scope in self.saved_scopes:
-                self.saved_scopes[self.saved_scopes.index(current_scope)] = current_scope.copy()
-            self.saved_scopes.insert(1, current_scope.copy())
+
+        if not self.scope_stack:
+            return
         
+        current_scope = self.scope_stack.pop()
+
+        if self.func_flag:  
+            if current_scope not in self.saved_scopes_func:
+                self.saved_scopes_func.insert(1, current_scope.copy())
+        else:  
+            if current_scope not in self.saved_scopes:
+                self.saved_scopes.insert(1, current_scope.copy())
+        
+    def exit_scope_func(self, func_name):
+        self.function_scopes[func_name] = {
+            "scope_stack": [scope.copy() for scope in self.scope_stack],
+            "saved_scopes": [scope.copy() for scope in self.saved_scopes_func]
+        }
+        self.scope_stack.pop()
+
     
     def restore_scope(self, scope_index=None):
         if len(self.saved_scopes) > 1:  
@@ -31,7 +53,14 @@ class SymbolTable:
         # print("Restore Scope:")
         # for scope in reversed(self.scope_stack):
         #     print(scope)
-    
+
+    def restore_scope_func(self, func_name):
+        if func_name not in self.function_scopes:
+            raise SemanticError(f"Function '{func_name}' has no saved scope.")
+
+        func_data = self.function_scopes[func_name]
+        self.scope_stack = [scope.copy() for scope in func_data["scope_stack"]]
+        self.saved_scopes_func = [scope.copy() for scope in func_data["saved_scopes"]]
     
     def define(self, name: str, value):
         current_scope = self.scope_stack[-1]
@@ -71,6 +100,13 @@ class SymbolTable:
             "immo": immo
         }
 
+    def define_func(self, name, params, body):
+        current_scope = self.scope_stack[-1]
+        current_scope[name] = {
+            "params": params,
+            "body": body
+        }
+    
     def lookup(self, name: str):
         for scope in reversed(self.scope_stack):
             if name in scope:
@@ -84,6 +120,6 @@ class SymbolTable:
     def __repr__(self):
         return "SymbolTable:\n" + "\n".join(
             f"{name}: {info}"
-            for scope in self.scope_stack
+            for scope in self.play_scope
             for name, info in scope.items()
         ) 

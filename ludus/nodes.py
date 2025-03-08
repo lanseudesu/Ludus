@@ -40,6 +40,11 @@ class NodeType:
     CHECKPOINT_STMT     = "CheckpointStmt"
     FOR_STMT            = "ForStmt"
     GRINDWHILE_STMT     = "GrindWhileStmt"
+    PARAMS              = "Params"
+    RECALL_STMT         = "RecallStmt"
+    GLOBAL_FUNC_NAME    = "GlobalFuncDec"
+    GLOBAL_FUNC_BODY    = "GlobalFuncBody"
+    FUNC_CALL           = "FuncCallStmt"
 
 class Stmt:
     def __init__(self, kind: str):
@@ -94,6 +99,11 @@ class Program(Stmt):
 class Expr(Stmt):
     def __init__(self, kind: str):
         super().__init__(kind)
+
+class BlockStmt(Stmt):
+    def __init__(self, statements: List[Stmt]):
+        super().__init__(NodeType.BLOCK_STMT)
+        self.statements = statements
 
 class BinaryExpr(Expr):
     def __init__(self, left: Expr, operator: str, right: Expr):
@@ -154,7 +164,7 @@ class ChainRelatExpr(Expr):
         self.expressions = expressions
 
 class PlayFunc(Stmt):
-    def __init__(self, body: 'BlockStmt'):
+    def __init__(self, body: BlockStmt):
         super().__init__(NodeType.PLAY_FUNC)
         self.name = 'play'
         self.body = body
@@ -165,11 +175,6 @@ class FunctionDec(Stmt):
         self.name = name
         self.parameters = parameters
         self.body = body
-
-class BlockStmt(Stmt):
-    def __init__(self, statements: List[Stmt]):
-        super().__init__(NodeType.BLOCK_STMT)
-        self.statements = statements
 
 class VarDec(Stmt):
     def __init__(self, name: Identifier, value: Expr, immo: bool, scope: str):
@@ -327,3 +332,34 @@ class GrindWhileStmt(Stmt):
         self.condition = condition
         self.body = body
         self.is_grind = is_grind
+
+class Params(Stmt):
+    def __init__(self, param: str, param_val=None):
+        super().__init__(NodeType.PARAMS)
+        self.param = param
+        self.param_val = param_val
+
+class RecallStmt(Stmt):
+    def __init__(self, expressions: Expr):
+        super().__init__(NodeType.RECALL_STMT)
+        self.expressions = expressions
+
+class GlobalFuncDec(Stmt):
+    def __init__(self, name: Identifier, params: List[Stmt]):
+        super().__init__(NodeType.GLOBAL_FUNC_NAME)
+        self.name = name
+        self.params = params
+
+class GlobalFuncBody(Stmt):
+    def __init__(self, name: Identifier, params: List[Stmt], body: BlockStmt, recall: RecallStmt):
+        super().__init__(NodeType.GLOBAL_FUNC_BODY)
+        self.name = name
+        self.params = params
+        self.body = body
+        self.recall = recall
+    
+class FuncCallStmt(Stmt):
+    def __init__(self, name: Identifier, args: List[Expr]):
+        super().__init__(NodeType.FUNC_CALL)
+        self.name = name
+        self.args = args

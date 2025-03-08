@@ -12,6 +12,7 @@ class Semantic:
         self.current_token_index = 0
         self.current_token = self.get_next_token()
         self.globalstruct = []
+        self.global_func = {}
         self.scope_stack = [{}]
         self.loop_flag = False
         self.flank_flag = False
@@ -34,8 +35,6 @@ class Semantic:
 
     def declare_id(self, name, type, dimensions=0):
         current_scope = self.scope_stack[-1]
-        if name in current_scope:
-            raise SemanticError(f"NameError: Identifier '{name}' is already defined in this scope.")
         current_scope[name] = {
             "type": type,
             "dimensions": dimensions
@@ -61,7 +60,7 @@ class Semantic:
         for scope in reversed(self.scope_stack):
             if name in scope:
                 return scope[name]  
-        raise SemanticError(f"Identifier '{name}' not declared")
+        raise SemanticError(f"Identifier '{name}' not declared.")
     
     def is_array(self, name):
         if self.lookup_identifier(name):
@@ -140,11 +139,16 @@ class Semantic:
                 elif self.current_token and self.current_token.token == 'build':
                     program.body.append(self.parse_globalstruct())
                 elif self.current_token and self.current_token.token == 'play':
+                    program.body.append(self.parse_play())
+                elif self.current_token and self.current_token.token == 'generate':
                     program.body.append(self.parse_func())
                 elif self.current_token and self.current_token.token == 'gameOver':
                     break
                 else:
                     raise SemanticError(f"Unexpected token found during parsing: {self.current_token.token}")
+            if self.global_func:
+                first_func = next(iter(self.global_func))  
+                raise SemanticError(f"FunctionError: Function '{first_func}' was declared but not initialized.")
             if self.globalstruct:
                 raise SemanticError(f"StructError: Global struct '{self.globalstruct[0]}' was declared but not initialized.")
         
@@ -152,7 +156,93 @@ class Semantic:
             return e
         return program
                 
-    def parse_func(self) -> PlayFunc:
+    def parse_func(self) -> Union[GlobalFuncDec, GlobalFuncBody]: 
+        self.current_token = self.get_next_token() # eat generate
+        self.skip_spaces()
+        if not self.current_token or not re.match(r'^id\d+$', self.current_token.token):
+                raise SemanticError("Expected struct name after 'generate'.")
+        func_name = Identifier(self.current_token.lexeme)
+        if self.lookup_identifier(func_name.symbol):
+            info = self.get_identifier_info(func_name.symbol)
+            raise SemanticError(f"NameError: Function name {func_name.symbol}' was "
+                                f"already declared as {info["type"]}.")
+        self.current_token = self.get_next_token() # eat id
+        self.skip_spaces()
+        self.expect("(", "Expected '(' after function name.")
+        self.skip_spaces()
+        param_names = []
+        params = []
+        while self.current_token.token != ')':
+            if not self.current_token or not re.match(r'^id\d+$', self.current_token.token):
+                raise SemanticError("Expected parameter name after inside parantheses.")
+            param_name = self.current_token.lexeme
+            if param_name in param_names:
+                raise SemanticError(f"ParamError: Duplicate parameter names: '{param_name}'")
+            param_names.append(param_name)
+            if self.lookup_identifier(param_name):
+                raise SemanticError("ParamError: Parameter's name cannot be the same with a global element.")
+            self.current_token = self.get_next_token() # eat id
+            self.skip_spaces()
+            if self.current_token.token == ':':
+                self.current_token = self.get_next_token() # eat :
+                self.skip_spaces()
+                param_val = self.parse_expr(func_name.symbol)
+                self.skip_spaces()
+                params.append(Params(param_name, param_val))
+            else:
+                params.append(Params(param_name))
+
+            if self.current_token.token == ',':
+                self.current_token = self.get_next_token() # eat ,
+                self.skip_spaces()
+
+        self.current_token = self.get_next_token() # eat )
+        self.skip_whitespace()
+
+        if self.current_token.token == '{':
+            if func_name.symbol in self.global_func:
+                existing_params = self.global_func[func_name.symbol]["params"]
+
+                if str(existing_params) != str(params):
+                    raise SemanticError(
+                        f"Parameter mismatch for function '{func_name.symbol}'. "
+                    )
+                del self.global_func[func_name.symbol]
+                return self.create_func(func_name, params)
+            raise SemanticError(f"NameError: User-defined function '{func_name.symbol}' was not declared.")
+        else:
+            if func_name.symbol in self.global_func:
+                raise SemanticError(f"NameError: User-defined function '{func_name.symbol}' was already declared.")
+            self.global_func[func_name.symbol] = {
+                "params" : params
+            }
+            return GlobalFuncDec(func_name, params)
+    
+    def create_func(self, name, params) -> GlobalFuncBody:
+        self.push_scope()
+        if params:
+            for param in params:
+                self.declare_id(param.param, "a parameter")
+        func_name = name.symbol
+        recall_stmt = None
+        self.current_token = self.get_next_token() # eat {
+        self.skip_whitespace()
+        body = []
+        self.func_flag = True
+        while self.current_token and self.current_token.token != '}':
+            stmt = self.parse_stmt(func_name)
+            body.append(stmt)
+            self.skip_whitespace()
+            if isinstance(stmt, RecallStmt):
+                recall_stmt = stmt
+                break
+        self.expect("}", "Expected '}' to close a for loop statement's body.")
+        self.skip_whitespace()
+        self.pop_scope()
+        self.func_flag = False
+        return GlobalFuncBody(name, params, body, recall_stmt)
+    
+    def parse_play(self) -> PlayFunc:
         self.skip_whitespace()
         self.push_scope()
         if not self.current_token or self.current_token.token != "play":
@@ -176,7 +266,7 @@ class Semantic:
         self.pop_scope()
         return PlayFunc(body=BlockStmt(statements=body))
     
-    def parse_stmt(self, scope, is_flank=False, is_loop=False) -> Stmt:
+    def parse_stmt(self, scope) -> Stmt:
         self.skip_whitespace()
 
         if self.current_token and re.match(r'^id\d+$', self.current_token.token):
@@ -189,6 +279,11 @@ class Semantic:
                 return self.parse_array(scope)
             elif la_token is not None and la_token.token == '.':  
                 return self.parse_inst_ass(scope)
+            elif la_token is not None and la_token.token == '(':
+                if self.current_token.lexeme in self.global_func:
+                    return self.parse_func_call(scope)
+                else:
+                    raise SemanticError(f"FunctionCallError: Function {self.current_token.lexeme} does not exist.")
             else:
                 raise SemanticError(f"Unexpected token found during parsing: {la_token.token}")
         elif self.current_token and self.current_token.token in ['hp','xp','comms','flag']:
@@ -223,9 +318,52 @@ class Semantic:
              return self.parse_grind_while(scope)
         elif self.current_token and self.current_token.token == 'while':
              return self.parse_while(scope)
+        elif self.current_token and self.current_token.token == 'recall':
+             if self.func_flag:
+                return self.parse_recall(scope)
+             else:
+                raise SemanticError(f"RecallError: Cannot use recall if not within a user-defined function body.")
         else:
             raise SemanticError(f"Unexpected token found during parsing: {self.current_token.token}")
 
+    def parse_recall(self, scope) -> RecallStmt:
+        self.current_token = self.get_next_token() # eat recall
+        self.skip_spaces()
+        stmt = []
+        while self.current_token.token != 'newline':
+            if self.current_token.token == '[':
+                self.current_token = self.get_next_token() # eat [
+                self.skip_spaces()
+                self.expect("]", "Expected '[' after ']'")
+                self.skip_spaces()
+                stmt.append([])
+            else:
+                value = self.parse_expr(scope)
+                self.skip_spaces()
+                stmt.append(value)
+            
+            if self.current_token.token == ',':
+                self.current_token = self.get_next_token() # eat ,
+                self.skip_spaces()
+
+        return RecallStmt(stmt)
+
+    def parse_func_call(self, scope) -> FuncCallStmt:
+        func_name = Identifier(self.current_token.lexeme)
+        self.current_token = self.get_next_token() # eat id
+        self.expect("(", "Expects '(' after function name.")
+        args = []
+        self.skip_spaces()
+        while self.current_token.token != ')':
+            arg = self.parse_expr(scope)
+            args.append(arg)
+            self.skip_spaces()
+            if self.current_token.token == ',':
+                self.current_token = self.get_next_token() # eat ,
+                self.skip_spaces()
+        self.current_token = self.get_next_token() # eat )
+        return FuncCallStmt(func_name, args)
+    
     ######### ARRAYS AND VARIABLES #########    
     def var_or_arr(self, scope) -> Union[VarDec, ArrayDec]:
         datatype = self.current_token.token  
@@ -276,12 +414,17 @@ class Semantic:
                 value = self.parse_expr(scope)
                 declarations = []
                 for var in var_names:
-                    if self.lookup_identifier(var.symbol):
+                    info = self.lookup_identifier(var.symbol)
+                    if info:
                         info = self.get_identifier_info(var.symbol)
-                        if info["type"] != "a variable":
+                        if info["type"] == 'a parameter':
+                            self.declare_id(var.symbol, "a variable")
+                            declarations.append(VarAssignment(var, ":", value))
+                        elif info["type"] != "a variable":
                             raise SemanticError(f"NameError: Identifier {var.symbol}' was "
                                                 f"already declared as {info["type"]}.")
-                        declarations.append(VarAssignment(var, ":", value))
+                        else:
+                            declarations.append(VarAssignment(var, ":", value))
                     else:
                         declarations.append(VarDec(var, value, False, scope))
                         self.declare_id(var.symbol, "a variable")
@@ -320,25 +463,38 @@ class Semantic:
         if len(var_names) > 1:
             declarations = []
             for var in var_names:
-                if self.lookup_identifier(var.symbol):
+                info = self.lookup_identifier(var.symbol)
+                if info:
                     info = self.get_identifier_info(var.symbol)
-                    if info["type"] != "a variable":
+                    if info["type"] == 'a parameter':
+                        self.declare_id(var.symbol, "a variable")
+                        declarations.append(VarAssignment(var, ":", values_table[var.symbol]['values']))
+                    elif info["type"] != "a variable":
                         raise SemanticError(f"NameError: Identifier {var.symbol}' was "
                                             f"already declared as {info["type"]}.")
-                    declarations.append(VarAssignment(var, ":", values_table[var.symbol]['values']))
+                    else:
+                        declarations.append(VarAssignment(var, ":", values_table[var.symbol]['values']))
                 else:
                     declarations.append(VarDec(var, values_table[var.symbol]['values'], False, scope))
                     self.declare_id(var.symbol, "a variable")
+           
             return BatchVarDec(declarations)
         else:
             var = var_names[0]
-            if self.lookup_identifier(var.symbol):
-                if info["type"] != "a variable":
+            info = self.lookup_identifier(var.symbol)
+            if info:
+                info = self.get_identifier_info(var.symbol)
+                if info["type"] == 'a parameter':
+                    self.declare_id(var.symbol, "a variable")
+                    return VarAssignment(var, ':', value)
+                elif info["type"] != "a variable":
                     raise SemanticError(f"NameError: Identifier {name}' was "
                                         f"already declared as {info["type"]}.")
-                return VarAssignment(left=var, operator=':', right=value)
-            self.declare_id(var.symbol, "a variable")
-            return VarDec(var, value, False, scope) 
+                else:
+                    return VarAssignment(var, ':', value)
+            else:
+                self.declare_id(var.symbol, "a variable")
+                return VarDec(var, value, False, scope) 
         
     def parse_var_dec(self, datatype, scope) -> Union[VarDec, BatchVarDec]:
         var_names = []
@@ -601,7 +757,7 @@ class Semantic:
                 raise SemanticError("Expected struct name after 'build'.")
         struct_name = Identifier(self.current_token.lexeme)
         self.current_token = self.get_next_token() # eat id
-        self.skip_spaces()
+        self.skip_whitespace()
         if self.current_token.token == '{':
             for item in self.globalstruct:
                 if item == struct_name.symbol:
