@@ -274,16 +274,20 @@ class Semantic:
                 self.current_token = self.get_next_token() # eat :
                 self.skip_spaces()
                 value = self.parse_expr(scope)
-
+                declarations = []
                 for var in var_names:
-                    if self.lookup_identifier(name):
-                        info = self.get_identifier_info(name)
-                        raise SemanticError(f"NameError: Identifier {name}' was "
-                                            f"already declared as {info["type"]}.")
-                    self.declare_id(var.symbol, "a variable")
+                    if self.lookup_identifier(var.symbol):
+                        info = self.get_identifier_info(var.symbol)
+                        if info["type"] != "a variable":
+                            raise SemanticError(f"NameError: Identifier {var.symbol}' was "
+                                                f"already declared as {info["type"]}.")
+                        declarations.append(VarAssignment(var, ":", value))
+                    else:
+                        declarations.append(VarDec(var, value, False, scope))
+                        self.declare_id(var.symbol, "a variable")
 
                 self.skip_spaces()
-                return BatchVarDec(declarations=[VarDec(var, value, False, scope) for var in var_names])
+                return BatchVarDec(declarations)
 
         self.current_token = self.get_next_token() # eat :
         self.skip_spaces()
@@ -314,16 +318,24 @@ class Semantic:
 
         self.skip_spaces()
         if len(var_names) > 1:
+            declarations = []
             for var in var_names:
-                if self.lookup_identifier(name):
-                    info = self.get_identifier_info(name)
-                    raise SemanticError(f"NameError: Identifier {name}' was "
-                                        f"already declared as {info["type"]}.")
-                self.declare_id(var.symbol, "a variable")
-            return BatchVarDec(declarations=[VarDec(var, values_table[var.symbol]['values'], False, scope) for var in var_names])
+                if self.lookup_identifier(var.symbol):
+                    info = self.get_identifier_info(var.symbol)
+                    if info["type"] != "a variable":
+                        raise SemanticError(f"NameError: Identifier {var.symbol}' was "
+                                            f"already declared as {info["type"]}.")
+                    declarations.append(VarAssignment(var, ":", values_table[var.symbol]['values']))
+                else:
+                    declarations.append(VarDec(var, values_table[var.symbol]['values'], False, scope))
+                    self.declare_id(var.symbol, "a variable")
+            return BatchVarDec(declarations)
         else:
             var = var_names[0]
             if self.lookup_identifier(var.symbol):
+                if info["type"] != "a variable":
+                    raise SemanticError(f"NameError: Identifier {name}' was "
+                                        f"already declared as {info["type"]}.")
                 return VarAssignment(left=var, operator=':', right=value)
             self.declare_id(var.symbol, "a variable")
             return VarDec(var, value, False, scope) 
@@ -1077,6 +1089,10 @@ class Semantic:
                 self.current_token = self.get_next_token()
                 self.skip_spaces()
                 return UnaryExpr(operator='-', operand=identifier)
+        elif tk == 'dead':
+            self.current_token = self.get_next_token()
+            self.skip_spaces()
+            return DeadLiteral(None, None)
         else:
             raise SemanticError(f"Unexpected token found during parsing: {tk}")
         

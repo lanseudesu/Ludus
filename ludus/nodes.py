@@ -180,7 +180,7 @@ class VarDec(Stmt):
         self.scope = scope
 
 class BatchVarDec(Stmt):
-    def __init__(self, declarations: list[VarDec]):
+    def __init__(self, declarations: list[Stmt]):
         super().__init__(NodeType.BATCH_VAR_DEC)
         self.declarations = declarations
 

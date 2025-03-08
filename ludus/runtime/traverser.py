@@ -94,7 +94,7 @@ class ASTVisitor:
                 "datatype": field.datatype
             }
         self.symbol_table.define(node.name.symbol, fields)
-
+    
     def visit_GlobalStructDec(self, node: GlobalStructDec):
         fields = {}
         self.symbol_table.define(node.name.symbol, fields)
@@ -242,9 +242,14 @@ class SemanticAnalyzer(ASTVisitor):
     def visit_BatchVarDec(self, node: BatchVarDec):
         declared_types = set() 
         for var_dec in node.declarations:
+            if var_dec.kind == 'VarAssignmentStmt':
+                name = var_dec.left.symbol
+            else:
+                name = var_dec.name.symbol
+            
             self.visit(var_dec)
 
-            value = self.symbol_table.lookup(var_dec.name.symbol)
+            value = self.symbol_table.lookup(name)
             value_type = value["type"]
             declared_types.add(value_type)
         
