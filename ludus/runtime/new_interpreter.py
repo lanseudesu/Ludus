@@ -20,6 +20,8 @@ def evaluate(ast_node, symbol_table):
         value = symbol_table.lookup(ast_node.symbol)
         if value is None:
             raise SemanticError(f"Variable '{ast_node.symbol}' is not defined.")
+        if not isinstance(value, dict):
+            return value
         return value["value"]
     elif ast_node.kind == 'StructInstField':
         structinst = symbol_table.lookup(ast_node.instance.symbol)

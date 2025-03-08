@@ -107,7 +107,17 @@ class SymbolTable:
             "body": body
         }
     
-    def lookup(self, name: str):
+    def lookup(self, name: str, scope_to_check=None):
+        if scope_to_check:
+            for scope in reversed(scope_to_check):
+                if name in scope:
+                    value = scope[name]
+                    if isinstance(value, Expr): 
+                        raise SemanticError(f"NameError: Identifier '{name}' is not defined before use.")
+                    return value  
+
+            raise SemanticError(f"NameError: Identifier '{name}' is not defined.")
+        
         for scope in reversed(self.scope_stack):
             if name in scope:
                 value = scope[name]

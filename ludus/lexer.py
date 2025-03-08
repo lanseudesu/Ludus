@@ -1191,6 +1191,7 @@ class Lexer:
                 while self.current_char is not None:
                     if self.current_char == '\n':
                         self.process_token(cur_ln, cur_col, comments, TT_COMMENTS1, '\n', errors, tokens) 
+                        self.current_char = self.prev_char
                         break
                     comments += self.current_char
                     self.advance()

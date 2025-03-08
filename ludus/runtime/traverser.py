@@ -163,9 +163,6 @@ class ASTVisitor:
         for stmt in node.body:
             self.visit(stmt)
             body.append(stmt)
-        if node.params:
-            for param in node.params:
-                self.symbol_table.define(param.param, param.param_val)
         self.symbol_table.define_func(node.name.symbol, node.params, body)
         self.symbol_table.func_flag = False
         self.symbol_table.exit_scope_func(node.name.symbol)
@@ -343,8 +340,6 @@ class SemanticAnalyzer(ASTVisitor):
         self.symbol_table.define_arr(lhs_name, lhs_dim, lhs_data, lhs_immo, lhs_type)
     
     def visit_ArrayRedec(self, node: ArrayRedec):
-        declared_types = []
-        values = []
         arr_name = node.name
         arr_info = self.symbol_table.lookup(arr_name)
         arr_immo = arr_info["immo"]
@@ -352,27 +347,43 @@ class SemanticAnalyzer(ASTVisitor):
         arr_dimensions = arr_info["dimensions"]
         if arr_immo==True:
             raise SemanticError(f"RedeclerationError: '{arr_name}' is declared as an immutable array.")
-        if len(node.dimensions) != len(arr_dimensions):
-            raise SemanticError(f"RedeclerationError: Incorrect number of dimensions.")
-        if len(node.dimensions) == 1:
-            for val in node.elements:
-                value = evaluate(val, self.symbol_table)
-                val_type = self.TYPE_MAP.get(type(value), str(type(value)))
-                declared_types.append(val_type)
-                values.append(value)
+
+        if isinstance(node.elements, str):
+            rhs_arr = self.symbol_table.lookup(node.elements)
+            if rhs_arr["elements"] is None:
+                raise SemanticError(f"ArrayRedeclarationError: Array {rhs_arr} is a dead array.")
+            values = rhs_arr["elements"]
+            if len(arr_dimensions) != len(rhs_arr["dimensions"]):
+                raise SemanticError(f"RedeclerationError: Incorrect number of dimensions.")
+            if rhs_arr["type"] != arr_type:
+                raise SemanticError(f"TypeError: Array '{arr_name}' expects '{arr_type}' datatype. Found '{rhs_arr["type"]}'")
+            self.symbol_table.define_arr(arr_name, rhs_arr["dimensions"], values, node.immo, arr_type)
         else:
-            for row in node.elements:
-                inner_values = []
-                for val in row:
+            declared_types = []
+            values = []
+
+            if len(node.dimensions) != len(arr_dimensions):
+                raise SemanticError(f"RedeclerationError: Incorrect number of dimensions.")
+        
+            if len(node.dimensions) == 1:
+                for val in node.elements:
                     value = evaluate(val, self.symbol_table)
                     val_type = self.TYPE_MAP.get(type(value), str(type(value)))
                     declared_types.append(val_type)
-                    inner_values.append(value)
-                values.append(inner_values)
+                    values.append(value)
+            else:
+                for row in node.elements:
+                    inner_values = []
+                    for val in row:
+                        value = evaluate(val, self.symbol_table)
+                        val_type = self.TYPE_MAP.get(type(value), str(type(value)))
+                        declared_types.append(val_type)
+                        inner_values.append(value)
+                    values.append(inner_values)
 
-        for elem_type in declared_types:
-            if elem_type != arr_type:
-                raise SemanticError(f"TypeError: Array '{arr_name}' expects '{arr_type}' datatype. Found '{elem_type}'")
+            for elem_type in declared_types:
+                if elem_type != arr_type:
+                    raise SemanticError(f"TypeError: Array '{arr_name}' expects '{arr_type}' datatype. Found '{elem_type}'")
         self.symbol_table.define_arr(arr_name, node.dimensions, values, node.immo, arr_type)
     
     def visit_StructInst(self, node: StructInst):
@@ -623,13 +634,41 @@ class SemanticAnalyzer(ASTVisitor):
         prev_stack = [scope.copy() for scope in self.symbol_table.scope_stack]
         prev_saved_stack = [scope.copy() for scope in self.symbol_table.saved_scopes_func]
 
-        # loop through func scope names then compare if it matches with prev_stack[1] names (global),
-        # if it does, define the one in func scope names with the value from prev_stack[1] names
-        # then update global scope
-
         self.symbol_table.restore_scope_func(node.name.symbol)
+
         info = self.symbol_table.lookup(node.name.symbol)
-        
+        if not info:
+            raise SemanticError(f"Function '{node.name.symbol}' is not defined.")
+
+        param_scope = {}
+        params = info["params"]
+        args = node.args
+       
+        if params:
+            if len(args) > len(params):
+                raise SemanticError(f"Function '{node.name.symbol}' expects {len(params)} arguments, got {len(args)}.")
+            
+            for i, param in enumerate(params):
+                if args and i < len(args):  # Argument provided
+                    arg = args[i]
+
+                    if hasattr(arg, "symbol"):
+                        arg_value = self.symbol_table.lookup(arg.symbol, prev_stack)
+                        if arg_value is None:
+                            raise SemanticError(f"Argument '{arg.symbol}' is not defined.")
+                    else:  # It's a literal
+                        arg_value = evaluate(arg, self.symbol_table)
+                else:  # No argument, use default value if available
+                    if param.param_val is not None:
+                        arg_value = evaluate(param.param_val, self.symbol_table)
+                    else:
+                        raise SemanticError(f"Missing argument for parameter '{param.param}' and no default value provided.")
+            
+                param_scope[param.param] = arg_value
+            
+        if param_scope:
+            self.symbol_table.scope_stack.append(param_scope)
+            
         global_scope = prev_stack[0]  
         func_global_scope = self.symbol_table.scope_stack[0]  
 

@@ -16,6 +16,7 @@ class Semantic:
         self.scope_stack = [{}]
         self.loop_flag = False
         self.flank_flag = False
+        self.func_flag = False
     
     TYPE_MAP = {
         int: "hp",
@@ -570,7 +571,7 @@ class Semantic:
             self.skip_spaces()
             self.expect("]", "Expected ']' to close array dimension declaration.")
             self.skip_spaces()
-        
+        print(self.current_token.token )
         if self.current_token and self.current_token.token == 'newline':
             default_value = {
                 'hp': HpLiteral(0),
@@ -592,6 +593,7 @@ class Semantic:
                 else:
                     values = [default_value] * dimensions[0]
 
+            self.skip_whitespace()
             self.declare_id(name, "an array", len(dimensions))
             return ArrayDec(arr_name, dimensions, values, False, scope, datatype)
         elif self.current_token and self.current_token.token == ':':
@@ -745,6 +747,23 @@ class Semantic:
         if self.current_token and self.current_token.token == '[':
             values = self.parse_array_values(dimensions, scope)
             return ArrayRedec(name, dimensions, values, False, scope)
+        elif re.match(r'^id\d+$', self.current_token.token):
+            rhs_name = self.current_token.lexeme
+            print(rhs_name)
+            self.current_token = self.get_next_token() # eat id
+            self.skip_whitespace()
+            info = self.lookup_identifier(rhs_name)
+            if info:
+                print("yo")
+                info = self.get_identifier_info(rhs_name)
+                if info["type"] == 'a parameter':
+                    self.declare_id(name, "an array")
+                    return ArrayRedec(name, dimensions, rhs_name, False, scope)
+                elif info["type"] != "an array":
+                    raise SemanticError(f"RedeclarationError: Array '{name}' is being redeclared with"
+                                        " non-array element.")
+                else:
+                    return ArrayRedec(name, dimensions, rhs_name, False, scope)
         else:
             raise SemanticError(f"RedeclarationError: Array '{name}' is being redeclared with"
                                 " non-array element.")
@@ -1193,8 +1212,14 @@ class Semantic:
                 
                 identifier = ArrElement(identifier, dimensions)
             else:
-                if not self.lookup_id_type(identifier.symbol, "a variable"):
-                    raise SemanticError(f"NameError: Variable '{identifier.symbol}' does not exist.")
+                if self.func_flag:
+                    if self.lookup_identifier(identifier.symbol):
+                        info = self.get_identifier_info(identifier.symbol)
+                        if info["type"] != "a parameter" and info["type"] != "a variable":
+                            raise SemanticError(f"NameError: Identifier '{identifier.symbol}' is already declared as {info["type"]}")
+                else:
+                    if not self.lookup_id_type(identifier.symbol, "a variable"):
+                        raise SemanticError(f"NameError: Variable '{identifier.symbol}' does not exist.")
             return identifier
         elif tk == 'hp_ltr':
             literal = HpLiteral(value=self.current_token.lexeme)
