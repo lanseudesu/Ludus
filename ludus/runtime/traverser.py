@@ -649,16 +649,16 @@ class SemanticAnalyzer(ASTVisitor):
                 raise SemanticError(f"Function '{node.name.symbol}' expects {len(params)} arguments, got {len(args)}.")
             
             for i, param in enumerate(params):
-                if args and i < len(args):  # Argument provided
+                if args and i < len(args):  
                     arg = args[i]
 
                     if hasattr(arg, "symbol"):
                         arg_value = self.symbol_table.lookup(arg.symbol, prev_stack)
                         if arg_value is None:
                             raise SemanticError(f"Argument '{arg.symbol}' is not defined.")
-                    else:  # It's a literal
+                    else:  
                         arg_value = evaluate(arg, self.symbol_table)
-                else:  # No argument, use default value if available
+                else:  
                     if param.param_val is not None:
                         arg_value = evaluate(param.param_val, self.symbol_table)
                     else:

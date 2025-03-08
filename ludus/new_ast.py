@@ -17,6 +17,7 @@ class Semantic:
         self.loop_flag = False
         self.flank_flag = False
         self.func_flag = False
+        self.func_call_flag = False
     
     TYPE_MAP = {
         int: "hp",
@@ -355,8 +356,9 @@ class Semantic:
         self.expect("(", "Expects '(' after function name.")
         args = []
         self.skip_spaces()
+
         while self.current_token.token != ')':
-            arg = self.parse_expr(scope)
+            arg = self.parse_primary_expr(scope, True)
             args.append(arg)
             self.skip_spaces()
             if self.current_token.token == ',':
@@ -1169,7 +1171,7 @@ class Semantic:
 
         return left 
 
-    def parse_primary_expr(self, scope) -> Expr:
+    def parse_primary_expr(self, scope, is_func_call=False) -> Expr:
         self.skip_spaces()
         if not self.current_token:
             raise SemanticError("Unexpected end of input during parsing!")
@@ -1212,14 +1214,19 @@ class Semantic:
                 
                 identifier = ArrElement(identifier, dimensions)
             else:
+                if not self.lookup_identifier(identifier.symbol):
+                    raise SemanticError(f"NameError: Variable '{identifier.symbol}' does not exist.")
+                
+                info = self.get_identifier_info(identifier.symbol)
+                allowed_types = {"a variable"}
                 if self.func_flag:
-                    if self.lookup_identifier(identifier.symbol):
-                        info = self.get_identifier_info(identifier.symbol)
-                        if info["type"] != "a parameter" and info["type"] != "a variable":
-                            raise SemanticError(f"NameError: Identifier '{identifier.symbol}' is already declared as {info["type"]}")
-                else:
-                    if not self.lookup_id_type(identifier.symbol, "a variable"):
-                        raise SemanticError(f"NameError: Variable '{identifier.symbol}' does not exist.")
+                    allowed_types.add("a parameter")
+                if is_func_call:
+                    allowed_types.add("an array")
+
+                if info["type"] not in allowed_types:
+                    raise SemanticError(f"NameError: Identifier '{identifier.symbol}' is already declared as {info['type']}")
+
             return identifier
         elif tk == 'hp_ltr':
             literal = HpLiteral(value=self.current_token.lexeme)
@@ -1507,17 +1514,17 @@ def check(fn, text):
     if isinstance(result, SemanticError):
         return str(result), {}
     
-    try:
-        visitor = ASTVisitor()
-        visitor.visit(result)
+    # try:
+    #     visitor = ASTVisitor()
+    #     visitor.visit(result)
 
-        analyzer = SemanticAnalyzer(visitor.symbol_table)
-        analyzer.visit(result)
-        table = analyzer.symbol_table
-    except SemanticError as e:
-        return str(e), {}
+    #     analyzer = SemanticAnalyzer(visitor.symbol_table)
+    #     analyzer.visit(result)
+    #     table = analyzer.symbol_table
+    # except SemanticError as e:
+    #     return str(e), {}
 
-    return result, table
+    # return result, table
 
     return result, {}
         

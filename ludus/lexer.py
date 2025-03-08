@@ -194,7 +194,6 @@ class Lexer:
             self.advance()
         else:
             if token == TT_COMMENTS2 or token == TT_COMMENTS1:
-                self.advance()
                 pass
             else:
                 if token == TT_COMMS:
@@ -1191,7 +1190,6 @@ class Lexer:
                 while self.current_char is not None:
                     if self.current_char == '\n':
                         self.process_token(cur_ln, cur_col, comments, TT_COMMENTS1, '\n', errors, tokens) 
-                        self.current_char = self.prev_char
                         break
                     comments += self.current_char
                     self.advance()
