@@ -163,9 +163,10 @@ class ASTVisitor:
         for stmt in node.body:
             self.visit(stmt)
             body.append(stmt)
-        self.symbol_table.define_func(node.name.symbol, node.params, body)
         self.symbol_table.func_flag = False
+        self.symbol_table.define_func(node.name.symbol, node.params, body, node.recall_stmts)
         self.symbol_table.exit_scope_func(node.name.symbol)
+        self.symbol_table.define_func(node.name.symbol, node.params, body, node.recall_stmts)
 
 ########################################
 ####### 2ND RUN OF TRAVERSER ###########
@@ -676,7 +677,8 @@ class SemanticAnalyzer(ASTVisitor):
     def visit_GlobalFuncBody(self, node: GlobalFuncBody):
         pass
 
-    def visit_FuncCallStmt(self, node: FuncCallStmt):
+    def visit_FuncCallStmt(self, node: FuncCallStmt, being_assigned = False):
+        result = None
         prev_stack = [scope.copy() for scope in self.symbol_table.scope_stack]
         prev_saved_stack = [scope.copy() for scope in self.symbol_table.saved_scopes]
 
@@ -701,7 +703,7 @@ class SemanticAnalyzer(ASTVisitor):
             for i, param in enumerate(params):
                 if i < len(args):  
                     arg_value = args[i]
-                    print(arg_value)
+                    print(f"arg value raw -> {arg_value}")
                     if arg_value is None:
                         raise SemanticError(f"Argument for parameter '{param.param}' is not defined.")   
                 elif param.param_val is not None:
@@ -722,7 +724,10 @@ class SemanticAnalyzer(ASTVisitor):
                 func_global_scope[name] = value  
         
         for stmt in info["body"]:
-            self.visit(stmt)
+            if isinstance(stmt, RecallStmt):
+                result = self.visit(stmt)
+            else:
+                self.visit(stmt)
 
         for name, value in func_global_scope.items():
             if name in global_scope:  
@@ -731,9 +736,21 @@ class SemanticAnalyzer(ASTVisitor):
         self.symbol_table.scope_stack = prev_stack.copy()
         self.symbol_table.saved_scopes = prev_saved_stack.copy()
 
+        if result and not being_assigned:
+                raise SemanticError(f"Function '{node.name.symbol}' has a recall value but is not being assigned anywhere.")
+        elif result:
+            return result
+
     def visit_ArrVar(self, node: ArrayOrVar):
         info = self.symbol_table.lookup(node.lhs_name)
         if not isinstance(info, dict):
             self.visit(node.statements[0])
         else:
             self.visit(node.statements[1])
+
+    def visit_RecallStmt(self, node: RecallStmt):
+        result = []
+        for expr in node.expressions:
+            result.append(evaluate(expr, self.symbol_table))
+
+        return result[0]

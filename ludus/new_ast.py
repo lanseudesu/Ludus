@@ -18,6 +18,7 @@ class Semantic:
         self.flank_flag = False
         self.func_flag = False
         self.func_call_flag = False
+        self.recall_stmts = []
     
     TYPE_MAP = {
         int: "hp",
@@ -176,8 +177,10 @@ class Semantic:
         func_name = Identifier(self.current_token.lexeme)
         if self.lookup_identifier(func_name.symbol):
             info = self.get_identifier_info(func_name.symbol)
-            raise SemanticError(f"NameError: Function name {func_name.symbol}' was "
-                                f"already declared as {info["type"]}.")
+            if info["type"] != "a function":
+                raise SemanticError(f"NameError: Function name '{func_name.symbol}' was "
+                                    f"already declared as {info["type"]}.")
+        self.declare_id(func_name.symbol, "a function")
         self.current_token = self.get_next_token() # eat id
         self.skip_spaces()
         self.expect("(", "Expected '(' after function name.")
@@ -236,23 +239,22 @@ class Semantic:
             for param in params:
                 self.declare_id(param.param, "a parameter")
         func_name = name.symbol
-        recall_stmt = None
         self.current_token = self.get_next_token() # eat {
         self.skip_whitespace()
         body = []
         self.func_flag = True
+        self.recall_stmts = []
         while self.current_token and self.current_token.token != '}':
             stmt = self.parse_stmt(func_name)
             body.append(stmt)
             self.skip_whitespace()
             if isinstance(stmt, RecallStmt):
-                recall_stmt = stmt
-                break
-        self.expect("}", "Expected '}' to close a for loop statement's body.")
+                self.recall_stmts.append(stmt)
+        self.expect("}", "Expected '}' to close a function's body.")
         self.skip_whitespace()
         self.pop_scope()
         self.func_flag = False
-        return GlobalFuncBody(name, params, body, recall_stmt)
+        return GlobalFuncBody(name, params, body, self.recall_stmts)
     
     def parse_play(self) -> PlayFunc:
         self.skip_whitespace()
@@ -362,6 +364,8 @@ class Semantic:
 
     def parse_func_call(self, scope) -> FuncCallStmt:
         func_name = Identifier(self.current_token.lexeme)
+        if not self.lookup_id_type(func_name.symbol, "a function"):
+            raise SemanticError(f"NameError: Function '{func_name.symbol}' does not exist.")
         self.current_token = self.get_next_token() # eat id
         self.expect("(", "Expects '(' after function name.")
         args = []
@@ -1285,6 +1289,26 @@ class Semantic:
                         self.skip_spaces()
                 
                 identifier = ArrElement(identifier, dimensions)
+            elif self.current_token.token == '(':
+                if not self.lookup_id_type(identifier.symbol, "a function"):
+                    raise SemanticError(f"NameError: Function '{identifier.symbol}' does not exist.")
+                self.current_token = self.get_next_token() # eat ( 
+                self.skip_spaces()
+                args = []       
+                while self.current_token.token != ')':
+                    la_token = self.look_ahead()
+                    if la_token.token == ',' or la_token.token == ')':
+                        arg = self.parse_primary_expr(scope, True)
+                    else:
+                        arg = self.parse_expr(scope)
+                    args.append(arg)
+                    self.skip_spaces()
+                    if self.current_token.token == ',':
+                        self.current_token = self.get_next_token() # eat ,
+                        self.skip_spaces()
+                self.current_token = self.get_next_token() # eat )
+                self.skip_spaces()
+                identifier = FuncCallStmt(identifier, args)
             else:
                 if not self.lookup_identifier(identifier.symbol):
                     raise SemanticError(f"NameError: Variable '{identifier.symbol}' does not exist.")
@@ -1372,7 +1396,8 @@ class Semantic:
             stmt = self.parse_stmt(scope)
             then_branch.append(stmt)
             self.skip_whitespace()
-
+            if isinstance(stmt, RecallStmt):
+                self.recall_stmts.append(stmt)
         self.expect("}", "Expected '}' to close an if statement's body.")
         self.skip_whitespace()
         self.pop_scope()
@@ -1392,6 +1417,8 @@ class Semantic:
                 stmt = self.parse_stmt(scope)
                 elif_body.append(stmt)
                 self.skip_whitespace()
+                if isinstance(stmt, RecallStmt):
+                    self.recall_stmts.append(stmt)
 
             self.expect("}", "Expected '}' to close an elif statement's body.")
             self.skip_whitespace()
@@ -1410,6 +1437,9 @@ class Semantic:
                 stmt = self.parse_stmt(scope)
                 else_branch.append(stmt)
                 self.skip_whitespace()
+                if isinstance(stmt, RecallStmt):
+                    self.recall_stmts.append(stmt)
+
             self.pop_scope()
             self.expect("}", "Expected '}' to close an else statement's body.")
             self.skip_whitespace()
@@ -1451,6 +1481,8 @@ class Semantic:
                 stmt = self.parse_stmt(scope, True)
                 choice_body.append(stmt)
                 self.skip_whitespace()
+                if isinstance(stmt, RecallStmt):
+                    self.recall_stmts.append(stmt)
             self.pop_scope()
             choices.append(ChoiceStmts(values, choice_body))
         
@@ -1469,6 +1501,8 @@ class Semantic:
             stmt = self.parse_stmt(scope)
             backup_body.append(stmt)
             self.skip_whitespace()
+            if isinstance(stmt, RecallStmt):
+                self.recall_stmts.append(stmt)
         self.pop_scope()
 
         self.expect("}", "Expected '}' to close a flank statement's body.")
@@ -1520,6 +1554,8 @@ class Semantic:
             stmt = self.parse_stmt(scope)
             body.append(stmt)
             self.skip_whitespace()
+            if isinstance(stmt, RecallStmt):
+                self.recall_stmts.append(stmt)
         self.expect("}", "Expected '}' to close a for loop statement's body.")
         self.skip_whitespace()
         self.pop_scope()
@@ -1540,6 +1576,8 @@ class Semantic:
             stmt = self.parse_stmt(scope)
             body.append(stmt)
             self.skip_whitespace()
+            if isinstance(stmt, RecallStmt):
+                self.recall_stmts.append(stmt)
         self.expect("}", "Expected '}' to close a while loop statement's body.")
         self.skip_whitespace()
         self.pop_scope()
@@ -1558,6 +1596,8 @@ class Semantic:
             stmt = self.parse_stmt(scope)
             body.append(stmt)
             self.skip_whitespace()
+            if isinstance(stmt, RecallStmt):
+                self.recall_stmts.append(stmt)
         self.expect("}", "Expected '}' to close a grind while loop statement's body.")
         self.skip_whitespace()
         self.pop_scope()

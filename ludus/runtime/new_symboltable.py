@@ -100,11 +100,12 @@ class SymbolTable:
             "immo": immo
         }
 
-    def define_func(self, name, params, body):
+    def define_func(self, name, params, body, recall_stmts):
         current_scope = self.scope_stack[-1]
         current_scope[name] = {
             "params": params,
-            "body": body
+            "body": body,
+            "recall": recall_stmts
         }
     
     def lookup(self, name: str, scope_to_check=None):

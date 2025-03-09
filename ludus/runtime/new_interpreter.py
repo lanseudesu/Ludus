@@ -69,7 +69,19 @@ def evaluate(ast_node, symbol_table):
             return not operand
         else:
             raise SemanticError(f"Unknown unary operator: {ast_node.operator}")
+    elif ast_node.kind == "FuncCallStmt":
+        value = symbol_table.lookup(ast_node.name.symbol)
+        if value["recall"] == []:
+            raise SemanticError(f"Function '{ast_node.name.symbol}' does not return a value.")
+        from .traverser import SemanticAnalyzer  # if needed
+        traverser = SemanticAnalyzer(symbol_table)
+        result = traverser.visit_FuncCallStmt(ast_node, True)
     
+        return result
+        
+
+
+
 def eval_binary_expr(binop, symbol_table):
     lhs = evaluate(binop.left, symbol_table)
     rhs = evaluate(binop.right, symbol_table)

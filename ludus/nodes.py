@@ -341,7 +341,7 @@ class Params(Stmt):
         self.param_val = param_val
 
 class RecallStmt(Stmt):
-    def __init__(self, expressions: Expr):
+    def __init__(self, expressions: List[Expr]):
         super().__init__(NodeType.RECALL_STMT)
         self.expressions = expressions
 
@@ -352,12 +352,12 @@ class GlobalFuncDec(Stmt):
         self.params = params
 
 class GlobalFuncBody(Stmt):
-    def __init__(self, name: Identifier, params: List[Stmt], body: BlockStmt, recall: RecallStmt):
+    def __init__(self, name: Identifier, params: List[Stmt], body: BlockStmt, recall_stmts: List[RecallStmt]):
         super().__init__(NodeType.GLOBAL_FUNC_BODY)
         self.name = name
         self.params = params
         self.body = body
-        self.recall = recall
+        self.recall_stmts = recall_stmts
     
 class FuncCallStmt(Stmt):
     def __init__(self, name: Identifier, args: List[Expr]):
