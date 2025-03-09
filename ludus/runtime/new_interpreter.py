@@ -22,9 +22,14 @@ def evaluate(ast_node, symbol_table):
             raise SemanticError(f"Variable '{ast_node.symbol}' is not defined.")
         if not isinstance(value, dict):
             return value
-        return value["value"]
+        if "value" in value:
+            return value["value"]
+        elif "elements" in value or "fields" in value:
+            return value
     elif ast_node.kind == 'StructInstField':
         structinst = symbol_table.lookup(ast_node.instance.symbol)
+        if not isinstance(structinst, dict) or "fields" not in structinst:
+            raise SemanticError(f"TypeError: '{ast_node.instance.symbol}' is not a struct instance.")
         for fld in structinst["fields"]:
             if fld["name"] == ast_node.field.symbol:
                 return fld["value"]
@@ -34,6 +39,8 @@ def evaluate(ast_node, symbol_table):
     elif ast_node.kind == 'ArrayElement':
         arr_name = ast_node.left.symbol
         arr = symbol_table.lookup(arr_name)
+        if not isinstance(arr, dict) or "dimensions" not in arr:
+            raise SemanticError(f"TypeError: '{arr_name}' is not an array.")
         if len(ast_node.index) != len(arr["dimensions"]):
             raise SemanticError(f"ArrayIndexError: Incorrect number of dimensions for {arr_name}.")
         target = arr["elements"]
@@ -66,6 +73,9 @@ def evaluate(ast_node, symbol_table):
 def eval_binary_expr(binop, symbol_table):
     lhs = evaluate(binop.left, symbol_table)
     rhs = evaluate(binop.right, symbol_table)
+    
+    if isinstance(rhs, dict) or isinstance(lhs, dict):
+        raise SemanticError("TypeError: Trying to use a list object in an expression.")
 
     if binop.operator in ['AND', 'OR', '&&', '||']:
         if isinstance(lhs, bool) and isinstance(rhs, bool):

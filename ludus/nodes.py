@@ -45,6 +45,7 @@ class NodeType:
     GLOBAL_FUNC_NAME    = "GlobalFuncDec"
     GLOBAL_FUNC_BODY    = "GlobalFuncBody"
     FUNC_CALL           = "FuncCallStmt"
+    ARR_VAR             = "ArrVar"
 
 class Stmt:
     def __init__(self, kind: str):
@@ -363,3 +364,9 @@ class FuncCallStmt(Stmt):
         super().__init__(NodeType.FUNC_CALL)
         self.name = name
         self.args = args
+
+class ArrayOrVar(Stmt):
+    def __init__(self, lhs_name: str, statements: List[Stmt]):
+        super().__init__(NodeType.ARR_VAR)
+        self.lhs_name = lhs_name
+        self.statements = statements

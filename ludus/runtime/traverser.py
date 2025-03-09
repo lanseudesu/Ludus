@@ -176,7 +176,8 @@ class SemanticAnalyzer(ASTVisitor):
         int: "hp",
         float: "xp",
         str: "comms",
-        bool: "flag"
+        bool: "flag",
+        dict: "array"
     }
 
     def __init__(self, symbol_table):
@@ -188,6 +189,11 @@ class SemanticAnalyzer(ASTVisitor):
 
     def visit_VarDec(self, node: VarDec):
         value = evaluate(node.value, self.symbol_table)
+        if isinstance(value, dict):
+            if "dimensions" in value:
+                raise SemanticError(f"DeclarationError: Trying to declare an array to a variable: '{node.value.symbol}'.")
+            if "parent" in value:
+                raise SemanticError(f"DeclarationError: Trying to declare a struct instance to a variable: '{node.value.symbol}'.")
         if isinstance(node.value, DeadLiteral):
             val_type = node.value.datatype
         elif isinstance(node.value, Identifier) and value == None:
@@ -199,10 +205,25 @@ class SemanticAnalyzer(ASTVisitor):
 
     def visit_VarAssignmentStmt(self, node: VarAssignment):
         value = self.symbol_table.lookup(node.left.symbol)
+        
+        if not isinstance(value, dict):
+            datatype = self.TYPE_MAP.get(type(value), str(type(value)))
+            self.symbol_table.define_var(node.left.symbol, value, datatype, False)
+            value = self.symbol_table.lookup(node.left.symbol)
+
+        if "value" not in value:
+            raise SemanticError(f"AssignmentError: Mismatched types — trying to assign a single value from '{node.right.symbol}' to a list object.")
+        
         value_type = value["type"]
         if value["immo"]==True:
             raise SemanticError(f"AssignmentError: '{node.left.symbol}' is declared as an immutable variable.")
         new_val = evaluate(node.right, self.symbol_table)
+
+        if isinstance(new_val, dict):
+            if "dimensions" in new_val:
+                raise SemanticError(f"DeclarationError: Trying to assign an array to a variable: '{node.right.symbol}'.")
+            if "parent" in new_val:
+                raise SemanticError(f"DeclarationError: Trying to assign a struct instance to a variable: '{node.right.symbol}'.")
 
         if node.operator in ['+=', '-=', '*=', '/=', '%=']:
             if (isinstance(new_val, str) and isinstance(value["value"], bool)) or (isinstance(new_val, bool) and isinstance(value["value"], str)):
@@ -270,6 +291,8 @@ class SemanticAnalyzer(ASTVisitor):
     def visit_ArrayAssignmentStmt(self, node: ArrAssignment):
         lhs_name = node.left.left.symbol
         lhs_info = self.symbol_table.lookup(lhs_name)
+        if not isinstance(lhs_info, dict) or "dimensions" not in lhs_info:
+            raise SemanticError(f"TypeError: '{lhs_name}' is not an array.")
         lhs_immo = lhs_info["immo"]
         lhs_type = lhs_info["type"]
         if lhs_immo==True:
@@ -294,6 +317,11 @@ class SemanticAnalyzer(ASTVisitor):
             raise SemanticError(f"ArrayIndexError: Index {final_idx} out of bounds for final dimension of array '{lhs_name}'.")
 
         value = evaluate(node.right, self.symbol_table)
+        
+        if isinstance(value, dict):
+            raise SemanticError(f"AssignmentError: Mismatchd types — Trying to assign a list object from '{node.right.symbol}' to an array element.")
+            
+        
         if node.operator in ['+=', '-=', '*=', '/=', '%=']:
             if (isinstance(value, str) and isinstance(target[final_idx], bool)) or (isinstance(value, bool) and isinstance(target[final_idx], str)):
                 raise SemanticError("TypeError: Cannot mix comms and flags in an expression.")
@@ -342,6 +370,8 @@ class SemanticAnalyzer(ASTVisitor):
     def visit_ArrayRedec(self, node: ArrayRedec):
         arr_name = node.name
         arr_info = self.symbol_table.lookup(arr_name)
+        if not isinstance(arr_info, dict) or "dimensions" not in arr_info:
+            raise SemanticError(f"TypeError: '{arr_name}' is not an array.")
         arr_immo = arr_info["immo"]
         arr_type = arr_info["type"]
         arr_dimensions = arr_info["dimensions"]
@@ -350,6 +380,9 @@ class SemanticAnalyzer(ASTVisitor):
 
         if isinstance(node.elements, str):
             rhs_arr = self.symbol_table.lookup(node.elements)
+            if not isinstance(rhs_arr, dict) or "elements" not in rhs_arr:
+                raise SemanticError(f"TypeError: '{node.elements}' is not an array.")
+            
             if rhs_arr["elements"] is None:
                 raise SemanticError(f"ArrayRedeclarationError: Array {rhs_arr} is a dead array.")
             values = rhs_arr["elements"]
@@ -389,7 +422,7 @@ class SemanticAnalyzer(ASTVisitor):
     def visit_StructInst(self, node: StructInst):
         structinst = self.symbol_table.lookup(node.name.symbol)
         structparent = self.symbol_table.lookup(structinst["parent"])
-
+        
         fields = structinst["fields"]
         field_names = list(structparent.keys())
         struct_fields = []
@@ -426,6 +459,8 @@ class SemanticAnalyzer(ASTVisitor):
 
     def visit_InstAssignmentStmt(self, node: InstAssignment):
         structinst = self.symbol_table.lookup(node.left.instance.symbol)
+        if not isinstance(structinst, dict) or "fields" not in structinst:
+            raise SemanticError(f"TypeError: '{node.left.instance.symbol}' is not a struct instance.")
         if structinst["immo"] == True:
             raise SemanticError(f"InstanceAssignmentError: '{node.left.instance.symbol}' is declared as an immutable struct instance.")
         field_names = [field["name"] for field in structinst["fields"]]
@@ -436,6 +471,8 @@ class SemanticAnalyzer(ASTVisitor):
                                 f"in struct instance '{node.left.instance.symbol}'.")
         
         new_val = evaluate(node.right, self.symbol_table)
+        if isinstance(new_val, dict):
+            raise SemanticError(f"AssignmentError: Mismatched types — trying to assign a list object from '{node.right.symbol}' to a instance field.")
 
         for field in structinst["fields"]:
             if new_field == field["name"]:
@@ -554,6 +591,15 @@ class SemanticAnalyzer(ASTVisitor):
     def visit_ForStmt(self, node: ForStmt):
         val_name = node.initialization.left
         value = self.symbol_table.lookup(val_name)
+
+        if not isinstance(value, dict):
+            datatype = self.TYPE_MAP.get(type(value), str(type(value)))
+            self.symbol_table.define_var(val_name, value, datatype, False)
+            value = self.symbol_table.lookup(node.left.symbol)
+
+        if "value" not in value:
+            raise SemanticError(f"AssignmentError: Mismatched types — trying to assign a single value from '{node.right.symbol}' to a list object.")
+
         value_type = value["type"]
         if value["immo"]==True:
             raise SemanticError(f"TypeError: '{val_name}' is declared as an immutable variable.")
@@ -632,37 +678,36 @@ class SemanticAnalyzer(ASTVisitor):
 
     def visit_FuncCallStmt(self, node: FuncCallStmt):
         prev_stack = [scope.copy() for scope in self.symbol_table.scope_stack]
-        prev_saved_stack = [scope.copy() for scope in self.symbol_table.saved_scopes_func]
+        prev_saved_stack = [scope.copy() for scope in self.symbol_table.saved_scopes]
 
+        args = []
+        if node.args:
+            for arg in node.args:
+                args.append(evaluate(arg, self.symbol_table))
+        
         self.symbol_table.restore_scope_func(node.name.symbol)
-
+       
         info = self.symbol_table.lookup(node.name.symbol)
         if not info:
             raise SemanticError(f"Function '{node.name.symbol}' is not defined.")
 
         param_scope = {}
         params = info["params"]
-        args = node.args
        
         if params:
             if len(args) > len(params):
                 raise SemanticError(f"Function '{node.name.symbol}' expects {len(params)} arguments, got {len(args)}.")
             
             for i, param in enumerate(params):
-                if args and i < len(args):  
-                    arg = args[i]
-
-                    if hasattr(arg, "symbol"):
-                        arg_value = self.symbol_table.lookup(arg.symbol, prev_stack)
-                        if arg_value is None:
-                            raise SemanticError(f"Argument '{arg.symbol}' is not defined.")
-                    else:  
-                        arg_value = evaluate(arg, self.symbol_table)
-                else:  
-                    if param.param_val is not None:
-                        arg_value = evaluate(param.param_val, self.symbol_table)
-                    else:
-                        raise SemanticError(f"Missing argument for parameter '{param.param}' and no default value provided.")
+                if i < len(args):  
+                    arg_value = args[i]
+                    print(arg_value)
+                    if arg_value is None:
+                        raise SemanticError(f"Argument for parameter '{param.param}' is not defined.")   
+                elif param.param_val is not None:
+                    arg_value = evaluate(param.param_val, self.symbol_table)
+                else:
+                    raise SemanticError(f"Missing argument for parameter '{param.param}' and no default value provided.")
             
                 param_scope[param.param] = arg_value
             
@@ -683,5 +728,12 @@ class SemanticAnalyzer(ASTVisitor):
             if name in global_scope:  
                 global_scope[name] = value
         
-        self.symbol_table.scope_stack = prev_stack
-        self.symbol_table.saved_scopes_func = prev_saved_stack
+        self.symbol_table.scope_stack = prev_stack.copy()
+        self.symbol_table.saved_scopes = prev_saved_stack.copy()
+
+    def visit_ArrVar(self, node: ArrayOrVar):
+        info = self.symbol_table.lookup(node.lhs_name)
+        if not isinstance(info, dict):
+            self.visit(node.statements[0])
+        else:
+            self.visit(node.statements[1])

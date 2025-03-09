@@ -32,8 +32,8 @@ class SymbolTable:
             if current_scope not in self.saved_scopes_func:
                 self.saved_scopes_func.insert(1, current_scope.copy())
         else:  
-            if current_scope not in self.saved_scopes:
-                self.saved_scopes.insert(1, current_scope.copy())
+            self.saved_scopes.insert(1, current_scope.copy())
+            #print(f"exit scope -> {self.saved_scopes}")
         
     def exit_scope_func(self, func_name):
         self.function_scopes[func_name] = {
@@ -60,7 +60,7 @@ class SymbolTable:
 
         func_data = self.function_scopes[func_name]
         self.scope_stack = [scope.copy() for scope in func_data["scope_stack"]]
-        self.saved_scopes_func = [scope.copy() for scope in func_data["saved_scopes"]]
+        self.saved_scopes = [scope.copy() for scope in func_data["saved_scopes"]]
     
     def define(self, name: str, value):
         current_scope = self.scope_stack[-1]
