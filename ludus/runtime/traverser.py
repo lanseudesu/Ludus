@@ -929,6 +929,91 @@ class SemanticAnalyzer(ASTVisitor):
     def visit_ShootStmt(self, node: ShootStmt):
         if node.element.kind in ['Load', 'LoadNum']:
             raise SemanticError("ArgsError: load and loadNum function are an invalid argument for shoot and shootNxt function.")
-        
         element = evaluate(node.element, self.symbol_table)
+        if not isinstance(element, dict):
+            element=element
+        elif element is None:
+            element = 'dead'
+        elif "value" in element:
+            element = element["value"]
+        elif "elements" in element or "fields" in element:
+            raise SemanticError("ArgsError: Cannot use a list object as a shoot argument.")
+        
         print(f"shoot element -> {element}")
+
+    def visit_JoinStmt(self, node: JoinStmt):
+        arr_name = node.arr_name.symbol
+        arr_info = self.symbol_table.lookup(arr_name)
+        if not isinstance(arr_info, dict) or "dimensions" not in arr_info:
+            raise SemanticError(f"TypeError: '{arr_name}' is not an array.")
+        arr_immo = arr_info["immo"]
+        arr_type = arr_info["type"]
+        arr_dimensions = arr_info["dimensions"]
+        arr_elements = arr_info["elements"]
+
+        if arr_elements == None:
+            raise SemanticError(f"TypeError: Array '{arr_name}' is a dead array and must be defined with a value first.")
+
+        if arr_immo==True:
+            raise SemanticError(f"JoinError: Array '{arr_name}' is declared as an immutable array.")
+        
+        if node.dimensions != len(arr_dimensions):
+            raise SemanticError(f"RedeclerationError: Incorrect number of dimensions.")
+        
+        row_index = None
+        if node.row_index:
+            row_index = evaluate(node.row_index, self.symbol_table)
+
+        evaluated_values = []
+        for value in node.values:
+            if isinstance(value, list):
+                evaluated_row = []
+                for v in value:
+                    elem = self._evaluate_element(v, arr_name, arr_type)
+                    evaluated_row.append(elem)
+                evaluated_values.append(evaluated_row)
+            else:
+                elem = self._evaluate_element(value, arr_name, arr_type)
+                evaluated_values.append(elem)
+        
+        if len(arr_dimensions) == 1:  
+            if any(isinstance(val, list) for val in evaluated_values):
+                raise SemanticError("JoinError: Cannot append nested lists to a 1D array.")
+            arr_elements.extend(evaluated_values)
+
+        elif len(arr_dimensions) == 2:  # 2D array
+            if row_index is not None:
+                if row_index >= len(arr_elements) or row_index < 0:
+                    raise SemanticError(f"IndexError: Row index {row_index} out of bounds.")
+                if not isinstance(arr_elements[row_index], list):
+                    raise SemanticError(f"JoinError: Target row is not a list.")
+                arr_elements[row_index].extend(evaluated_values)
+            else:
+                if any(not isinstance(val, list) for val in evaluated_values):
+                    raise SemanticError("JoinError: Appending non-row values to a 2D array.")
+                arr_elements.extend(evaluated_values)
+        
+        self.symbol_table.define_arr(arr_name, arr_dimensions, arr_elements, arr_immo, arr_type)
+            
+    def _evaluate_element(self, value, arr_name, arr_type):
+        if value.kind == 'FuncCallStmt':
+            return_values = evaluate(value, self.symbol_table)
+            if len(return_values) > 1:
+                raise SemanticError(f"RecallError: Function '{value.name.symbol}' recalls more than one value.")
+            elem = return_values[0]
+            if elem == []:
+                raise SemanticError(f"TypeError: Trying to append an array to an array element.")
+        elif value.kind in {'LoadNum', 'Load'}:
+            raise SemanticError(f"LoadError: loadNum and load function cannot be used to append an element to an array.")
+        else:
+            elem = evaluate(value, self.symbol_table)
+
+        if isinstance(elem, dict):
+            raise SemanticError(f"TypeError: Trying to append a list object to an array.")
+
+        elem_type = self.TYPE_MAP.get(type(elem), str(type(elem)))
+        if arr_type != elem_type:
+            raise SemanticError(f"TypeError: Array '{arr_name}' expects '{arr_type}' but got '{elem_type}'.")
+
+        return elem
+

@@ -51,6 +51,8 @@ class NodeType:
     SHOOT               = "ShootStmt"
     XP_FORMAT           = "XpFormatting"
     FORM_COMMS_LITERAL  = "FormCommsLiteral"
+    WIPE                = "WipeStmt"
+    JOIN_STMT           = "JoinStmt"
 
 class Stmt:
     def __init__(self, kind: str):
@@ -405,3 +407,15 @@ class XpFormatting(Expr):
         super().__init__(NodeType.XP_FORMAT)
         self.lhs = lhs
         self.digits = digits
+
+class WipeStmt(Stmt):
+    def __init__(self):
+        super().__init__(NodeType.WIPE)
+
+class JoinStmt(Stmt):
+    def __init__(self, arr_name, values, dimensions, row_index=None):
+        super().__init__(NodeType.JOIN_STMT)
+        self.arr_name = arr_name
+        self.values = values
+        self.dimensions = dimensions
+        self.row_index = row_index

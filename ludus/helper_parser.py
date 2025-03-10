@@ -62,7 +62,7 @@ class Helper:
     def parse_expr(self, scope) -> Expr:
         self.skip_spaces()
         expr = self.parse_or_expr(scope)
-        if self.current_token and self.current_token.token != ')':
+        if self.current_token and self.current_token.token not in [')', ']']:
             raise SemanticError(f"Unexpected token found during parsing: {self.current_token.token}")
         print(expr)
         return expr

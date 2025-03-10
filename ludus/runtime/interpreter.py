@@ -120,6 +120,28 @@ def evaluate(ast_node, symbol_table):
         evaluated_values = []
         for expr in ast_node.expressions:
             result = evaluate(expr, symbol_table)  
+            print(f"res {result}")
+            if not isinstance(result, dict):
+                if result is None:
+                    result = 'dead'
+                elif result == True:
+                    result = 'true'
+                elif result == False:
+                    result = 'false'
+                else:
+                    result=result  
+            elif "value" in result:
+                result = result["value"]
+                if result is None:
+                    result = 'dead'
+                elif result == True:
+                    result = 'true'
+                elif result == False:
+                    result = 'false'
+                else:
+                    result=result  
+            elif "elements" in result or "fields" in result:
+                raise SemanticError("TypeError: Cannot format a list object within a comms literal.")
             evaluated_values.append(str(result))  
 
         formatted = ast_node.value

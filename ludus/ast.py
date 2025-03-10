@@ -124,6 +124,22 @@ class Semantic:
 
         return None  
     
+    def find_token_in_line(self, target_token):
+        la_token_index = self.current_token_index
+
+        while la_token_index < len(self.tokens):
+            la_token = self.tokens[la_token_index]
+
+            if la_token.token == target_token:
+                return la_token
+
+            if la_token.token in {'newline', 'EOF'}:  
+                break
+
+            la_token_index += 1
+
+        return None  
+    
     def produce_ast(self) -> Program:
         program = Program(body=[])
         try:
@@ -351,6 +367,13 @@ class Semantic:
         ###### built-in funcs ######
         elif self.current_token and self.current_token.token in ['shoot', 'shootNxt']:
             return self.parse_shoot(scope)
+        elif self.current_token and self.current_token.token == 'wipe':
+            self.current_token = self.get_next_token()
+            self.expect("(", "Expects a parentheses after wipe keyword.")
+            self.skip_spaces()
+            self.expect(")", "Expects a closing parentheses.")
+            self.skip_whitespace()
+            return WipeStmt()
         else:
             raise SemanticError(f"4 Unexpected token found during parsing: {self.current_token.token}")
 
@@ -687,8 +710,12 @@ class Semantic:
         self.current_token = self.get_next_token() # eat id
         self.skip_spaces()
         arr_exist = self.is_array(name) or self.is_params(name)
+        if arr_exist:
+            join_token = self.find_token_in_line('join')
+            if join_token:
+                return self.parse_join2d(scope, arr_name)
+
         dimensions = []
-        
         while self.current_token and self.current_token.token == '[':
             self.current_token = self.get_next_token() #eat [
             self.skip_spaces
@@ -792,8 +819,6 @@ class Semantic:
         inner_values = []
         while self.current_token and self.current_token.token != ']':
             value = self.parse_expr(scope)
-            if value.kind not in ["HpLiteral", "XpLiteral", "CommsLiteral", "FlagLiteral"]:
-                raise SemanticError("Arrays can only be initialied with literal values.")
             inner_values.append(value)
             self.skip_spaces()
             if self.current_token.token == ',':
@@ -969,10 +994,17 @@ class Semantic:
 
     def parse_inst_ass(self, scope) -> InstAssignment:
         struct_inst_name = Identifier(self.current_token.lexeme)
+        
+        join_token = self.find_token_in_line('join')
+        if join_token:
+            return self.parse_join(scope)
+        
         if self.lookup_identifier(struct_inst_name.symbol):
             info = self.get_identifier_info(struct_inst_name.symbol)
             if info["type"] != "a struct instance" and info["type"] != "a parameter":
                 raise SemanticError(f"NameError: Struct instance '{struct_inst_name.symbol}' is not defined.")
+        else:
+            raise SemanticError(f"NameError: Struct instance '{struct_inst_name.symbol}' is not defined.")
         self.current_token = self.get_next_token() # eat id
         if self.current_token.token != '.':
             raise SemanticError("Expected '.' after struct instance name.")
@@ -1431,7 +1463,7 @@ class Semantic:
                     helper = Helper(tokens, self.scope_stack, self.func_flag)
                     result = helper.parse_expr(scope)
                     if isinstance(result, SemanticError):
-                        raise SemanticError(f"Error in placeholder {i}: {str(result)}")
+                        raise SemanticError(f"Error in placeholder {i+1}: {str(result)}")
                     results.append(result)
                 literal = FormattedCommsLiteral(value, placeholders, results)
                 self.current_token = self.get_next_token()
@@ -1755,6 +1787,91 @@ class Semantic:
         self.expect(")", "Expected closing parentheses in function call.")
         self.skip_whitespace()
         return ShootStmt(value, is_Next)
+
+    def parse_join(self, scope) -> JoinStmt:
+        array_name = Identifier(self.current_token.lexeme)
+        if self.lookup_identifier(array_name.symbol):
+            info = self.get_identifier_info(array_name.symbol)
+            if info["type"] != "an array" and info["type"] != "a parameter":
+                raise SemanticError(f"NameError: Array '{array_name.symbol}' is not defined.")
+        else:
+            raise SemanticError(f"NameError: Array '{array_name.symbol}' is not defined.")
+        if info["type"] == "a parameter":
+            dimensions = None
+        elif info["type"] == "an array":
+            dimensions = self.get_dimensions(array_name.symbol)
+        self.current_token = self.get_next_token() # eat id
+        self.expect(".", "Expects '.' in join function call.")
+        self.expect("join", "Expects 'join' keyword in join function call.")
+        self.expect("(", "Expects '(' after join keyword in join function call.")
+        self.skip_spaces()
+        if self.current_token.token == '[':
+            if dimensions is None or dimensions == 2:
+                pass
+            else:
+                raise SemanticError("DimensionsError: Trying to append a new row to a one dimensional array.")
+            self.current_token = self.get_next_token() # eat [
+            self.skip_spaces()
+            values = [self.parse_inner_arr_values(scope)]
+            self.expect("]", "Expects ']' to close array row values.")
+            self.skip_spaces()
+            self.expect(")", "Expects ')' after to close join arguments.")
+            self.skip_whitespace()
+            return JoinStmt(array_name, values, 2)
+        else:
+            if dimensions is None or dimensions == 1:
+                pass
+            else:
+                raise SemanticError("DimensionsError: Trying to append new elements incorrectly to a two dimensional array, must specify row index first.")
+            if self.current_token.token == ')':
+                raise SemanticError("JoinError: Elements inside parentheses must not be empty.")
+            values = []
+            while self.current_token and self.current_token.token != ')':
+                value = self.parse_expr(scope)
+                values.append(value)
+                self.skip_spaces()
+                if self.current_token.token == ',':
+                    self.current_token = self.get_next_token()  # eat ,
+                    self.skip_spaces()
+            self.expect(")", "Expects ')' after to close join arguments.")
+            self.skip_whitespace()
+            return JoinStmt(array_name, values, 1)
+
+    def parse_join2d(self, scope, arr_name) -> JoinStmt:
+        self.expect("[", "Expects '[' to specify row index of two-dimensional array.")
+        self.skip_spaces()
+        if self.current_token.token == ']':
+            raise SemanticError("JoinError: Index must not be blank for join function call.")
+        dim = self.parse_expr(scope)
+        self.skip_spaces()
+        self.expect("]", "Expected ']' to close array dimension declaration.")
+        self.skip_spaces()
+        info = self.get_identifier_info(arr_name.symbol)
+        if info["type"] == "an array":
+            dimensions = self.get_dimensions(arr_name.symbol)
+        else:
+            dimensions = None
+        if dimensions is None or dimensions == 2:
+            pass
+        else:
+            raise SemanticError("DimensionsError: Trying to append elements in a specific row to a one dimensional array, must be two-dimensional.")
+        self.expect(".", "Expects '.' in join function call.")
+        self.expect("join", "Expects 'join' keyword in join function call.")
+        self.expect("(", "Expects '(' after join keyword in join function call.")
+        self.skip_spaces()
+        if self.current_token.token == ')':
+            raise SemanticError("JoinError: Elements inside parentheses must not be empty.")
+        values = []
+        while self.current_token and self.current_token.token != ')':
+            value = self.parse_expr(scope)
+            values.append(value)
+            self.skip_spaces()
+            if self.current_token.token == ',':
+                self.current_token = self.get_next_token()  # eat ,
+                self.skip_spaces()
+        self.expect(")", "Expects ')' after to close join arguments.")
+        self.skip_whitespace()
+        return JoinStmt(arr_name, values, 2, dim)
 
 def check(fn, text):
     lexer = Lexer(fn, text)
