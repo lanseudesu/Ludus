@@ -1391,6 +1391,26 @@ class Semantic:
             self.current_token = self.get_next_token()
             self.skip_spaces()
             return DeadLiteral(None, None)
+        elif tk == 'load' or tk == 'loadNum':
+            prompt_msg = None
+            self.current_token = self.get_next_token() # eat load
+            if self.current_token.token != '(':
+                raise SemanticError("LoadError: Missing parentheses.")
+            self.current_token = self.get_next_token() # eat (
+            self.skip_spaces()
+            if self.current_token.token == 'comms_ltr':
+                value = re.sub(r'^"(.*)"$', r'\1', self.current_token.lexeme)
+                prompt_msg = CommsLiteral(value)
+                self.current_token = self.get_next_token() # eat comms
+                self.skip_spaces()
+            if self.current_token.token != ')':
+                raise SemanticError("LoadError: Missing parentheses.")
+            self.current_token = self.get_next_token() # eat )
+            self.skip_spaces()
+            if tk == 'load':
+                return Load(prompt_msg)
+            else:
+                return LoadNum(prompt_msg)
         else:
             raise SemanticError(f"6 Unexpected token found during parsing: {tk}")
         

@@ -46,6 +46,8 @@ class NodeType:
     GLOBAL_FUNC_BODY    = "GlobalFuncBody"
     FUNC_CALL           = "FuncCallStmt"
     ARR_VAR             = "ArrVar"
+    LOAD_STR            = "Load"
+    LOAD_NUM            = "LoadNum"
 
 class Stmt:
     def __init__(self, kind: str):
@@ -371,3 +373,13 @@ class ArrayOrVar(Stmt):
         super().__init__(NodeType.ARR_VAR)
         self.lhs_name = lhs_name
         self.statements = statements
+
+class Load(Expr):
+    def __init__(self, prompt_msg: str):
+        super().__init__(NodeType.LOAD_STR)
+        self.prompt_msg = prompt_msg
+
+class LoadNum(Expr):
+    def __init__(self, prompt_msg: str):
+        super().__init__(NodeType.LOAD_NUM)
+        self.prompt_msg = prompt_msg

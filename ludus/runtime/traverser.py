@@ -1,8 +1,10 @@
 from ludus.nodes import GrindWhileStmt
 from ..nodes import *
 from .new_symboltable import SymbolTable
-from .new_interpreter import evaluate
+from .new_interpreter import evaluate, UnresolvedNumber
 from ..error import SemanticError
+
+
 
 class ASTVisitor:
     TYPE_MAP = {
@@ -204,12 +206,14 @@ class SemanticAnalyzer(ASTVisitor):
         else:    
             value = evaluate(node.value, self.symbol_table)
             
-        if isinstance(value, dict):
+        if isinstance(value, UnresolvedNumber):
+            val_type = "hp or xp" 
+        elif isinstance(value, dict):
             if "dimensions" in value:
                 raise SemanticError(f"DeclarationError: Trying to declare an array to a variable: '{node.name.symbol}'.")
             if "parent" in value:
                 raise SemanticError(f"DeclarationError: Trying to declare a struct instance to a variable: '{node.name.symbol}'.")
-        if isinstance(node.value, DeadLiteral):
+        elif isinstance(node.value, DeadLiteral):
             val_type = node.value.datatype
         elif isinstance(node.value, Identifier) and value == None:
             id_val = self.symbol_table.lookup(node.value.symbol)
@@ -228,15 +232,17 @@ class SemanticAnalyzer(ASTVisitor):
             new_val = return_values[0]
             if new_val == []:
                 raise SemanticError(f"DeclarationError: Trying to assign an array to a variable: '{node.left.symbol}'.")
+        elif node.right.kind in {'LoadNum', 'Load'} and node.operator != ':':
+            raise SemanticError(f"LoadError: loadNum and load function cannot be used in compound assignment statements.")
         else:
             new_val = evaluate(node.right, self.symbol_table)
-        
+ 
         if isinstance(new_val, dict):
             if "dimensions" in new_val:
                 raise SemanticError(f"DeclarationError: Trying to assign an array to a variable: '{node.left.symbol}'.")
             if "parent" in new_val:
                 raise SemanticError(f"DeclarationError: Trying to assign a struct instance to a variable: '{node.left.symbol}'.")
-        
+
         value = self.symbol_table.lookup(node.left.symbol)
         
         if not isinstance(value, dict):
@@ -245,13 +251,39 @@ class SemanticAnalyzer(ASTVisitor):
             value = self.symbol_table.lookup(node.left.symbol)
 
         if "value" not in value:
-            raise SemanticError(f"AssignmentError: Mismatched types — trying to assign a single value from to a list object: '{node.left.symbol}'.")
+            raise SemanticError(f"AssignmentError: Mismatched types — trying to assign a single value to a list object: '{node.left.symbol}'.")
         
         value_type = value["type"]
         if value["immo"]==True:
             raise SemanticError(f"AssignmentError: '{node.left.symbol}' is declared as an immutable variable.")   
-
+        
+        if isinstance(new_val, UnresolvedNumber) and not isinstance(value["value"], UnresolvedNumber):
+            if value_type == "hp":
+                new_val = value["value"]
+            elif value_type == "xp":
+                new_val = value["value"]
+            else:
+                raise SemanticError("TypeError: Using loadNum function to assign a non-numeric variable.")
+        elif isinstance(new_val, UnresolvedNumber) and isinstance(value["value"], UnresolvedNumber):
+            return
+        
         if node.operator in ['+=', '-=', '*=', '/=', '%=']:
+            if isinstance(value["value"], UnresolvedNumber):
+                if isinstance(new_val, int):
+                    value["value"] = 0
+                    value["type"] = "hp"
+                    value_type = value["type"]
+                elif isinstance(new_val, float):
+                    value["value"] = 0.0
+                    value["type"] = "xp"
+                    value_type = value["type"]
+                elif isinstance(new_val, bool):
+                    value["type"] = "hp"
+                    value["value"] = 0
+                    value_type = value["type"]
+                else:
+                    raise SemanticError("TypeError: Cannot mix comms and numeric type in an expression.")
+            
             if (isinstance(new_val, str) and isinstance(value["value"], bool)) or (isinstance(new_val, bool) and isinstance(value["value"], str)):
                 raise SemanticError("TypeError: Cannot mix comms and flags in an expression.")
 
@@ -288,12 +320,17 @@ class SemanticAnalyzer(ASTVisitor):
             else:
                 new_val = operations[node.operator](value["value"], new_val)  
         else:
-            new_val = new_val
+            new_val_type = self.TYPE_MAP.get(type(new_val), str(type(new_val)))
+            if value_type == "hp or xp":
+                if new_val_type in ["hp", "xp"]:
+                    value_type = new_val_type
+                else:
+                    raise SemanticError(f"TypeError: Invalid type for variable '{node.left.symbol}'. Expected numeric but got '{new_val_type}'.")
 
         new_val_type = self.TYPE_MAP.get(type(new_val), str(type(new_val)))
         
         if new_val_type != value_type:
-            raise SemanticError(f"TypeMismatchError: Type mismatch for variable '{node.left.symbol}'. Expected '{value_type}', got '{new_val_type}'.")
+            raise SemanticError(f"TypeError: Type mismatch for variable '{node.left.symbol}'. Expected '{value_type}', got '{new_val_type}'.")
         
         self.symbol_table.define_var(node.left.symbol, new_val, new_val_type, value["immo"])
 
@@ -301,12 +338,13 @@ class SemanticAnalyzer(ASTVisitor):
         declared_types = set()
 
         for var_dec in node.declarations:
-            if var_dec.kind == 'VarAssignmentStmt':
-                name = var_dec.left.symbol
-                kind = var_dec.right
-            else:
-                name = var_dec.name.symbol
-                kind = var_dec.value
+            kind = var_dec.right.kind if var_dec.kind == 'VarAssignmentStmt' else var_dec.value.kind
+            if kind in ['Load', 'LoadNum']:
+                raise SemanticError("LoadError: Cannot use loadNum and load function in batch declaration.")
+
+        for var_dec in node.declarations:
+            name = var_dec.left.symbol if var_dec.kind == 'VarAssignmentStmt' else var_dec.name.symbol
+            kind = var_dec.right if var_dec.kind == 'VarAssignmentStmt' else var_dec.value
 
             if kind.kind == 'FuncCallStmt':
                 return_values = evaluate(kind, self.symbol_table)
@@ -394,7 +432,15 @@ class SemanticAnalyzer(ASTVisitor):
         
         if isinstance(value, dict):
             raise SemanticError(f"AssignmentError: Mismatched types — Trying to assign a list object to an array element.")
-            
+
+        if isinstance (value, UnresolvedNumber):
+            if lhs_type == "hp":
+                value = 0
+            elif lhs_type == "xp":
+                value = 0.0    
+            else:
+                raise SemanticError("TypeError: Using loadNum function to assign a non-numeric array element.")
+
         if node.operator in ['+=', '-=', '*=', '/=', '%=']:
             if (isinstance(value, str) and isinstance(target[final_idx], bool)) or (isinstance(value, bool) and isinstance(target[final_idx], str)):
                 raise SemanticError("TypeError: Cannot mix comms and flags in an expression.")
@@ -571,6 +617,13 @@ class SemanticAnalyzer(ASTVisitor):
         for field in structinst["fields"]:
             if new_field == field["name"]:
                 old_type = self.TYPE_MAP.get(type(field["value"]), None)
+                if isinstance(new_val, UnresolvedNumber):
+                    if old_type == "hp":
+                        new_val = 0
+                    elif old_type == "xp":
+                        new_val = 0.0
+                    else:
+                        raise SemanticError("TypeError: Using loadNum function to assign a non-numeric instance field.")
                 if node.operator in ['+=', '-=', '*=', '/=', '%=']:
                     if (isinstance(new_val, str) and isinstance(field["value"], bool)) or (isinstance(new_val, bool) and isinstance(field["value"], str)):
                         raise SemanticError("TypeError: Cannot mix comms and flags in an expression.")
@@ -791,10 +844,11 @@ class SemanticAnalyzer(ASTVisitor):
         self.recall_values = []
         prev_stack = [scope.copy() for scope in self.symbol_table.scope_stack]
         prev_saved_stack = [scope.copy() for scope in self.symbol_table.saved_scopes]
-
         args = []
         if node.args:
             for arg in node.args:
+                if arg.kind in ['Load', 'LoadNum']:
+                    raise SemanticError("LoadError: Cannot use load and loadNum function as a function argument.")
                 args.append(evaluate(arg, self.symbol_table))
         
         self.symbol_table.restore_scope_func(node.name.symbol)
@@ -805,6 +859,9 @@ class SemanticAnalyzer(ASTVisitor):
 
         param_scope = {}
         params = info["params"]
+
+        if node.args and not params:
+            raise SemanticError(f"Function '{node.name.symbol}' does not take any arguments, but {len(node.args)} were provided.")
        
         if params:
             if len(args) > len(params):
@@ -813,9 +870,7 @@ class SemanticAnalyzer(ASTVisitor):
             for i, param in enumerate(params):
                 if i < len(args):  
                     arg_value = args[i]
-                    print(f"arg value raw -> {arg_value}")
-                    if arg_value is None:
-                        raise SemanticError(f"Argument for parameter '{param.param}' is not defined.")   
+                    print(f"arg value raw -> {arg_value}") 
                 elif param.param_val is not None:
                     arg_value = evaluate(param.param_val, self.symbol_table)
                 else:

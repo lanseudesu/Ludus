@@ -3,6 +3,13 @@ from ..error import SemanticError
 
 symbol_table = SymbolTable()
 
+class UnresolvedNumber:
+    def __init__(self, possible_types=("int", "float")):
+        self.possible_types = possible_types
+    
+    def __repr__(self):
+        return "0 or 0.0"
+
 def evaluate(ast_node, symbol_table):
     if ast_node.kind == "HpLiteral":
         return ast_node.value
@@ -18,8 +25,9 @@ def evaluate(ast_node, symbol_table):
         return eval_chain_relat_expr(ast_node, symbol_table)
     elif ast_node.kind == "Identifier":
         value = symbol_table.lookup(ast_node.symbol)
+        print(value)
         if value is None:
-            raise SemanticError(f"Variable '{ast_node.symbol}' is not defined.")
+            return value
         if not isinstance(value, dict):
             return value
         if "value" in value:
@@ -81,13 +89,25 @@ def evaluate(ast_node, symbol_table):
         result = traverser.visit_FuncCallStmt(ast_node, True)
         # print(f"yoyo {result}")
         return result
-        
-
-
+    elif ast_node.kind == "Load":
+        return ""
+    elif ast_node.kind == "LoadNum":
+        return UnresolvedNumber()
 
 def eval_binary_expr(binop, symbol_table):
+    if binop.left.kind in {'Load', 'LoadNum'} or binop.right.kind in {'Load', 'LoadNum'}:
+        raise SemanticError("LoadError: Cannot use load or loadNum function in a binary expression.")
     lhs = evaluate(binop.left, symbol_table)
     rhs = evaluate(binop.right, symbol_table)
+
+    if isinstance(rhs, list):
+        if len(rhs) > 1:
+            raise SemanticError("TypeError: Cannot use list in an expression.")
+        rhs = rhs[0]
+    if isinstance(lhs, list):
+        if len(lhs) > 1:
+            raise SemanticError("TypeError: Cannot use list in an expression.")
+        lhs = lhs[0]
     
     if isinstance(rhs, dict) or isinstance(lhs, dict):
         raise SemanticError("TypeError: Trying to use a list object in an expression.")
@@ -122,10 +142,7 @@ def eval_concat(lhs, rhs, operator):
 def eval_numeric_binary_expr(lhs, rhs, operator):
     # print(f"lhs -> {lhs}")
     # print(f"rhs -> {rhs}")
-    if isinstance(rhs, list):
-        if len(rhs) > 1:
-            raise SemanticError("TypeError: Cannot use list in an expression.")
-        rhs = rhs[0]
+    
     try:
         if operator == "^":
             result = lhs ** rhs
@@ -153,7 +170,11 @@ def eval_numeric_binary_expr(lhs, rhs, operator):
                 raise SemanticError("ModuloError: Only hp values can be used in modulo operation.")
         return result
     except TypeError as e:
-        raise SemanticError(str(e))
+        error_message = str(e)
+        if "unsupported operand type(s)" in error_message and "'NoneType'" in error_message:
+            raise SemanticError("TypeError: 'dead' types cannot be used as an operand.")
+        else:
+            raise SemanticError(error_message)
     
 def eval_relational_expr(lhs, rhs, operator):
     if operator == '<':
