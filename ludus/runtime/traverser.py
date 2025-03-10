@@ -1,7 +1,7 @@
 from ludus.nodes import GrindWhileStmt
 from ..nodes import *
-from .new_symboltable import SymbolTable
-from .new_interpreter import evaluate, UnresolvedNumber
+from .symbol_table import SymbolTable
+from .interpreter import evaluate, UnresolvedNumber
 from ..error import SemanticError
 
 

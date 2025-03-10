@@ -1,5 +1,5 @@
 import eel
-from ludus import lexer, parser, new_ast
+from ludus import ast, lexer, parser
 
 eel.init('web')  
 
@@ -31,7 +31,7 @@ def syntax_analyzer(input_text):
 
 @eel.expose
 def semantic_analyzer(input_text):
-    result, table = new_ast.check("yo", input_text)
+    result, table = ast.check("yo", input_text)
     output = str(result) + "\n" + str(table) 
 
     eel.updateTerminal(output)
