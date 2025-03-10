@@ -40,6 +40,9 @@ class Parser:
             if re.match(r'^id\d+$', self.current_token.token):
                 self.current_token.token= 'id'
 
+            if re.match(r'^comms_ltr', self.current_token.token):
+                self.current_token.token= 'comms_ltr'
+
             # print(f"Current Top = {self.top}")
             # print(f"Current Token = {self.current_token.token}")
 

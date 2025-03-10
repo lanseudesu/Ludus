@@ -926,3 +926,9 @@ class SemanticAnalyzer(ASTVisitor):
                 self.recall_values.append(evaluate(expr, self.symbol_table))
         self.recall_flag = True
 
+    def visit_ShootStmt(self, node: ShootStmt):
+        if node.element.kind in ['Load', 'LoadNum']:
+            raise SemanticError("ArgsError: load and loadNum function are an invalid argument for shoot and shootNxt function.")
+        
+        element = evaluate(node.element, self.symbol_table)
+        print(f"shoot element -> {element}")

@@ -38,7 +38,7 @@ delim3  = ALPHANUM + '_ ."-!('
 delim4  = ALPHANUM + '_ .-!('
 delim5  = ALPHANUM + whitespace + '_."-(!['
 delim6  = ALPHA + '_('
-delim7 = ' })'
+delim7 = '})' + whitespace + arith_op + relat_op # add sa dox
 
 valid_lhs = ALPHANUM + '_)]'
 
@@ -97,7 +97,7 @@ TT_COMMENTS1  = 'single-line comment'
 TT_COMMENTS2  = 'multi-line comment'
 TT_NEWLINE	  = 'newline'
 TT_SPACE	  = 'space'
-TT_XP_FORMATTING = 'xp formatting'
+TT_XP_FORMATTING = 'xp_formatting'
 
 TT_EOF = 'EOF'
 
@@ -1161,7 +1161,7 @@ class Lexer:
                     if self.current_char is not None and self.current_char == 'f':
                         result = '.' + result + 'f'
                         self.advance()
-                        self.process_token(cur_ln, cur_col, result, TT_XP_FORMATTING, ')', errors, tokens)
+                        self.process_token(cur_ln, cur_col, result, TT_XP_FORMATTING, delim7, errors, tokens)
                     else:
                         result, error = self.make_number('.' + result)
 
@@ -1422,15 +1422,13 @@ class Lexer:
         escape_characters = {
             'n': '\n',   
             't': '\t',   
-            '{': '{',    
-            '}': '}',    
             '"': '"',    
             '\\': '\\' 
         }
 
         while self.current_char is not None:
             if escape_character:
-                if self.current_char in 'nt{}"\\':
+                if self.current_char in 'nt"\\':
                     resolved_char = escape_characters.get(self.current_char, self.current_char)
                     string += resolved_char 
                     escape_character = False    

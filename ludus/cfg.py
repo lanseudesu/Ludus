@@ -127,9 +127,10 @@ cfg = {
     
     # khar 123-179
     "<factor>": [["id", "<id_rhs_tail>"], ["<value>"], ["-", "<negative>"],
-                 ["<builtin_w_ret>"], ["!", "<not_tail>"], ["(", "<expr>", ")"]],
+                 ["<builtin_w_ret>"], ["!", "<not_tail>"], ["(", "<expr>", ")", "<xp_format>"]],
     "<id_rhs_tail>": [["(", "<args>", ")"], [".", "<rhs_dot_tail>"], 
-                     ["[", "<index>", "]", "<rhs_bracket_tail>"], ["λ"]],
+                     ["[", "<index>", "]", "<rhs_bracket_tail>"], ["xp_formatting"], ["λ"]],
+    "<xp_format>": [["xp_formatting"], ["λ"]],               
     "<args>": [["<expr>", "<args_recur>"], ["λ"]],
     "<args_recur>": [[",", "<expr>", "<args_recur>"], ["λ"]],
     "<rhs_dot_tail>": [["id"], ["seek", "(", "<seek_tail>", ")"], ["drop", "(", "<index>", ")"]],

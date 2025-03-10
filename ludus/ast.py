@@ -5,6 +5,8 @@ import re
 from typing import Union
 from .runtime.traverser import ASTVisitor, SemanticAnalyzer
 from .error import SemanticError
+from ludus import lexer
+from .helper_parser import Helper
 
 class Semantic:
     def __init__(self, tokens):
@@ -283,6 +285,7 @@ class Semantic:
     def parse_stmt(self, scope) -> Stmt:
         self.skip_whitespace()
 
+        ###### decs and ass ######
         if self.current_token and re.match(r'^id\d+$', self.current_token.token):
             la_token = self.look_ahead()
             if la_token is not None and la_token.token in [':',',']:  
@@ -308,10 +311,14 @@ class Semantic:
             return self.parse_struct_inst(scope)
         elif self.current_token and self.current_token.token == 'immo':
             return self.parse_immo(scope)
+        
+        ###### conditionals ######
         elif self.current_token and self.current_token.token == 'if':
             return self.parse_if(scope)
         elif self.current_token and self.current_token.token == 'flank':
             return self.parse_flank(scope)
+        
+        ###### loop control ######
         elif self.current_token and self.current_token.token == 'resume':
             if self.flank_flag or self.loop_flag:
                 self.current_token = self.get_next_token()
@@ -326,17 +333,24 @@ class Semantic:
                 return CheckpointStmt()
             else:
                 raise SemanticError(f"ResumeError: Cannot use checkpoint statement if not within a loop body.")
+       
+       ###### loops ######
         elif self.current_token and self.current_token.token == 'for':
              return self.parse_for(scope)
         elif self.current_token and self.current_token.token == 'grind':
              return self.parse_grind_while(scope)
         elif self.current_token and self.current_token.token == 'while':
              return self.parse_while(scope)
+        
         elif self.current_token and self.current_token.token == 'recall':
              if self.func_flag:
                 return self.parse_recall(scope)
              else:
                 raise SemanticError(f"RecallError: Cannot use recall if not within a user-defined function body.")
+        
+        ###### built-in funcs ######
+        elif self.current_token and self.current_token.token in ['shoot', 'shootNxt']:
+            return self.parse_shoot(scope)
         else:
             raise SemanticError(f"4 Unexpected token found during parsing: {self.current_token.token}")
 
@@ -1321,6 +1335,16 @@ class Semantic:
                 self.current_token = self.get_next_token() # eat )
                 self.skip_spaces()
                 identifier = FuncCallStmt(identifier, args)
+            elif self.current_token.token == 'xp_formatting':
+                if not self.lookup_id_type(identifier.symbol, "a variable"):
+                    raise SemanticError(f"NameError: Variable '{identifier.symbol}' does not exist.")
+                value = re.sub(r'^"(.*)"$', r'\1', self.current_token.lexeme)
+                if not re.match(r'^\.\d+f$', value):
+                    raise SemanticError(f"FormatError: Invalid format specifier '{value}'.")
+                digit = int(value[1])
+                self.current_token = self.get_next_token() # eat format 
+                self.skip_spaces()
+                return XpFormatting(identifier, digit)
             else:
                 if not self.lookup_identifier(identifier.symbol):
                     raise SemanticError(f"NameError: Variable '{identifier.symbol}' does not exist.")
@@ -1348,9 +1372,73 @@ class Semantic:
             self.current_token = self.get_next_token()
             self.skip_spaces()
             return literal
-        elif tk == 'comms_ltr':
+        elif re.match(r'^comms_ltr', tk) :
             value = re.sub(r'^"(.*)"$', r'\1', self.current_token.lexeme)
-            literal = CommsLiteral(value)
+            print(value)
+            open_braces = 0
+            placeholders = []
+            current_placeholder = ""
+            inside_placeholder = False
+            final_value = ""
+            escaped = False
+
+            for i, char in enumerate(value):
+                if escaped:
+                    if char in {'{', '}'}:
+                        final_value += char  
+                    else:
+                        final_value += '\\' + char  
+                    escaped = False
+                    continue
+
+                if char == '\\':
+                    escaped = True
+                    continue
+
+                if char == '{':
+                    if inside_placeholder:
+                        raise SemanticError("FormatError: Nested or unexpected '{' found in string literal.")
+                    inside_placeholder = True
+                    open_braces += 1
+                    current_placeholder = ""
+                elif char == '}':
+                    if not inside_placeholder:
+                        raise SemanticError("FormatError: Unexpected '}' found in string literal.")
+                    inside_placeholder = False
+                    open_braces -= 1
+                    if not current_placeholder:
+                        raise SemanticError("FormatError: Empty placeholder '{}' found in string literal.")
+                    placeholders.append(current_placeholder)
+                else:
+                    if inside_placeholder:
+                        current_placeholder += char
+                    else:
+                        final_value += char
+
+            if open_braces > 0:
+                raise SemanticError("FormatError: Unclosed '{' found in string literal.")
+
+            print(f"Placeholders: {placeholders}")
+            print(f"Final string: {final_value}")
+            if placeholders:
+                results = []
+                for i, placeholder in enumerate(placeholders):
+                    tokens, error = lexer.run("yo", placeholder)
+                    if error:
+                        raise SemanticError(f"Lexical error in placeholder {i}: cannot proceed to parsing.\n"+ str(error))
+                    print(tokens)
+                    tokens.pop()
+                    helper = Helper(tokens, self.scope_stack, self.func_flag)
+                    result = helper.parse_expr(scope)
+                    if isinstance(result, SemanticError):
+                        raise SemanticError(f"Error in placeholder {i}: {str(result)}")
+                    results.append(result)
+                literal = FormattedCommsLiteral(value, placeholders, results)
+                self.current_token = self.get_next_token()
+                self.skip_spaces()
+                return literal
+
+            literal = CommsLiteral(final_value)
             self.current_token = self.get_next_token()
             self.skip_spaces()
             return literal
@@ -1368,9 +1456,19 @@ class Semantic:
             self.current_token = self.get_next_token()
             self.skip_spaces()
             value = self.parse_expr(scope)  
-            
+            #print(value)
+            if value.kind == 'XpFormatting':
+                raise SemanticError("FormatError: xp formatting cannot be used as a value within a parentheses.")
             self.expect(')', "Unexpected token found inside parenthesised expression. Expected closing parenthesis.")
             self.skip_spaces()
+            if self.current_token.token == 'xp_formatting':
+                format_str = re.sub(r'^"(.*)"$', r'\1', self.current_token.lexeme)
+                if not re.match(r'^\.\d+f$', format_str):
+                    raise SemanticError(f"FormatError: Invalid format specifier '{format_str}'.")
+                digit = int(format_str[1])
+                self.current_token = self.get_next_token() # eat format 
+                self.skip_spaces()
+                return XpFormatting(value, digit)
             return value
         elif tk == '-':
             self.current_token = self.get_next_token()
@@ -1639,6 +1737,24 @@ class Semantic:
         condition = self.parse_expr(scope)
         self.skip_whitespace()
         return GrindWhileStmt(condition, body, True)
+
+    ########## BUILT-IN FUNCS ###########
+    def parse_shoot(self, scope) -> ShootStmt:
+        is_Next = False
+        if self.current_token.token == 'shootNxt':
+            is_Next = True
+        self.current_token = self.get_next_token() # eat shoot or shootNxt
+        self.expect("(", "Expected opening parentheses after shoot keyword.")
+        self.skip_spaces()
+        if self.current_token.token == ')':
+            self.expect(")", "Expected closing parentheses in function call.")
+            self.skip_whitespace()
+            return ShootStmt("", is_Next)
+        value = self.parse_expr(scope)
+        self.skip_spaces()
+        self.expect(")", "Expected closing parentheses in function call.")
+        self.skip_whitespace()
+        return ShootStmt(value, is_Next)
 
 def check(fn, text):
     lexer = Lexer(fn, text)

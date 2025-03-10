@@ -93,6 +93,40 @@ def evaluate(ast_node, symbol_table):
         return ""
     elif ast_node.kind == "LoadNum":
         return UnresolvedNumber()
+    elif ast_node.kind == "XpFormatting":
+        value = evaluate(ast_node.lhs, symbol_table)
+        print (f"xp format val = {value}")
+        if not isinstance(value, dict):
+            if value is None:
+                raise SemanticError("FormatError: Cannot use xp formatting on a dead value.")
+            elif not isinstance(value, float):
+                raise SemanticError("FormatError: Using xp formatting on a non-xp value.")
+            formatted_digits = f".{ast_node.digits}f"
+            formatted = f"{value:{formatted_digits}}"  
+            print(f"formatted {formatted}")
+            return formatted
+        else:
+            if "elements" in value or "fields" in value:
+                raise SemanticError("FormatError: Using xp formatting on a non-xp value.")
+            elif value["type"] != "xp":
+                raise SemanticError("FormatError: Using xp formatting on a non-xp value.")
+            elif value["value"] is None:
+                raise SemanticError("FormatError: Cannot use xp formatting on a dead value.")
+            formatted_digits = f".{ast_node.digits}f"
+            formatted = f"{value:{formatted_digits}}"  
+            print(f"formatted {formatted}")
+            return formatted
+    elif ast_node.kind == "FormCommsLiteral":
+        evaluated_values = []
+        for expr in ast_node.expressions:
+            result = evaluate(expr, symbol_table)  
+            evaluated_values.append(str(result))  
+
+        formatted = ast_node.value
+        for placeholder, result in zip(ast_node.placeholders, evaluated_values):
+            formatted = formatted.replace(f"{{{placeholder}}}", result, 1)
+
+        return formatted
 
 def eval_binary_expr(binop, symbol_table):
     if binop.left.kind in {'Load', 'LoadNum'} or binop.right.kind in {'Load', 'LoadNum'}:

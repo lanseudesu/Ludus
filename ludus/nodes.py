@@ -48,6 +48,9 @@ class NodeType:
     ARR_VAR             = "ArrVar"
     LOAD_STR            = "Load"
     LOAD_NUM            = "LoadNum"
+    SHOOT               = "ShootStmt"
+    XP_FORMAT           = "XpFormatting"
+    FORM_COMMS_LITERAL  = "FormCommsLiteral"
 
 class Stmt:
     def __init__(self, kind: str):
@@ -134,6 +137,13 @@ class CommsLiteral(Expr):
     def __init__(self, value):
         super().__init__(NodeType.COMMS_LITERAL)
         self.value = str(value)
+
+class FormattedCommsLiteral(Expr):
+    def __init__(self, value, placeholders, expressions):
+        super().__init__(NodeType.FORM_COMMS_LITERAL)
+        self.value = str(value)              
+        self.placeholders = placeholders     
+        self.expressions = expressions 
 
 class FlagLiteral(Expr):
     def __init__(self, value: bool):
@@ -383,3 +393,15 @@ class LoadNum(Expr):
     def __init__(self, prompt_msg: str):
         super().__init__(NodeType.LOAD_NUM)
         self.prompt_msg = prompt_msg
+
+class ShootStmt(Stmt):
+    def __init__(self, element, is_Next=False):
+        super().__init__(NodeType.SHOOT)
+        self.element = element
+        self.is_Next = is_Next
+
+class XpFormatting(Expr):
+    def __init__(self, lhs, digits):
+        super().__init__(NodeType.XP_FORMAT)
+        self.lhs = lhs
+        self.digits = digits
