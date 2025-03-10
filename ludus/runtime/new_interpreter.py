@@ -71,12 +71,15 @@ def evaluate(ast_node, symbol_table):
             raise SemanticError(f"Unknown unary operator: {ast_node.operator}")
     elif ast_node.kind == "FuncCallStmt":
         value = symbol_table.lookup(ast_node.name.symbol)
-        if value["recall"] == []:
+        recall = value["recall"]
+        if recall == []:
+            raise SemanticError(f"Function '{ast_node.name.symbol}' does not return a value.")
+        if all(rec.expressions == ["void"] for rec in recall):
             raise SemanticError(f"Function '{ast_node.name.symbol}' does not return a value.")
         from .traverser import SemanticAnalyzer  # if needed
         traverser = SemanticAnalyzer(symbol_table)
         result = traverser.visit_FuncCallStmt(ast_node, True)
-    
+        # print(f"yoyo {result}")
         return result
         
 
@@ -117,6 +120,12 @@ def eval_concat(lhs, rhs, operator):
     return lhs + rhs
 
 def eval_numeric_binary_expr(lhs, rhs, operator):
+    # print(f"lhs -> {lhs}")
+    # print(f"rhs -> {rhs}")
+    if isinstance(rhs, list):
+        if len(rhs) > 1:
+            raise SemanticError("TypeError: Cannot use list in an expression.")
+        rhs = rhs[0]
     try:
         if operator == "^":
             result = lhs ** rhs
@@ -143,8 +152,8 @@ def eval_numeric_binary_expr(lhs, rhs, operator):
             else:
                 raise SemanticError("ModuloError: Only hp values can be used in modulo operation.")
         return result
-    except TypeError:
-        raise SemanticError("TypeError: 'dead' types cannot be used as an operand.")
+    except TypeError as e:
+        raise SemanticError(str(e))
     
 def eval_relational_expr(lhs, rhs, operator):
     if operator == '<':

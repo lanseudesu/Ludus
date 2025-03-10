@@ -351,6 +351,10 @@ class Semantic:
                 self.expect("]", "Expected '[' after ']'")
                 self.skip_spaces()
                 stmt.append([])
+            elif self.current_token.token == 'void':
+                stmt.append('void')
+                self.current_token = self.get_next_token() # eat void
+                self.skip_spaces()
             else:
                 value = self.parse_expr(scope)
                 self.skip_spaces()

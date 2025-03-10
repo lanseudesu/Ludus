@@ -27,7 +27,7 @@ comma_delim    = ALPHANUM + whitespace + '_.["-(!'
 period_delim   = ALPHA + '_'  
 rparen_delim   = whitespace + arith_op + relat_op + '{})],.'
 rcurly_delim   = whitespace + '}' # add sa docs
-rbracket_delim = whitespace + arith_op + relat_op + ',.[:)}'
+rbracket_delim = whitespace + arith_op + relat_op + ',.[:){}'
 
 nl_delim       = ALPHA + whitespace + '_{}`\t'
 space_delim    = ALPHANUM + whitespace + arith_op + relat_op + '_,.&|!:()[]{}"`\t'
@@ -983,6 +983,25 @@ class Lexer:
                                 char_str += 'e' 
                                 self.advance()
                                 self.tokenize_keyword(cur_ln, cur_col, char_str, flag_delim, errors, tokens)
+                            else: 
+                                self.tokenize_id(cur_ln, cur_col, char_str, id_delim, errors, tokens)
+                        else: 
+                            self.tokenize_id(cur_ln, cur_col, char_str, id_delim, errors, tokens)
+                    else: 
+                        self.tokenize_id(cur_ln, cur_col, char_str, id_delim, errors, tokens)
+                elif self.current_char == 'v':
+                    char_str += 'v' 
+                    self.advance()
+                    if self.current_char == 'o':
+                        char_str += 'o' 
+                        self.advance()
+                        if self.current_char == 'i':
+                            char_str += 'i' 
+                            self.advance()
+                            if self.current_char == 'd':
+                                char_str += 'd' 
+                                self.advance()
+                                self.tokenize_keyword(cur_ln, cur_col, char_str, whitespace, errors, tokens)
                             else: 
                                 self.tokenize_id(cur_ln, cur_col, char_str, id_delim, errors, tokens)
                         else: 
