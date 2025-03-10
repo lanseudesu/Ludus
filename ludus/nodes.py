@@ -53,6 +53,7 @@ class NodeType:
     FORM_COMMS_LITERAL  = "FormCommsLiteral"
     WIPE                = "WipeStmt"
     JOIN_STMT           = "JoinStmt"
+    DROP_STMT           = "DropStmt"
 
 class Stmt:
     def __init__(self, kind: str):
@@ -417,5 +418,13 @@ class JoinStmt(Stmt):
         super().__init__(NodeType.JOIN_STMT)
         self.arr_name = arr_name
         self.values = values
+        self.dimensions = dimensions
+        self.row_index = row_index
+
+class DropStmt(Stmt):
+    def __init__(self, arr_name, elem_index, dimensions, row_index=None):
+        super().__init__(NodeType.DROP_STMT)
+        self.arr_name = arr_name
+        self.elem_index = elem_index
         self.dimensions = dimensions
         self.row_index = row_index

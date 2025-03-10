@@ -1,6 +1,6 @@
 from .symbol_table import SymbolTable
 from ..error import SemanticError
-
+        
 symbol_table = SymbolTable()
 
 class UnresolvedNumber:
@@ -84,7 +84,8 @@ def evaluate(ast_node, symbol_table):
             raise SemanticError(f"Function '{ast_node.name.symbol}' does not return a value.")
         if all(rec.expressions == ["void"] for rec in recall):
             raise SemanticError(f"Function '{ast_node.name.symbol}' does not return a value.")
-        from .traverser import SemanticAnalyzer  # if needed
+        
+        from .traverser import SemanticAnalyzer 
         traverser = SemanticAnalyzer(symbol_table)
         result = traverser.visit_FuncCallStmt(ast_node, True)
         # print(f"yoyo {result}")
@@ -149,6 +150,11 @@ def evaluate(ast_node, symbol_table):
             formatted = formatted.replace(f"{{{placeholder}}}", result, 1)
 
         return formatted
+    elif ast_node.kind == 'DropStmt':
+        from .traverser import SemanticAnalyzer 
+        traverser = SemanticAnalyzer(symbol_table)
+        result = traverser.visit_DropStmt(ast_node, True)
+        return result
 
 def eval_binary_expr(binop, symbol_table):
     if binop.left.kind in {'Load', 'LoadNum'} or binop.right.kind in {'Load', 'LoadNum'}:

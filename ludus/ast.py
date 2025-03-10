@@ -714,6 +714,10 @@ class Semantic:
             join_token = self.find_token_in_line('join')
             if join_token:
                 return self.parse_join2d(scope, arr_name)
+            
+            join_token = self.find_token_in_line('drop')
+            if join_token:
+                return self.parse_drop2d(scope, arr_name)
 
         dimensions = []
         while self.current_token and self.current_token.token == '[':
@@ -994,18 +998,22 @@ class Semantic:
 
     def parse_inst_ass(self, scope) -> InstAssignment:
         struct_inst_name = Identifier(self.current_token.lexeme)
-        
+        self.current_token = self.get_next_token() # eat id
         join_token = self.find_token_in_line('join')
         if join_token:
-            return self.parse_join(scope)
+            return self.parse_join(scope, struct_inst_name)
         
+        join_token = self.find_token_in_line('drop')
+        if join_token:
+            return self.parse_drop(scope, struct_inst_name)
+
         if self.lookup_identifier(struct_inst_name.symbol):
             info = self.get_identifier_info(struct_inst_name.symbol)
             if info["type"] != "a struct instance" and info["type"] != "a parameter":
                 raise SemanticError(f"NameError: Struct instance '{struct_inst_name.symbol}' is not defined.")
         else:
             raise SemanticError(f"NameError: Struct instance '{struct_inst_name.symbol}' is not defined.")
-        self.current_token = self.get_next_token() # eat id
+        
         if self.current_token.token != '.':
             raise SemanticError("Expected '.' after struct instance name.")
         self.current_token = self.get_next_token() # eat .
@@ -1302,6 +1310,14 @@ class Semantic:
             self.current_token = self.get_next_token()
             self.skip_spaces()
             if self.current_token.token == '.':
+                join_token = self.find_token_in_line('join')
+                if join_token:
+                    return self.parse_join(scope, identifier)
+                
+                join_token = self.find_token_in_line('drop')
+                if join_token:
+                    return self.parse_drop(scope, identifier)
+
                 if not self.lookup_identifier(identifier.symbol):
                     raise SemanticError(f"NameError: Struct instance '{identifier.symbol}' does not exist.")
                 
@@ -1322,6 +1338,15 @@ class Semantic:
                 self.current_token = self.get_next_token()
                 self.skip_spaces()
             elif self.current_token.token == '[':
+                arr_exist = self.is_array(identifier.symbol) or self.is_params(identifier.symbol)
+                if arr_exist:
+                    join_token = self.find_token_in_line('join')
+                    if join_token:
+                        return self.parse_join2d(scope, identifier)
+                    
+                    join_token = self.find_token_in_line('drop')
+                    if join_token:
+                        return self.parse_drop2d(scope, identifier)
                 dimensions = []
                 if not self.lookup_identifier(identifier.symbol):
                     raise SemanticError(f"NameError: Array '{identifier.symbol}' does not exist.")
@@ -1788,19 +1813,17 @@ class Semantic:
         self.skip_whitespace()
         return ShootStmt(value, is_Next)
 
-    def parse_join(self, scope) -> JoinStmt:
-        array_name = Identifier(self.current_token.lexeme)
-        if self.lookup_identifier(array_name.symbol):
-            info = self.get_identifier_info(array_name.symbol)
+    def parse_join(self, scope, name) -> JoinStmt:
+        if self.lookup_identifier(name.symbol):
+            info = self.get_identifier_info(name.symbol)
             if info["type"] != "an array" and info["type"] != "a parameter":
-                raise SemanticError(f"NameError: Array '{array_name.symbol}' is not defined.")
+                raise SemanticError(f"NameError: Array '{name.symbol}' is not defined.")
         else:
-            raise SemanticError(f"NameError: Array '{array_name.symbol}' is not defined.")
+            raise SemanticError(f"NameError: Array '{name.symbol}' is not defined.")
         if info["type"] == "a parameter":
             dimensions = None
         elif info["type"] == "an array":
-            dimensions = self.get_dimensions(array_name.symbol)
-        self.current_token = self.get_next_token() # eat id
+            dimensions = self.get_dimensions(name.symbol)
         self.expect(".", "Expects '.' in join function call.")
         self.expect("join", "Expects 'join' keyword in join function call.")
         self.expect("(", "Expects '(' after join keyword in join function call.")
@@ -1817,7 +1840,7 @@ class Semantic:
             self.skip_spaces()
             self.expect(")", "Expects ')' after to close join arguments.")
             self.skip_whitespace()
-            return JoinStmt(array_name, values, 2)
+            return JoinStmt(name, values, 2)
         else:
             if dimensions is None or dimensions == 1:
                 pass
@@ -1835,7 +1858,7 @@ class Semantic:
                     self.skip_spaces()
             self.expect(")", "Expects ')' after to close join arguments.")
             self.skip_whitespace()
-            return JoinStmt(array_name, values, 1)
+            return JoinStmt(name, values, 1)
 
     def parse_join2d(self, scope, arr_name) -> JoinStmt:
         self.expect("[", "Expects '[' to specify row index of two-dimensional array.")
@@ -1872,6 +1895,61 @@ class Semantic:
         self.expect(")", "Expects ')' after to close join arguments.")
         self.skip_whitespace()
         return JoinStmt(arr_name, values, 2, dim)
+
+    def parse_drop(self, scope, name) -> DropStmt:
+        if self.lookup_identifier(name.symbol):
+            info = self.get_identifier_info(name.symbol)
+            if info["type"] != "an array" and info["type"] != "a parameter":
+                raise SemanticError(f"NameError: Array '{name.symbol}' is not defined.")
+        else:
+            raise SemanticError(f"NameError: Array '{name.symbol}' is not defined.")
+        if info["type"] == "a parameter":
+            dimensions = None
+        elif info["type"] == "an array":
+            dimensions = self.get_dimensions(name.symbol)
+        self.expect(".", "Expects '.' in drop function call.")
+        self.expect("drop", "Expects 'drop' keyword in drop function call.")
+        self.expect("(", "Expects '(' after drop keyword in drop function call.")   
+        self.skip_spaces()
+        index = None
+        if self.current_token.token != ')':
+            value = self.parse_expr(scope)
+            index = value
+            self.skip_spaces()
+        self.expect(")", "Expects ')' after to close drop arguments.")
+        self.skip_whitespace()
+        return DropStmt(name, index, dimensions)
+    
+    def parse_drop2d(self, scope, arr_name) -> DropStmt:
+        self.expect("[", "Expects '[' to specify row index of two-dimensional array.")
+        self.skip_spaces()
+        if self.current_token.token == ']':
+            raise SemanticError("DropError: Index must not be blank for drop function call.")
+        dim = self.parse_expr(scope)
+        self.skip_spaces()
+        self.expect("]", "Expected ']' to close array dimension declaration.")
+        self.skip_spaces()
+        info = self.get_identifier_info(arr_name.symbol)
+        if info["type"] == "an array":
+            dimensions = self.get_dimensions(arr_name.symbol)
+        else:
+            dimensions = None
+        if dimensions is None or dimensions == 2:
+            pass
+        else:
+            raise SemanticError("DimensionsError: Trying to drop specific row from a one dimensional array, must be two-dimensional.")
+        self.expect(".", "Expects '.' in drop function call.")
+        self.expect("drop", "Expects 'drop' keyword in drop function call.")
+        self.expect("(", "Expects '(' after drop keyword in drop function call.")
+        self.skip_spaces()
+        index = None
+        if self.current_token.token != ')':
+            value = self.parse_expr(scope)
+            index = value
+            self.skip_spaces()
+        self.expect(")", "Expects ')' after to close drop arguments.")
+        self.skip_whitespace()
+        return DropStmt(arr_name, index, dimensions, dim)
 
 def check(fn, text):
     lexer = Lexer(fn, text)

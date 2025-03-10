@@ -957,7 +957,9 @@ class SemanticAnalyzer(ASTVisitor):
         if arr_immo==True:
             raise SemanticError(f"JoinError: Array '{arr_name}' is declared as an immutable array.")
         
-        if node.dimensions != len(arr_dimensions):
+        if node.dimensions == None:
+            dimensions = len(arr_dimensions)
+        elif node.dimensions != len(arr_dimensions):
             raise SemanticError(f"RedeclerationError: Incorrect number of dimensions.")
         
         row_index = None
@@ -1017,3 +1019,70 @@ class SemanticAnalyzer(ASTVisitor):
 
         return elem
 
+    def visit_DropStmt(self, node: DropStmt, is_Return=False):
+        arr_name = node.arr_name.symbol   
+        arr_info = self.symbol_table.lookup(arr_name)
+        if not isinstance(arr_info, dict) or "dimensions" not in arr_info:
+            raise SemanticError(f"TypeError: '{arr_name}' is not an array.")
+        arr_immo = arr_info["immo"]
+        arr_type = arr_info["type"]
+        arr_dimensions = arr_info["dimensions"]
+        arr_elements = arr_info["elements"]
+
+        if arr_elements == None:
+            raise SemanticError(f"TypeError: Array '{arr_name}' is a dead array and must be defined with a value first.")
+        elif arr_elements == []:
+            raise SemanticError(f"TypeError: Array '{arr_name}' is an empty array, there is no value to be dropped.")
+        
+        if arr_immo==True:
+            raise SemanticError(f"JoinError: Array '{arr_name}' is declared as an immutable array.")
+        
+        if node.dimensions == None:
+            dimensions = len(arr_dimensions)
+        elif node.dimensions != len(arr_dimensions):
+            raise SemanticError(f"RedeclerationError: Incorrect number of dimensions.")
+        
+        row_index = evaluate(node.row_index, self.symbol_table) if node.row_index else None
+        elem_index = evaluate(node.elem_index, self.symbol_table) if node.elem_index else None
+
+        if len(arr_dimensions) == 1:  
+            if elem_index is not None:
+                if elem_index >= len(arr_elements) or elem_index < 0:
+                    raise SemanticError(f"IndexError: Index {elem_index} out of bounds for array '{arr_name}'.")
+                ret = arr_elements.pop(elem_index)
+            else:
+                ret = arr_elements.pop()  
+            
+            if is_Return:
+                    self.symbol_table.define_arr(arr_name, arr_dimensions, arr_elements, arr_immo, arr_type)
+                    return ret
+        
+        elif len(arr_dimensions) == 2: 
+            if row_index is not None:
+                if row_index >= len(arr_elements) or row_index < 0:
+                    raise SemanticError(f"IndexError: Row index {row_index} out of bounds for array '{arr_name}'.")
+                if not isinstance(arr_elements[row_index], list):
+                    raise SemanticError(f"TypeError: Target row '{row_index}' is not a list.")
+
+                if elem_index is not None:
+                    if elem_index >= len(arr_elements[row_index]) or elem_index < 0:
+                        raise SemanticError(f"IndexError: Index {elem_index} out of bounds for row {row_index} in array '{arr_name}'.")
+                    if is_Return:
+                        self.symbol_table.define_arr(arr_name, arr_dimensions, arr_elements, arr_immo, arr_type)
+                        return arr_elements.pop()
+                    ret = arr_elements[row_index].pop(elem_index)
+                else:
+                    ret = arr_elements[row_index].pop()  
+            else:
+                if elem_index is not None:
+                    if elem_index >= len(arr_elements) or elem_index < 0:
+                        raise SemanticError(f"IndexError: Row index {elem_index} out of bounds for array '{arr_name}'.")
+                    ret = arr_elements.pop(elem_index)
+                else:
+                    ret = arr_elements.pop()  
+            
+            if is_Return:
+                    self.symbol_table.define_arr(arr_name, arr_dimensions, arr_elements, arr_immo, arr_type)
+                    return ret
+            
+        self.symbol_table.define_arr(arr_name, arr_dimensions, arr_elements, arr_immo, arr_type)
