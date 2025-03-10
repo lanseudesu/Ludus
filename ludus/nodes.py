@@ -186,9 +186,10 @@ class VarDec(Stmt):
         self.scope = scope
 
 class BatchVarDec(Stmt):
-    def __init__(self, declarations: list[Stmt]):
+    def __init__(self, declarations: list[Stmt], batch_ver1=False):
         super().__init__(NodeType.BATCH_VAR_DEC)
         self.declarations = declarations
+        self.batch_ver1 = batch_ver1
 
 class ArrayDec(Stmt):
     def __init__(self, name: Identifier, dimensions: List[Optional[int]], 

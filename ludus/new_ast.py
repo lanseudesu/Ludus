@@ -383,6 +383,7 @@ class Semantic:
                 self.current_token = self.get_next_token() # eat ,
                 self.skip_spaces()
         self.current_token = self.get_next_token() # eat )
+        self.skip_whitespace()
         return FuncCallStmt(func_name, args)
     
     ######### ARRAYS AND VARIABLES #########    
@@ -431,6 +432,7 @@ class Semantic:
             self.skip_spaces()
             
             if self.current_token and self.current_token.token == ":":
+                is_func = False
                 self.current_token = self.get_next_token() # eat :
                 self.skip_spaces()
                 value = self.parse_expr(scope)
@@ -452,7 +454,7 @@ class Semantic:
                         self.declare_id(var.symbol, "a variable")
 
                 self.skip_spaces()
-                return BatchVarDec(declarations)
+                return BatchVarDec(declarations, True)
 
         self.current_token = self.get_next_token() # eat :
         self.skip_spaces()
@@ -796,6 +798,12 @@ class Semantic:
             return ArrayRedec(name, dimensions, values, False, scope)
         elif re.match(r'^id\d+$', self.current_token.token):
             rhs_name = self.current_token.lexeme
+            la_token = self.look_ahead()
+            if la_token.token == '(':
+                if not self.lookup_id_type(rhs_name, "a function"):
+                    raise SemanticError(f"NameError: Function '{rhs_name}' does not exist.")
+                values = self.parse_func_call(scope)
+                return ArrayRedec(name, dimensions, values, False, scope)
             self.current_token = self.get_next_token() # eat id
             self.skip_whitespace()
             info = self.lookup_identifier(rhs_name)
@@ -1624,7 +1632,7 @@ def check(fn, text):
 
     semantic = Semantic(tokens)
     result = semantic.produce_ast()
-    print(result)
+    #print(result)
 
     if isinstance(result, SemanticError):
         return str(result), {}
