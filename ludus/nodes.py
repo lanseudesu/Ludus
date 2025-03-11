@@ -414,10 +414,10 @@ class WipeStmt(Stmt):
         super().__init__(NodeType.WIPE)
 
 class JoinStmt(Stmt):
-    def __init__(self, arr_name, values, dimensions, row_index=None):
+    def __init__(self, arr_name, value, dimensions, row_index=None):
         super().__init__(NodeType.JOIN_STMT)
         self.arr_name = arr_name
-        self.values = values
+        self.value = value
         self.dimensions = dimensions
         self.row_index = row_index
 

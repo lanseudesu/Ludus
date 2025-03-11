@@ -823,6 +823,8 @@ class Semantic:
         inner_values = []
         while self.current_token and self.current_token.token != ']':
             value = self.parse_expr(scope)
+            if value.kind not in ["HpLiteral", "XpLiteral", "CommsLiteral", "FlagLiteral"]:
+                 raise SemanticError("Arrays can only be initialied with literal values.")
             inner_values.append(value)
             self.skip_spaces()
             if self.current_token.token == ',':
@@ -1310,14 +1312,14 @@ class Semantic:
             self.current_token = self.get_next_token()
             self.skip_spaces()
             if self.current_token.token == '.':
-                join_token = self.find_token_in_line('join')
-                if join_token:
-                    return self.parse_join(scope, identifier)
-                
                 join_token = self.find_token_in_line('drop')
                 if join_token:
                     return self.parse_drop(scope, identifier)
 
+                join_token = self.find_token_in_line('seek')
+                if join_token:
+                    return self.parse_seek(scope, identifier)
+                
                 if not self.lookup_identifier(identifier.symbol):
                     raise SemanticError(f"NameError: Struct instance '{identifier.symbol}' does not exist.")
                 
@@ -1340,13 +1342,15 @@ class Semantic:
             elif self.current_token.token == '[':
                 arr_exist = self.is_array(identifier.symbol) or self.is_params(identifier.symbol)
                 if arr_exist:
-                    join_token = self.find_token_in_line('join')
-                    if join_token:
-                        return self.parse_join2d(scope, identifier)
-                    
                     join_token = self.find_token_in_line('drop')
                     if join_token:
                         return self.parse_drop2d(scope, identifier)
+                    
+                    join_token = self.find_token_in_line('seek')
+                    if join_token:
+                        return self.parse_seek2d(scope, identifier)
+                
+                
                 dimensions = []
                 if not self.lookup_identifier(identifier.symbol):
                     raise SemanticError(f"NameError: Array '{identifier.symbol}' does not exist.")
@@ -1848,17 +1852,11 @@ class Semantic:
                 raise SemanticError("DimensionsError: Trying to append new elements incorrectly to a two dimensional array, must specify row index first.")
             if self.current_token.token == ')':
                 raise SemanticError("JoinError: Elements inside parentheses must not be empty.")
-            values = []
-            while self.current_token and self.current_token.token != ')':
-                value = self.parse_expr(scope)
-                values.append(value)
-                self.skip_spaces()
-                if self.current_token.token == ',':
-                    self.current_token = self.get_next_token()  # eat ,
-                    self.skip_spaces()
+            value = self.parse_expr(scope)
+            self.skip_spaces()
             self.expect(")", "Expects ')' after to close join arguments.")
             self.skip_whitespace()
-            return JoinStmt(name, values, 1)
+            return JoinStmt(name, value, 1)
 
     def parse_join2d(self, scope, arr_name) -> JoinStmt:
         self.expect("[", "Expects '[' to specify row index of two-dimensional array.")
@@ -1877,24 +1875,18 @@ class Semantic:
         if dimensions is None or dimensions == 2:
             pass
         else:
-            raise SemanticError("DimensionsError: Trying to append elements in a specific row to a one dimensional array, must be two-dimensional.")
+            raise SemanticError("DimensionsError: Trying to append an element in a specific row to a one dimensional array, must be two-dimensional.")
         self.expect(".", "Expects '.' in join function call.")
         self.expect("join", "Expects 'join' keyword in join function call.")
         self.expect("(", "Expects '(' after join keyword in join function call.")
         self.skip_spaces()
         if self.current_token.token == ')':
             raise SemanticError("JoinError: Elements inside parentheses must not be empty.")
-        values = []
-        while self.current_token and self.current_token.token != ')':
-            value = self.parse_expr(scope)
-            values.append(value)
-            self.skip_spaces()
-            if self.current_token.token == ',':
-                self.current_token = self.get_next_token()  # eat ,
-                self.skip_spaces()
+        value = self.parse_expr(scope)
+        self.skip_spaces()
         self.expect(")", "Expects ')' after to close join arguments.")
         self.skip_whitespace()
-        return JoinStmt(arr_name, values, 2, dim)
+        return JoinStmt(arr_name, value, 2, dim)
 
     def parse_drop(self, scope, name) -> DropStmt:
         if self.lookup_identifier(name.symbol):

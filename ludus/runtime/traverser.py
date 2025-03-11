@@ -957,31 +957,27 @@ class SemanticAnalyzer(ASTVisitor):
         if arr_immo==True:
             raise SemanticError(f"JoinError: Array '{arr_name}' is declared as an immutable array.")
         
-        if node.dimensions == None:
-            dimensions = len(arr_dimensions)
-        elif node.dimensions != len(arr_dimensions):
+        if node.dimensions and node.dimensions != len(arr_dimensions):
             raise SemanticError(f"RedeclerationError: Incorrect number of dimensions.")
         
         row_index = None
         if node.row_index:
             row_index = evaluate(node.row_index, self.symbol_table)
 
-        evaluated_values = []
-        for value in node.values:
-            if isinstance(value, list):
-                evaluated_row = []
+        if isinstance(node.value, list):
+            evaluated_row = []
+            eval = [evaluated_row]
+            for value in node.value:
                 for v in value:
                     elem = self._evaluate_element(v, arr_name, arr_type)
                     evaluated_row.append(elem)
-                evaluated_values.append(evaluated_row)
-            else:
-                elem = self._evaluate_element(value, arr_name, arr_type)
-                evaluated_values.append(elem)
+        else:
+            elem = self._evaluate_element(node.value, arr_name, arr_type)
         
         if len(arr_dimensions) == 1:  
-            if any(isinstance(val, list) for val in evaluated_values):
+            if isinstance(elem, list):
                 raise SemanticError("JoinError: Cannot append nested lists to a 1D array.")
-            arr_elements.extend(evaluated_values)
+            arr_elements.append(elem)
 
         elif len(arr_dimensions) == 2:  # 2D array
             if row_index is not None:
@@ -989,11 +985,11 @@ class SemanticAnalyzer(ASTVisitor):
                     raise SemanticError(f"IndexError: Row index {row_index} out of bounds.")
                 if not isinstance(arr_elements[row_index], list):
                     raise SemanticError(f"JoinError: Target row is not a list.")
-                arr_elements[row_index].extend(evaluated_values)
+                arr_elements[row_index].append(elem)
             else:
-                if any(not isinstance(val, list) for val in evaluated_values):
+                if not isinstance(evaluated_row, list):
                     raise SemanticError("JoinError: Appending non-row values to a 2D array.")
-                arr_elements.extend(evaluated_values)
+                arr_elements.extend(eval)
         
         self.symbol_table.define_arr(arr_name, arr_dimensions, arr_elements, arr_immo, arr_type)
             
@@ -1037,9 +1033,7 @@ class SemanticAnalyzer(ASTVisitor):
         if arr_immo==True:
             raise SemanticError(f"JoinError: Array '{arr_name}' is declared as an immutable array.")
         
-        if node.dimensions == None:
-            dimensions = len(arr_dimensions)
-        elif node.dimensions != len(arr_dimensions):
+        if node.dimensions and node.dimensions != len(arr_dimensions):
             raise SemanticError(f"RedeclerationError: Incorrect number of dimensions.")
         
         row_index = evaluate(node.row_index, self.symbol_table) if node.row_index else None
@@ -1067,19 +1061,18 @@ class SemanticAnalyzer(ASTVisitor):
                 if elem_index is not None:
                     if elem_index >= len(arr_elements[row_index]) or elem_index < 0:
                         raise SemanticError(f"IndexError: Index {elem_index} out of bounds for row {row_index} in array '{arr_name}'.")
-                    if is_Return:
-                        self.symbol_table.define_arr(arr_name, arr_dimensions, arr_elements, arr_immo, arr_type)
-                        return arr_elements.pop()
                     ret = arr_elements[row_index].pop(elem_index)
                 else:
                     ret = arr_elements[row_index].pop()  
             else:
+                if is_Return:
+                    raise SemanticError("ReturnError: Cannot remove and return an entire row of a 2D array.")
                 if elem_index is not None:
                     if elem_index >= len(arr_elements) or elem_index < 0:
                         raise SemanticError(f"IndexError: Row index {elem_index} out of bounds for array '{arr_name}'.")
-                    ret = arr_elements.pop(elem_index)
+                    arr_elements.pop(elem_index)
                 else:
-                    ret = arr_elements.pop()  
+                    arr_elements.pop()  
             
             if is_Return:
                     self.symbol_table.define_arr(arr_name, arr_dimensions, arr_elements, arr_immo, arr_type)
