@@ -163,6 +163,14 @@ def evaluate(ast_node, symbol_table):
     elif ast_node.kind == 'LevelStmt':
         result = traverser.visit_LevelStmt(ast_node)
         return result
+    elif ast_node.kind == 'ToNumStmt':
+        result = traverser.visit_ToNumStmt(ast_node)
+        return result
+    elif ast_node.kind == 'ToCommsStmt':
+        result = traverser.visit_ToCommsStmt(ast_node)
+        return result
+    else:
+        raise SemanticError(f"Unknown node kind: {ast_node.kind}")
 
 def eval_binary_expr(binop, symbol_table):
     if binop.left.kind in {'Load', 'LoadNum'} or binop.right.kind in {'Load', 'LoadNum'}:

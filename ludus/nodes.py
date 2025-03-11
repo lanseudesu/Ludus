@@ -57,6 +57,8 @@ class NodeType:
     SEEK_STMT           = "SeekStmt"
     ROUND_STMT          = "RoundStmt"
     LEVEL_STMT          = "LevelStmt"
+    TO_NUM_STMT         = "ToNumStmt"
+    TO_COMMS_STMT       = "ToCommsStmt"
 
 class Stmt:
     def __init__(self, kind: str):
@@ -450,3 +452,14 @@ class LevelStmt(Stmt):
         super().__init__(NodeType.LEVEL_STMT)
         self.value = value
         self.up_or_down = up_or_down
+
+class ToNumStmt(Stmt):
+    def __init__(self, value, hp_or_xp):
+        super().__init__(NodeType.TO_NUM_STMT)
+        self.value = value
+        self.hp_or_xp = hp_or_xp
+
+class ToCommsStmt(Stmt):
+    def __init__(self, value):
+        super().__init__(NodeType.TO_COMMS_STMT)
+        self.value = value

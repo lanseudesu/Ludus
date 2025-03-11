@@ -1422,7 +1422,7 @@ class Semantic:
                 if is_func_call == 'func_call':
                     allowed_types.add("an array")
                     allowed_types.add("a struct instance")
-                elif is_func_call in ['rounds', 'level']:
+                elif is_func_call == 'rounds':
                     allowed_types.add("an array")
 
                 if info["type"] not in allowed_types:
@@ -1582,8 +1582,8 @@ class Semantic:
             self.skip_spaces()
             value = self.parse_primary_expr(scope, 'rounds')
             if value.kind not in ['Identifier', 'ArrayElement', 'StructInstField', 'FuncCallStmt',
-                                  'CommsLiteral']: #add toComms here later
-                raise SemanticError("RoundsError: Invalid rounds argument.")
+                                  'CommsLiteral', 'ToCommsStmt']: 
+                raise SemanticError("ArgumentError: Invalid rounds argument.")
             self.skip_spaces()
             self.expect(')', "Expected ')' after rounds arguments.")
             self.skip_spaces()
@@ -1592,14 +1592,39 @@ class Semantic:
             self.current_token = self.get_next_token()  # consume levelUp or levelDown
             self.expect('(', f"Expected '(' after '{tk}'.")
             self.skip_spaces()
-            value = self.parse_primary_expr(scope, 'level')
-            valid_kinds = ['Identifier', 'ArrayElement', 'StructInstField', 'FuncCallStmt']  # add toComms later
+            value = self.parse_primary_expr(scope)
+            valid_kinds = ['Identifier', 'ArrayElement', 'StructInstField', 'FuncCallStmt',
+                           'ToCommsStmt']  
             if value.kind not in valid_kinds:
-                raise SemanticError(f"RoundsError: Invalid '{tk}' argument.")
+                raise SemanticError(f"ArgumentError: Invalid '{tk}' argument.")
             self.skip_spaces()
             self.expect(')', f"Expected ')' after '{tk}' arguments.")
             self.skip_spaces()
             return LevelStmt(value, tk == 'levelUp')
+        elif tk in ('toHp', 'toXp'):
+            self.current_token = self.get_next_token()  # consume toHp or toHp
+            self.expect('(', f"Expected '(' after '{tk}'.")
+            self.skip_spaces()
+            value = self.parse_primary_expr(scope)
+            valid_kinds = ['Identifier', 'ArrayElement', 'StructInstField'] 
+            if value.kind not in valid_kinds:
+                raise SemanticError(f"ArgumentError: Invalid '{tk}' argument.")
+            self.skip_spaces()
+            self.expect(')', f"Expected ')' after '{tk}' arguments.")
+            self.skip_spaces()
+            return ToNumStmt(value, tk == 'toHp')
+        elif tk == 'toComms':
+            self.current_token = self.get_next_token()  # consume toComms
+            self.expect('(', f"Expected '(' after '{tk}'.")
+            self.skip_spaces()
+            value = self.parse_primary_expr(scope)
+            valid_kinds = ['Identifier', 'ArrayElement', 'StructInstField'] 
+            if value.kind not in valid_kinds:
+                raise SemanticError(f"ArgumentError: Invalid '{tk}' argument.")
+            self.skip_spaces()
+            self.expect(')', f"Expected ')' after '{tk}' arguments.")
+            self.skip_spaces()
+            return ToCommsStmt(value)
         else:
             raise SemanticError(f"6 Unexpected token found during parsing: {tk}")
         

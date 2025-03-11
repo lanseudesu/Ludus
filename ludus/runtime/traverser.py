@@ -1163,3 +1163,57 @@ class SemanticAnalyzer(ASTVisitor):
             raise SemanticError(f"TypeError: Can only use {function_name} function on comms.")
 
         return info.upper() if node.up_or_down else info.lower()
+    
+    def visit_ToNumStmt(self, node: ToNumStmt):
+        info = evaluate(node.value, self.symbol_table)
+        print(f"info -> {info}")
+        
+        if isinstance(info, UnresolvedNumber):
+            return 0 if node.hp_or_xp else 0.0
+        
+        if isinstance(info, dict):
+            raise SemanticError(f"TypeError: Cannot convert a list object to a number.")
+
+        if isinstance(info, str):
+            if node.hp_or_xp:  
+                if not info.isdigit():
+                    raise SemanticError(f"TypeError: Cannot convert '{info}' to an hp — must be a whole number.")
+                return int(info)
+            else: 
+                try:
+                    return float(info)
+                except ValueError:
+                    raise SemanticError(f"TypeError: Cannot convert '{info}' to an xp — must be a valid floating-point number.")
+
+        if isinstance(info, bool):
+            if node.hp_or_xp:
+                return 1 if info else 0
+            else:
+                return 1.0 if info else 0.0
+        
+        if isinstance(info, int):
+            return info if node.hp_or_xp else float(info)
+
+        if isinstance(info, float):
+            return int(info) if node.hp_or_xp else info
+
+        raise SemanticError(f"TypeError: Cannot convert '{info}' to a number.")
+
+    def visit_ToCommsStmt(self, node: ToCommsStmt):
+        info = evaluate(node.value, self.symbol_table)
+        
+        if isinstance(info, UnresolvedNumber):
+            return "0 or 0.0"
+        
+        if isinstance(info, dict):
+            raise SemanticError(f"TypeError: Cannot convert a list object to comms.")
+
+        if isinstance(info, bool):
+            return "true" if info else "false"
+        
+        if isinstance(info, str):
+            return info
+
+        if isinstance(info, int) or isinstance(info, float):
+            return str(info)
+        raise SemanticError(f"TypeError: Cannot convert '{info}' to comms.")
