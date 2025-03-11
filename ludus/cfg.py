@@ -151,7 +151,9 @@ cfg = {
     "<load_args>": [["comms_ltr"], 
                     ["λ"]],
     "<rounds_args>": [["comms_ltr"], 
-                     ["id", "<id_rhs_tail>"]],
+                     ["id", "<rounds_args_tail>"],
+                     ["toComms", "(", "id", "<id_tail>", ")"]],
+    "<rounds_args_tail>": [["<id_tail>" ], ["(", "<args>", ")"]],
     "<recall_stmt>": [["recall", "<rec_elems>"]],
     "<rec_elems>": [["<expr>", "<rec_elems_recur>"], 
                     ["[", "]"], ["void"]],
@@ -417,4 +419,4 @@ def check_ambiguity(cfg, predict_set):
     else:
         print("\nNo ambiguities found in the CFG.")
 
-# check_ambiguity(cfg, predict_set)
+check_ambiguity(cfg, predict_set)

@@ -55,6 +55,7 @@ class NodeType:
     JOIN_STMT           = "JoinStmt"
     DROP_STMT           = "DropStmt"
     SEEK_STMT           = "SeekStmt"
+    ROUND_STMT          = "RoundStmt"
 
 class Stmt:
     def __init__(self, kind: str):
@@ -437,3 +438,8 @@ class SeekStmt(Stmt):
         self.value = value
         self.dimensions = dimensions
         self.row_index = row_index
+
+class RoundStmt(Stmt):
+    def __init__(self, value):
+        super().__init__(NodeType.ROUND_STMT)
+        self.value = value

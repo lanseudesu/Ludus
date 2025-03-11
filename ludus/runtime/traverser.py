@@ -1140,3 +1140,19 @@ class SemanticAnalyzer(ASTVisitor):
                     return arr_elements.index(evaluated_row)
                 except ValueError:
                     return -1
+                
+    def visit_RoundStmt(self, node: RoundStmt):
+        info = evaluate(node.value, self.symbol_table)
+        print(f"rounds info -> {info}")
+        if isinstance(info, dict):
+            if "dimensions" not in info:
+                raise SemanticError(f"TypeError: Can only use rounds function on comms and arrays.")
+            
+            return len(info["elements"])
+        
+        if not isinstance(info, str):
+            raise SemanticError(f"TypeError: Can only use rounds function on comms and arrays.")
+        
+        return len(info)
+
+        

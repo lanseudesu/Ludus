@@ -415,7 +415,7 @@ class Semantic:
         while self.current_token.token != ')':
             la_token = self.look_ahead()
             if la_token.token == ',' or la_token.token == ')':
-                arg = self.parse_primary_expr(scope, True)
+                arg = self.parse_primary_expr(scope, 'func_call')
             else:
                 arg = self.parse_expr(scope)
             args.append(arg)
@@ -1299,7 +1299,7 @@ class Semantic:
 
         return left 
 
-    def parse_primary_expr(self, scope, is_func_call=False) -> Expr:
+    def parse_primary_expr(self, scope, is_func_call=None) -> Expr:
         self.skip_spaces()
         if not self.current_token:
             raise SemanticError("Unexpected end of input during parsing!")
@@ -1389,7 +1389,7 @@ class Semantic:
                 while self.current_token.token != ')':
                     la_token = self.look_ahead()
                     if la_token.token == ',' or la_token.token == ')':
-                        arg = self.parse_primary_expr(scope, True)
+                        arg = self.parse_primary_expr(scope, 'func_call')
                     else:
                         arg = self.parse_expr(scope)
                     args.append(arg)
@@ -1419,9 +1419,11 @@ class Semantic:
                 if self.func_flag:
                     allowed_types.add("a parameter")
                     allowed_types.add("an array")
-                if is_func_call:
+                if is_func_call == 'func_call':
                     allowed_types.add("an array")
                     allowed_types.add("a struct instance")
+                elif is_func_call == 'rounds':
+                    allowed_types.add("an array")
 
                 if info["type"] not in allowed_types:
                     raise SemanticError(f"20 NameError: Identifier '{identifier.symbol}' is already declared as {info['type']}")
@@ -1574,6 +1576,17 @@ class Semantic:
                 return Load(prompt_msg)
             else:
                 return LoadNum(prompt_msg)
+        elif tk == 'rounds':
+            self.current_token = self.get_next_token() # eat rounds
+            self.expect('(', "Expected '(' after 'rounds'.")
+            self.skip_spaces()
+            value = self.parse_primary_expr(scope, 'rounds')
+            if value.kind not in ['Identifier', 'ArrayElement', 'StructInstField', 'FuncCallStmt']: #add toComms here later
+                raise SemanticError("RoundsError: Expected an xp literal as a parameter.")
+            self.skip_spaces()
+            self.expect(')', "Expected ')' after rounds arguments.")
+            self.skip_spaces()
+            return RoundStmt(value)
         else:
             raise SemanticError(f"6 Unexpected token found during parsing: {tk}")
         
