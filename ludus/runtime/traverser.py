@@ -1155,4 +1155,11 @@ class SemanticAnalyzer(ASTVisitor):
         
         return len(info)
 
-        
+    def visit_LevelStmt(self, node: LevelStmt):
+        info = evaluate(node.value, self.symbol_table)
+
+        if not isinstance(info, str):
+            function_name = "levelUp" if node.up_or_down else "levelDown"
+            raise SemanticError(f"TypeError: Can only use {function_name} function on comms.")
+
+        return info.upper() if node.up_or_down else info.lower()

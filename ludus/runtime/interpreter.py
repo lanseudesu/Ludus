@@ -11,6 +11,9 @@ class UnresolvedNumber:
         return "0 or 0.0"
 
 def evaluate(ast_node, symbol_table):
+    from .traverser import SemanticAnalyzer 
+    traverser = SemanticAnalyzer(symbol_table)
+
     if ast_node.kind == "HpLiteral":
         return ast_node.value
     elif ast_node.kind == "XpLiteral":
@@ -85,8 +88,6 @@ def evaluate(ast_node, symbol_table):
         if all(rec.expressions == ["void"] for rec in recall):
             raise SemanticError(f"Function '{ast_node.name.symbol}' does not return a value.")
         
-        from .traverser import SemanticAnalyzer 
-        traverser = SemanticAnalyzer(symbol_table)
         result = traverser.visit_FuncCallStmt(ast_node, True)
         # print(f"yoyo {result}")
         return result
@@ -151,19 +152,16 @@ def evaluate(ast_node, symbol_table):
 
         return formatted
     elif ast_node.kind == 'DropStmt':
-        from .traverser import SemanticAnalyzer 
-        traverser = SemanticAnalyzer(symbol_table)
         result = traverser.visit_DropStmt(ast_node, True)
         return result
     elif ast_node.kind == 'SeekStmt':
-        from .traverser import SemanticAnalyzer 
-        traverser = SemanticAnalyzer(symbol_table)
         result = traverser.visit_SeekStmt(ast_node)
         return result
     elif ast_node.kind == 'RoundStmt':
-        from .traverser import SemanticAnalyzer 
-        traverser = SemanticAnalyzer(symbol_table)
         result = traverser.visit_RoundStmt(ast_node)
+        return result
+    elif ast_node.kind == 'LevelStmt':
+        result = traverser.visit_LevelStmt(ast_node)
         return result
 
 def eval_binary_expr(binop, symbol_table):

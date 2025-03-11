@@ -56,6 +56,7 @@ class NodeType:
     DROP_STMT           = "DropStmt"
     SEEK_STMT           = "SeekStmt"
     ROUND_STMT          = "RoundStmt"
+    LEVEL_STMT          = "LevelStmt"
 
 class Stmt:
     def __init__(self, kind: str):
@@ -443,3 +444,9 @@ class RoundStmt(Stmt):
     def __init__(self, value):
         super().__init__(NodeType.ROUND_STMT)
         self.value = value
+
+class LevelStmt(Stmt):
+    def __init__(self, value, up_or_down):
+        super().__init__(NodeType.LEVEL_STMT)
+        self.value = value
+        self.up_or_down = up_or_down
