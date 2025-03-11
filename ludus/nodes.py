@@ -54,6 +54,7 @@ class NodeType:
     WIPE                = "WipeStmt"
     JOIN_STMT           = "JoinStmt"
     DROP_STMT           = "DropStmt"
+    SEEK_STMT           = "SeekStmt"
 
 class Stmt:
     def __init__(self, kind: str):
@@ -426,5 +427,13 @@ class DropStmt(Stmt):
         super().__init__(NodeType.DROP_STMT)
         self.arr_name = arr_name
         self.elem_index = elem_index
+        self.dimensions = dimensions
+        self.row_index = row_index
+
+class SeekStmt(Stmt):
+    def __init__(self, arr_name, value, dimensions, row_index=None):
+        super().__init__(NodeType.SEEK_STMT)
+        self.arr_name = arr_name
+        self.value = value
         self.dimensions = dimensions
         self.row_index = row_index

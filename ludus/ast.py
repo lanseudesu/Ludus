@@ -133,7 +133,7 @@ class Semantic:
             if la_token.token == target_token:
                 return la_token
 
-            if la_token.token in {'newline', 'EOF'}:  
+            if la_token.token in {':', 'newline', 'EOF'}:  
                 break
 
             la_token_index += 1
@@ -710,6 +710,7 @@ class Semantic:
         self.current_token = self.get_next_token() # eat id
         self.skip_spaces()
         arr_exist = self.is_array(name) or self.is_params(name)
+        
         if arr_exist:
             join_token = self.find_token_in_line('join')
             if join_token:
@@ -1001,11 +1002,12 @@ class Semantic:
     def parse_inst_ass(self, scope) -> InstAssignment:
         struct_inst_name = Identifier(self.current_token.lexeme)
         self.current_token = self.get_next_token() # eat id
+        
         join_token = self.find_token_in_line('join')
         if join_token:
             return self.parse_join(scope, struct_inst_name)
         
-        join_token = self.find_token_in_line('drop')
+        join_token = self.find_token_in_line('drop') 
         if join_token:
             return self.parse_drop(scope, struct_inst_name)
 
@@ -1312,6 +1314,7 @@ class Semantic:
             self.current_token = self.get_next_token()
             self.skip_spaces()
             if self.current_token.token == '.':
+                
                 join_token = self.find_token_in_line('drop')
                 if join_token:
                     return self.parse_drop(scope, identifier)
@@ -1341,6 +1344,7 @@ class Semantic:
                 self.skip_spaces()
             elif self.current_token.token == '[':
                 arr_exist = self.is_array(identifier.symbol) or self.is_params(identifier.symbol)
+                
                 if arr_exist:
                     join_token = self.find_token_in_line('drop')
                     if join_token:
@@ -1875,7 +1879,7 @@ class Semantic:
         if dimensions is None or dimensions == 2:
             pass
         else:
-            raise SemanticError("DimensionsError: Trying to append an element in a specific row to a one dimensional array, must be two-dimensional.")
+            raise SemanticError("DimensionsError: Trying to append an element in a specific row to a 1d array, must be a 2d array.")
         self.expect(".", "Expects '.' in join function call.")
         self.expect("join", "Expects 'join' keyword in join function call.")
         self.expect("(", "Expects '(' after join keyword in join function call.")
@@ -1942,6 +1946,77 @@ class Semantic:
         self.expect(")", "Expects ')' after to close drop arguments.")
         self.skip_whitespace()
         return DropStmt(arr_name, index, dimensions, dim)
+
+    def parse_seek(self, scope, name) -> SeekStmt:
+        if self.lookup_identifier(name.symbol):
+            info = self.get_identifier_info(name.symbol)
+            if info["type"] != "an array" and info["type"] != "a parameter":
+                raise SemanticError(f"NameError: Array '{name.symbol}' is not defined.")
+        else:
+            raise SemanticError(f"NameError: Array '{name.symbol}' is not defined.")
+        if info["type"] == "a parameter":
+            dimensions = None
+        elif info["type"] == "an array":
+            dimensions = self.get_dimensions(name.symbol)
+        self.expect(".", "Expects '.' in seek function call.")
+        self.expect("seek", "Expects 'seek' keyword in seek function call.")
+        self.expect("(", "Expects '(' after seek keyword in seek function call.")
+        self.skip_spaces()
+        if self.current_token.token == '[':
+            if dimensions is None or dimensions == 2:
+                pass
+            else:
+                raise SemanticError("DimensionsError: Trying to seek a specific row in a 1d array, must be a 2d array.")
+            self.current_token = self.get_next_token() # eat [
+            self.skip_spaces()
+            values = [self.parse_inner_arr_values(scope)]
+            self.expect("]", "Expects ']' to close array row values.")
+            self.skip_spaces()
+            self.expect(")", "Expects ')' after to close seek arguments.")
+            self.skip_whitespace()
+            return SeekStmt(name, values, 2)
+        else:
+            if dimensions is None or dimensions == 1:
+                pass
+            else:
+                raise SemanticError("DimensionsError: Trying to seek a specific element in a 2d array, must specify row index first..")
+            if self.current_token.token == ')':
+                raise SemanticError("SeekError: Elements inside parentheses must not be empty.")
+            value = self.parse_expr(scope)
+            self.skip_spaces()
+            self.expect(")", "Expects ')' after to close seek arguments.")
+            self.skip_whitespace()
+            return SeekStmt(name, value, 1)
+        
+    def parse_seek2d(self, scope, arr_name) -> SeekStmt:
+        self.expect("[", "Expects '[' to specify row index of two-dimensional array.")
+        self.skip_spaces()
+        if self.current_token.token == ']':
+            raise SemanticError("SeekError: Index must not be blank for seek function call.")
+        dim = self.parse_expr(scope)
+        self.skip_spaces()
+        self.expect("]", "Expected ']' to close array dimension declaration.")
+        self.skip_spaces()
+        info = self.get_identifier_info(arr_name.symbol)
+        if info["type"] == "an array":
+            dimensions = self.get_dimensions(arr_name.symbol)
+        else:
+            dimensions = None
+        if dimensions is None or dimensions == 2:
+            pass
+        else:
+            raise SemanticError("DimensionsError: Trying to seek a specific row in a 1d array, must be a 2d array.")
+        self.expect(".", "Expects '.' in seek function call.")
+        self.expect("seek", "Expects 'seek' keyword in seek function call.")
+        self.expect("(", "Expects '(' after seek keyword in seek function call.")
+        self.skip_spaces()
+        if self.current_token.token == ')':
+            raise SemanticError("SeekError: Elements inside parentheses must not be empty.")
+        value = self.parse_expr(scope)
+        self.skip_spaces()
+        self.expect(")", "Expects ')' after to close seek arguments.")
+        self.skip_whitespace()
+        return SeekStmt(arr_name, value, 2, dim)
 
 def check(fn, text):
     lexer = Lexer(fn, text)

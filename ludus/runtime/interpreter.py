@@ -155,6 +155,11 @@ def evaluate(ast_node, symbol_table):
         traverser = SemanticAnalyzer(symbol_table)
         result = traverser.visit_DropStmt(ast_node, True)
         return result
+    elif ast_node.kind == 'SeekStmt':
+        from .traverser import SemanticAnalyzer 
+        traverser = SemanticAnalyzer(symbol_table)
+        result = traverser.visit_SeekStmt(ast_node)
+        return result
 
 def eval_binary_expr(binop, symbol_table):
     if binop.left.kind in {'Load', 'LoadNum'} or binop.right.kind in {'Load', 'LoadNum'}:

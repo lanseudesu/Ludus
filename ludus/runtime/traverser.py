@@ -966,11 +966,11 @@ class SemanticAnalyzer(ASTVisitor):
 
         if isinstance(node.value, list):
             evaluated_row = []
-            eval = [evaluated_row]
             for value in node.value:
                 for v in value:
                     elem = self._evaluate_element(v, arr_name, arr_type)
                     evaluated_row.append(elem)
+            eval = [evaluated_row]
         else:
             elem = self._evaluate_element(node.value, arr_name, arr_type)
         
@@ -980,14 +980,14 @@ class SemanticAnalyzer(ASTVisitor):
             arr_elements.append(elem)
 
         elif len(arr_dimensions) == 2:  # 2D array
-            if row_index is not None:
+            if row_index is not None: # id[expr].join(expr)
                 if row_index >= len(arr_elements) or row_index < 0:
                     raise SemanticError(f"IndexError: Row index {row_index} out of bounds.")
                 if not isinstance(arr_elements[row_index], list):
                     raise SemanticError(f"JoinError: Target row is not a list.")
                 arr_elements[row_index].append(elem)
             else:
-                if not isinstance(evaluated_row, list):
+                if not isinstance(eval, list):
                     raise SemanticError("JoinError: Appending non-row values to a 2D array.")
                 arr_elements.extend(eval)
         
@@ -1079,3 +1079,64 @@ class SemanticAnalyzer(ASTVisitor):
                     return ret
             
         self.symbol_table.define_arr(arr_name, arr_dimensions, arr_elements, arr_immo, arr_type)
+
+    def visit_SeekStmt(self, node: SeekStmt):
+        arr_name = node.arr_name.symbol
+        arr_info = self.symbol_table.lookup(arr_name)
+        if not isinstance(arr_info, dict) or "dimensions" not in arr_info:
+            raise SemanticError(f"TypeError: '{arr_name}' is not an array.")
+        arr_immo = arr_info["immo"]
+        arr_type = arr_info["type"]
+        arr_dimensions = arr_info["dimensions"]
+        arr_elements = arr_info["elements"]
+
+        if arr_elements == None:
+            raise SemanticError(f"TypeError: Array '{arr_name}' is a dead array and must be defined with a value first.")
+        elif arr_elements == []:
+            raise SemanticError(f"TypeError: Array '{arr_name}' is an empty array, there is no value to be seeked.")
+        
+        if node.dimensions and node.dimensions != len(arr_dimensions):
+            raise SemanticError(f"RedeclerationError: Incorrect number of dimensions.")
+        
+        row_index = None
+        if node.row_index:
+            row_index = evaluate(node.row_index, self.symbol_table)
+
+        if isinstance(node.value, list):
+            evaluated_row = []
+            for value in node.value:
+                for v in value:
+                    elem = self._evaluate_element(v, arr_name, arr_type)
+                    evaluated_row.append(elem)
+            eval = [evaluated_row]
+        else:
+            elem = self._evaluate_element(node.value, arr_name, arr_type)
+
+        if len(arr_dimensions) == 1:  
+            if isinstance(elem, list):
+                raise SemanticError("SeeError: Cannot append seek multiple values in a 1d array.")
+            try:
+                return arr_elements.index(elem)
+            except ValueError:
+                return -1
+        
+        elif len(arr_dimensions) == 2:  # 2D array
+            if row_index is not None:   # id: id[expr].seek(expr)
+                if row_index >= len(arr_elements) or row_index < 0:
+                    raise SemanticError(f"IndexError: Row index {row_index} out of bounds.")
+                if not isinstance(arr_elements[row_index], list):
+                    raise SemanticError(f"SeekError: Target row is not a list.")
+                
+                try:
+                    return arr_elements[row_index].index(elem)
+                except ValueError:
+                    return -1
+            
+            else:   # id: id.seek([elems elems_recur])
+                if not isinstance(evaluated_row, list):
+                    raise SemanticError("SeekError: Cannot seek a specific element in a 2d array without specifying the index.")
+                
+                try:
+                    return arr_elements.index(evaluated_row)
+                except ValueError:
+                    return -1
