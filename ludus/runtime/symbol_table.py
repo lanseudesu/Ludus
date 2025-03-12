@@ -29,8 +29,7 @@ class SymbolTable:
         current_scope = self.scope_stack.pop()
 
         if self.func_flag:  
-            if current_scope not in self.saved_scopes_func:
-                self.saved_scopes_func.insert(1, current_scope.copy())
+            self.saved_scopes_func.insert(1, current_scope.copy())
         else:  
             self.saved_scopes.insert(1, current_scope.copy())
             #print(f"exit scope -> {self.saved_scopes}")
@@ -44,12 +43,14 @@ class SymbolTable:
 
     
     def restore_scope(self, scope_index=None):
-        if len(self.saved_scopes) > 1:  
-            if scope_index is not None:
+        if len(self.saved_scopes) > 1:
+            if scope_index is not None and (0 <= scope_index < len(self.saved_scopes)):
                 restored_scope = self.saved_scopes[scope_index]
             else:
                 restored_scope = self.saved_scopes[1]  
             self.scope_stack.append(restored_scope)
+        else:
+            raise SemanticError("No saved scope available to restore.")
         # print("Restore Scope:")
         # for scope in reversed(self.scope_stack):
         #     print(scope)
@@ -67,6 +68,7 @@ class SymbolTable:
         current_scope[name] = value
 
     def define_var(self, name: str, value, datatype, immo):
+        current_scope = self.scope_stack[-1]
         for scope in reversed(self.scope_stack):
             if name in scope:
                 current_scope = scope

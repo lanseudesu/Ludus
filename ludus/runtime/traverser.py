@@ -771,7 +771,10 @@ class SemanticAnalyzer(ASTVisitor):
             raise SemanticError(f"LoopError: Loop condition does not evaluate to a flag value.")
         
         if condition:
-            self.symbol_table.restore_scope(len(self.symbol_table.scope_stack))
+            if self.in_func_flag:
+                self.symbol_table.restore_scope(len(self.symbol_table.saved_scopes) - 1)
+            else:
+                self.symbol_table.restore_scope(len(self.symbol_table.scope_stack))
             while evaluate(node.condition, self.symbol_table):
                 for stmt in node.body:
                     self.visit(stmt)
@@ -1108,7 +1111,6 @@ class SemanticAnalyzer(ASTVisitor):
                 for v in value:
                     elem = self._evaluate_element(v, arr_name, arr_type)
                     evaluated_row.append(elem)
-            eval = [evaluated_row]
         else:
             elem = self._evaluate_element(node.value, arr_name, arr_type)
 

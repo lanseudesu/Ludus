@@ -1281,7 +1281,7 @@ class Semantic:
             operator = self.current_token.token
             self.current_token = self.get_next_token()
             self.skip_spaces()
-            operand = self.parse_exp_expr()
+            operand = self.parse_exp_expr(scope)
             return UnaryExpr(operator=operator, operand=operand)
 
         return self.parse_exp_expr(scope)
@@ -1310,7 +1310,7 @@ class Semantic:
             tk= 'id'
 
         if tk == 'id':
-            identifier = Identifier(symbol=self.current_token.lexeme)
+            identifier = Identifier(self.current_token.lexeme)
             self.current_token = self.get_next_token()
             self.skip_spaces()
             if self.current_token.token == '.':
@@ -1547,11 +1547,11 @@ class Semantic:
                 self.expect(')', "Unexpected token found inside parenthesized expression. Expected closing parenthesis.")
                 self.skip_spaces()
                 return UnaryExpr(operator='-', operand=expr)
-            elif re.match(r'^id\d+$', self.current_token.token):
-                identifier = Identifier(symbol=self.current_token.lexeme)
-                self.current_token = self.get_next_token()
-                self.skip_spaces()
-                return UnaryExpr(operator='-', operand=identifier)
+            else:
+                expr = self.parse_expr(scope)
+                if expr.kind not in ['Identifier', 'ArrayElement', 'StructInstField']:
+                    raise SemanticError("UnaryError: Invalid expression after unary operator.")
+                return UnaryExpr(operator='-', operand=expr)
         elif tk == 'dead':
             self.current_token = self.get_next_token()
             self.skip_spaces()
@@ -1724,7 +1724,7 @@ class Semantic:
             self.push_scope()
             choice_body = []
             while self.current_token and self.current_token.token not in ["choice", "backup", "}"]:
-                stmt = self.parse_stmt(scope, True)
+                stmt = self.parse_stmt(scope)
                 choice_body.append(stmt)
                 self.skip_whitespace()
                 if isinstance(stmt, RecallStmt):
@@ -1782,7 +1782,7 @@ class Semantic:
                 raise SemanticError("ForError: Expected variable name after loop condition.")
         upd_name = Identifier(self.current_token.lexeme)
         if not self.lookup_id_type(upd_name.symbol, "a variable"):
-            raise SemanticError(f"NameError: Variable '{upd_name}' is not defined.")
+            raise SemanticError(f"NameError: Variable '{upd_name.symbol}' is not defined.")
         self.current_token = self.get_next_token() # eat id
         self.skip_spaces()
         operator = self.current_token.token
@@ -2076,12 +2076,13 @@ def check(fn, text):
     tokens, error = lexer.make_tokens()
 
     if error:
-        return 'Lexical errors found, cannot continue with syntax analyzing. Please check lexer tab.', {}
+        return 'Lexical errors found, cannot continue with syntax analyzing. Please check lexer tab.\n\nLexical Errors:\n' + "\n\n".join(error), {}
 
     result = parse(fn, text)
 
     if result != 'No lexical errors found!\nValid syntax.':
-        return 'Syntax errors found, cannot continue with semantic analyzing. Please check syntax tab.', {}
+        result = result.split("\n", 1)[-1]
+        return f'Syntax errors found, cannot continue with semantic analyzing. Please check syntax tab.\n{result}', {}
 
     semantic = Semantic(tokens)
     result = semantic.produce_ast()

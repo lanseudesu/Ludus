@@ -26,7 +26,7 @@ lcurly_delim   = ALPHANUM + whitespace + '_{(-!'
 comma_delim    = ALPHANUM + whitespace + '_.["-(!'
 period_delim   = ALPHA + '_'  
 rparen_delim   = whitespace + arith_op + relat_op + '{})],.'
-rcurly_delim   = whitespace + '}' # add sa docs
+rcurly_delim   = whitespace + '}' 
 rbracket_delim = whitespace + arith_op + relat_op + ',.[:){}'
 
 nl_delim       = ALPHA + whitespace + '_{}`\t'
@@ -38,7 +38,7 @@ delim3  = ALPHANUM + '_ ."-!('
 delim4  = ALPHANUM + '_ .-!('
 delim5  = ALPHANUM + whitespace + '_."-(!['
 delim6  = ALPHA + '_('
-delim7 = '})' + whitespace + arith_op + relat_op # add sa dox
+delim7 = '})' + whitespace + arith_op + relat_op 
 
 valid_lhs = ALPHANUM + '_)]'
 

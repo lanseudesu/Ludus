@@ -13,8 +13,9 @@ class Node:
 
 
 class Parser:
-    def __init__(self, tokens):
+    def __init__(self, tokens, source_code):
         self.tokens = tokens
+        self.source_code = source_code.split("\n")
         self.current_token_index = 0
         self.current_token = self.get_next_token()
         self.save_stack = []
@@ -87,10 +88,12 @@ class Parser:
                                 i += 1
 
 
-                        expected_tokens = list(set(expected_tokens))
+                        expected_tokens = sorted(set(expected_tokens))
                     
-                    return (f"Syntax Error: Unexpected token '{self.current_token.token}' at line {self.current_token.line} and column {self.current_token.column}."
-                            f" Expected tokens: {', '.join(expected_tokens)}.")
+                    error_msg = (f"Syntax Error: Unexpected token '{self.current_token.token}' at line {self.current_token.line} and column {self.current_token.column}."
+                                f" Expected tokens: {', '.join(expected_tokens)}.\n\n")
+                    error_msg += self.generate_error_message()
+                    return error_msg
             else:
                 if null_flag:
                     # print(f"save stack: {self.save_stack}")
@@ -113,13 +116,17 @@ class Parser:
                             i += 1
 
 
-                    expected_tokens = list(set(expected_tokens))
+                    expected_tokens = sorted(set(expected_tokens))
 
-                    return (f"Syntax Error: Unexpected token '{self.current_token.token}' at line {self.current_token.line} and column {self.current_token.column}."
-                            f" Expected tokens: {', '.join(expected_tokens)}.")
+                    error_msg = (f"Syntax Error: Unexpected token '{self.current_token.token}' at line {self.current_token.line} and column {self.current_token.column}."
+                                f" Expected tokens: {', '.join(expected_tokens)}.\n\n")
+                    error_msg += self.generate_error_message()
+                    return error_msg
 
-                return (f"Syntax Error: Unexpected token '{self.current_token.token}' at line {self.current_token.line} and column {self.current_token.column}."
-                        f" Expected token: {self.top}.")
+                error_msg = (f"Syntax Error: Unexpected token '{self.current_token.token}' at line {self.current_token.line} and column {self.current_token.column}."
+                        f" Expected token: {self.top}.\n\n")
+                error_msg += self.generate_error_message()
+                return error_msg
 
         while self.current_token.token in {"newline", "space"}:
                 self.current_token = self.get_next_token()
@@ -129,6 +136,15 @@ class Parser:
         else:
             return "Input not fully consumed."
 
+    def generate_error_message(self):
+        line_num = self.current_token.line
+        col_num = self.current_token.column
+        error_line = self.source_code[line_num - 1]  
+
+        underline = " " * (col_num - 1) + "^" * len(self.current_token.lexeme)
+
+        return (f"{error_line}\n{underline}")
+
 def parse(fn, text):
     lexer = Lexer(fn, text)
     if text == "":
@@ -136,10 +152,10 @@ def parse(fn, text):
     tokens, error = lexer.make_tokens()
 
     if error:
-        return 'Lexical errors found, cannot continue with syntax analyzing. Please check lexer tab.' 
+         return 'Lexical errors found, cannot continue with syntax analyzing. Please check lexer tab.\n\nLexical Errors:\n' + "\n\n".join(error)
      
 
-    syntax = Parser(tokens)
+    syntax = Parser(tokens, text)
     result = syntax.parser() 
 
     return f"No lexical errors found!\n{result}"

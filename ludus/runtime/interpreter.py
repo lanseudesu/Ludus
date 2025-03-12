@@ -44,9 +44,7 @@ def evaluate(ast_node, symbol_table):
         for fld in structinst["fields"]:
             if fld["name"] == ast_node.field.symbol:
                 return fld["value"]
-            else:
-                raise SemanticError(f"FieldError: Field '{ast_node.field.symbol}' does not exist "
-                                f"in struct instance '{ast_node.instance.symbol}'.")
+        raise SemanticError(f"NameError: Field '{ast_node.field.symbol}' is not defined in struct instance '{ast_node.instance.symbol}'.")
     elif ast_node.kind == 'ArrayElement':
         arr_name = ast_node.left.symbol
         arr = symbol_table.lookup(arr_name)
@@ -126,22 +124,22 @@ def evaluate(ast_node, symbol_table):
             if not isinstance(result, dict):
                 if result is None:
                     result = 'dead'
-                elif result == True:
-                    result = 'true'
+                elif isinstance(result, int) or isinstance(result, float):
+                    result=result
                 elif result == False:
                     result = 'false'
                 else:
-                    result=result  
+                    result='true'  
             elif "value" in result:
                 result = result["value"]
                 if result is None:
                     result = 'dead'
-                elif result == True:
-                    result = 'true'
+                elif isinstance(result, int) or isinstance(result, float):
+                    result=result
                 elif result == False:
                     result = 'false'
                 else:
-                    result=result  
+                    result='true'  
             elif "elements" in result or "fields" in result:
                 raise SemanticError("TypeError: Cannot format a list object within a comms literal.")
             evaluated_values.append(str(result))  
