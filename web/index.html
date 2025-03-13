@@ -4,6 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Ludus</title>
+  <link rel="icon" type="image/png" href="ludus.png"> <!--edit-->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.5/codemirror.min.js"></script>
   <link rel="stylesheet" href="codemirror.css">
   <link rel="stylesheet" href="styles.css">
@@ -13,34 +14,37 @@
   <script src="main.js"></script>
 </head>
 <body>
-  <nav class="navbar">
-    <div class="nav-left">
-        <div class="nav-logo">
-            <span class="brackets">[</span>L<span class="brackets">]</span>udus</div>
-        <ul class="nav-files">
-            <li><a href="#files">Files</a></li>
-            <button class="run-button">
-                <li><a href="index.html" onclick = "preserveText()">▷ Run</a></li>
-            </button>
+    <nav class="navbar">
+        <div class="nav-left">
+            <div class="nav-logo">
+                <span class="brackets">[</span>L<span class="brackets">]</span>udus</div>
+            <ul class="nav-files">
+                <div class="file-dropdown">
+                    <button class="file-button" onclick="toggleFileButton()">Files
+                        <span class="file-icon">▽</span>
+                    </button>
+                    <div id="dropdown-content" class="file-options">
+                        <a href="#" onclick="newFile()">New File</a>
+                        <a href="#" onclick="openFile()">Open File</a>
+                        <a href="#" onclick="saveFile()">Save</a>
+                        <a href="#" onclick="saveAs()">Save As</a>
+                        <hr class="dashed">
+                        <a href="#" onclick="exitApp()">Exit</a>
+                    </div>
+                </div>
+                <button class="run-button">
+                    <li><a href="index.html" onclick = "preserveText()">▷ Run</a></li>
+                </button>
+            </ul>
+        </div>
+        
+        <ul class="nav-links">
+            <li><a href="lexerpage.html" onclick = "preserveText()">Lexical</a></li>
+            <li><a href="syntax.html" onclick = "preserveText()">Syntax</a></li>
+            <li><a href="semantic_page.html" onclick = "preserveText()">Semantic</a></li>
         </ul>
-    </div>
-    
-    <ul class="nav-links">
-        <li><a href="lexerpage.html" onclick = "preserveText()">Lexical</a></li>
-        <li><a href="syntax.html" onclick = "preserveText()">Syntax</a></li>
-        <li><a href="semantic_page.html" onclick = "preserveText()">Semantic</a></li>
-    </ul>
-    <script>
-        window.addEventListener("DOMContentLoaded", () => {
-            if (window.location.href.includes("index.html")) {
-                console.log("Running analyzers after navigation...");
-                lexicalAnalyzer();
-                syntaxAnalyzer();
-                semanticAnalyzer();
-            }
-        });
-        </script>
-  </nav>
+      </nav>
+
   <div class="master_box">
     <div class="code-editor-wrapper">
         <div class="line-numbers" id="lineNumbers"></div>
