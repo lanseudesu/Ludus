@@ -113,8 +113,12 @@ class Position:
 
     def advance(self, current_char):
         self.idx += 1
-        self.col += 1
 
+        if current_char == '\t':
+            self.col += 4 - (self.col % 4)
+        else:
+            self.col += 1
+        
         if current_char == '\n':
             self.ln += 1
             self.col = 0

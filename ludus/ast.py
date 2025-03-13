@@ -404,18 +404,22 @@ class Semantic:
         return RecallStmt(stmt)
 
     def parse_func_call(self, scope) -> FuncCallStmt:
-        func_name = Identifier(self.current_token.lexeme)
+        pos_start = [self.current_token.line, self.current_token.column]
+        var_name_size = len(self.current_token.lexeme)
+        id_pos_end = [self.current_token.line, self.current_token.column + var_name_size - 1]
+        func_name = Identifier(self.current_token.lexeme, pos_start, id_pos_end)
         if not self.lookup_id_type(func_name.symbol, "a function"):
             raise SemanticError(f"NameError: Function '{func_name.symbol}' does not exist.")
         self.current_token = self.get_next_token() # eat id
+        arg_pos_start = [self.current_token.line, self.current_token.column]
         self.expect("(", "Expects '(' after function name.")
         args = []
         self.skip_spaces()
-
+        arg_pos = [self.current_token.line, self.current_token.column]
         while self.current_token.token != ')':
             la_token = self.look_ahead()
             if la_token.token == ',' or la_token.token == ')':
-                arg = self.parse_primary_expr(scope, 'func_call')
+                arg = self.parse_primary_expr(scope, 'func_call', arg_pos)
             else:
                 arg = self.parse_expr(scope)
             args.append(arg)
@@ -423,12 +427,14 @@ class Semantic:
             if self.current_token.token == ',':
                 self.current_token = self.get_next_token() # eat ,
                 self.skip_spaces()
+        pos_end = [self.current_token.line, self.current_token.column]
         self.current_token = self.get_next_token() # eat )
         self.skip_whitespace()
-        return FuncCallStmt(func_name, args)
+        return FuncCallStmt(func_name, args, pos_start, pos_end, arg_pos_start, pos_end)
     
     ######### ARRAYS AND VARIABLES #########    
     def var_or_arr(self, scope) -> Union[VarDec, ArrayDec]:
+        pos_start = [self.current_token.line, self.current_token.column]
         datatype = self.current_token.token  
         self.current_token = self.get_next_token()
         self.skip_spaces()
@@ -443,20 +449,23 @@ class Semantic:
                 info = self.get_identifier_info(name)
                 raise SemanticError(f"4 NameError: Identifier {name}' was "
                                     f"already declared as {info["type"]}.")
-            return self.parse_empty_array(datatype, scope)
+            return self.parse_empty_array(datatype, scope, pos_start)
         else:
             if self.lookup_identifier(name):
                 info = self.get_identifier_info(name)
                 raise SemanticError(f"5 NameError: Identifier {name}' was "
                                     f"already declared as {info["type"]}.")
-            return self.parse_var_dec(datatype, scope)
+            return self.parse_var_dec(datatype, scope, pos_start)
     
     def parse_var_init(self, scope) -> Union[VarDec, BatchVarDec, VarAssignment]:
-        var_names = [Identifier(symbol=self.current_token.lexeme)]  
         name = self.current_token.lexeme
+        pos_start = [self.current_token.line, self.current_token.column]
+        var_name_size = len(self.current_token.lexeme)
+        id_pos_end = [self.current_token.line, self.current_token.column + var_name_size - 1]
+        var_names = [Identifier(self.current_token.lexeme, pos_start, id_pos_end)]  
 
         if self.is_array(name): 
-            return self.parse_arr_redec(name, scope)
+            return self.parse_arr_redec(var_names[0], scope)
 
         self.current_token = self.get_next_token() # eat id
         self.skip_spaces()
@@ -468,7 +477,10 @@ class Semantic:
             if not self.current_token or not re.match(r'^id\d+$', self.current_token.token):
                 raise SemanticError("Expected variable name after ','.")
 
-            var_names.append(Identifier(symbol=self.current_token.lexeme))
+            id_pos_start = [self.current_token.line, self.current_token.column]
+            var_name_size = len(self.current_token.lexeme)
+            id_pos_end = [self.current_token.line, self.current_token.column + var_name_size - 1]
+            var_names.append(Identifier(self.current_token.lexeme ,id_pos_start, id_pos_end))
             self.current_token = self.get_next_token() # eat id
             self.skip_spaces()
             
@@ -477,6 +489,7 @@ class Semantic:
                 self.current_token = self.get_next_token() # eat :
                 self.skip_spaces()
                 value = self.parse_expr(scope)
+                pos_end = value.pos_end
                 declarations = []
                 for var in var_names:
                     info = self.lookup_identifier(var.symbol)
@@ -484,18 +497,18 @@ class Semantic:
                         info = self.get_identifier_info(var.symbol)
                         if info["type"] == 'a parameter':
                             self.declare_id(var.symbol, "a variable")
-                            declarations.append(VarAssignment(var, ":", value))
+                            declarations.append(VarAssignment(var, ":", value, pos_start, pos_end))
                         elif info["type"] != "a variable":
                             raise SemanticError(f"6 NameError: Identifier {var.symbol}' was "
                                                 f"already declared as {info["type"]}.")
                         else:
-                            declarations.append(VarAssignment(var, ":", value))
+                            declarations.append(VarAssignment(var, ":", value, pos_start, pos_end))
                     else:
-                        declarations.append(VarDec(var, value, False, scope))
+                        declarations.append(VarDec(var, value, False, scope, pos_start, pos_end))
                         self.declare_id(var.symbol, "a variable")
 
                 self.skip_spaces()
-                return BatchVarDec(declarations, True)
+                return BatchVarDec(declarations, True, pos_start, pos_end)
 
         self.current_token = self.get_next_token() # eat :
         self.skip_spaces()
@@ -513,6 +526,7 @@ class Semantic:
                         self.expect("[", "Expected '[' for array values.")
                         self.skip_spaces()
                         inner_values = self.parse_inner_arr_values(scope)
+                        pos_end = [self.current_token.line, self.current_token.column]
                         self.expect("]", "Expected ']' to close array values.")
                         self.skip_spaces()
                         if self.current_token.token == ',':
@@ -522,9 +536,8 @@ class Semantic:
                         else:
                             values = inner_values
                             break
-                    return ArrayRedec(name, None, values, False, scope)
+                    return ArrayRedec(var_names[0], None, values, False, scope, pos_start, pos_end)
                 
-
         value = self.parse_expr(scope)
         values_table = {name: {"values": value}}
         self.skip_spaces()
@@ -536,7 +549,11 @@ class Semantic:
             if not self.current_token or not re.match(r'^id\d+$', self.current_token.token):
                 raise SemanticError("Expected variable name after ','.")
             
-            var_names.append(Identifier(symbol=self.current_token.lexeme))
+            id_pos_start = [self.current_token.line, self.current_token.column]
+            var_name_size = len(self.current_token.lexeme)
+            id_pos_end = [self.current_token.line, self.current_token.column + var_name_size - 1]
+            
+            var_names.append(Identifier(self.current_token.lexeme, id_pos_start, id_pos_end))
             variable_name = self.current_token.lexeme
             self.current_token = self.get_next_token() # eat id
             self.skip_spaces()
@@ -550,6 +567,7 @@ class Semantic:
             value = self.parse_expr(scope)
             values_table[variable_name] = {"values": value}
 
+        pos_end = value.pos_end
         self.skip_spaces()
         if len(var_names) > 1:
             declarations = []
@@ -559,17 +577,17 @@ class Semantic:
                     info = self.get_identifier_info(var.symbol)
                     if info["type"] == 'a parameter':
                         self.declare_id(var.symbol, "a variable")
-                        declarations.append(VarAssignment(var, ":", values_table[var.symbol]['values']))
+                        declarations.append(VarAssignment(var, ":", values_table[var.symbol]['values'], var.pos_start, values_table[var.symbol]['values'].pos_end))
                     elif info["type"] != "a variable":
                         raise SemanticError(f"7 NameError: Identifier '{var.symbol}' was "
                                             f"already declared as {info["type"]}.")
                     else:
-                        declarations.append(VarAssignment(var, ":", values_table[var.symbol]['values']))
+                        declarations.append(VarAssignment(var, ":", values_table[var.symbol]['values'], var.pos_start, values_table[var.symbol]['values'].pos_end))
                 else:
-                    declarations.append(VarDec(var, values_table[var.symbol]['values'], False, scope))
+                    declarations.append(VarDec(var, values_table[var.symbol]['values'], False, scope, var.pos_start, values_table[var.symbol]['values'].pos_end))
                     self.declare_id(var.symbol, "a variable")
            
-            return BatchVarDec(declarations)
+            return BatchVarDec(declarations, False, pos_start, pos_end)
         else:
             var = var_names[0]
             info = self.lookup_identifier(var.symbol)
@@ -581,18 +599,20 @@ class Semantic:
                 else:
                     if info["type"] == "a parameter" and isinstance(value, Identifier):
                         if self.is_array(value.symbol):
-                            return ArrayRedec(var.symbol, None, value.symbol, False, scope)
-                        return ArrayOrVar(var.symbol, [VarAssignment(var, ':', value), ArrayRedec(var.symbol, None, value.symbol, False, scope)])
-                    return VarAssignment(var, ':', value)
+                            return ArrayRedec(var, None, value, False, scope, pos_start, pos_end)
+                        return ArrayOrVar(var.symbol, [VarAssignment(var, ':', value, pos_start, pos_end), ArrayRedec(var, None, value, False, scope, pos_start, pos_end)])
+                    return VarAssignment(var, ':', value, pos_start, pos_end)
             else:
                 self.declare_id(var.symbol, "a variable")
-                return VarDec(var, value, False, scope) 
+                return VarDec(var, value, False, scope, pos_start, pos_end) 
         
-    def parse_var_dec(self, datatype, scope) -> Union[VarDec, BatchVarDec]:
+    def parse_var_dec(self, datatype, scope, pos_start) -> Union[VarDec, BatchVarDec]:
         var_names = []
-
         while True:
-            var_names.append(Identifier(symbol=self.current_token.lexeme))
+            id_pos_start = [self.current_token.line, self.current_token.column]
+            var_name_size = len(self.current_token.lexeme)
+            id_pos_end = [self.current_token.line, self.current_token.column + var_name_size - 1]
+            var_names.append(Identifier(self.current_token.lexeme, id_pos_start, id_pos_end))
             self.current_token = self.get_next_token() # eat id
             self.skip_spaces()
 
@@ -602,6 +622,7 @@ class Semantic:
             else:
                 break
         value = None
+        pos_end = [self.current_token.line, self.current_token.column]
         if self.current_token and self.current_token.token == 'newline':
             if datatype == 'hp':
                 value = HpLiteral(0)
@@ -614,6 +635,7 @@ class Semantic:
             else:
                 raise SemanticError(f"Unknown data type '{datatype}'.")
         elif self.current_token and self.current_token.token == ':':
+            pos_end = [self.current_token.line, self.current_token.column + 3]
             self.current_token = self.get_next_token()
             self.skip_spaces()
             self.expect("dead", "Expected 'dead' keyword.")
@@ -628,9 +650,9 @@ class Semantic:
                                         f"already declared as {info["type"]}.")  
                 self.declare_id(var.symbol, "a variable")
             if value != None:
-                return BatchVarDec([VarDec(var, value, False, scope) for var in var_names])
+                return BatchVarDec([VarDec(var, value, False, scope) for var in var_names], False, pos_start, pos_end)
             else:
-                return BatchVarDec([VarDec(var, DeadLiteral(value, datatype), False, scope) for var in var_names])
+                return BatchVarDec([VarDec(var, DeadLiteral(value, datatype), False, scope) for var in var_names], False, pos_start, pos_end)
         else:
             var = var_names[0]
             if self.lookup_identifier(var.symbol):
@@ -639,12 +661,15 @@ class Semantic:
                                         f"already declared as {info["type"]}.")    
             self.declare_id(var.symbol, "a variable")
             if value != None:
-                return VarDec(var, value, False, scope)
+                return VarDec(var, value, False, scope, pos_start, var.pos_end)
             else:
-                return VarDec(var, DeadLiteral(value, datatype), False, scope)
+                return VarDec(var, DeadLiteral(value, datatype), False, scope, pos_start, pos_end)
 
-    def parse_empty_array(self, datatype, scope) -> ArrayDec:
-        arr_name = Identifier(symbol=self.current_token.lexeme)
+    def parse_empty_array(self, datatype, scope, pos_start) -> ArrayDec:
+        id_pos_start = [self.current_token.line, self.current_token.column]
+        var_name_size = len(self.current_token.lexeme)
+        id_pos_end = [self.current_token.line, self.current_token.column + var_name_size - 1]
+        arr_name = Identifier(self.current_token.lexeme, id_pos_start, id_pos_end)
         name = arr_name.symbol
         self.current_token = self.get_next_token()
         self.skip_spaces()
@@ -661,6 +686,7 @@ class Semantic:
                 dimensions.append(None)
             self.skip_spaces()
             self.expect("]", "Expected ']' to close array dimension declaration.")
+            pos_end = [self.current_token.line, self.current_token.column - 1]
             self.skip_spaces()
         if self.current_token and self.current_token.token == 'newline':
             default_value = {
@@ -685,10 +711,11 @@ class Semantic:
 
             self.skip_whitespace()
             self.declare_id(name, "an array", len(dimensions))
-            return ArrayDec(arr_name, dimensions, values, False, scope, datatype)
+            return ArrayDec(arr_name, dimensions, values, False, scope, datatype, pos_start, pos_end)
         elif self.current_token and self.current_token.token == ':':
             self.current_token = self.get_next_token() #eat :
             self.skip_spaces()
+            pos_end = [self.current_token.line, self.current_token.column + 3]
             self.expect("dead", "Expected 'dead' after ':'.")
             if len(dimensions) == 2:
                 if dimensions[0] is None and dimensions[1] is None:
@@ -702,23 +729,25 @@ class Semantic:
                     raise SemanticError("NullPointerError: Null arrays cannot be initialized with specific size.")
                 
             self.declare_id(name, "an array", len(dimensions))
-            return ArrayDec(arr_name, dimensions, values, False, scope, datatype)      
+            return ArrayDec(arr_name, dimensions, values, False, scope, datatype, pos_start, pos_end)      
     
     def parse_array(self, scope) -> Union[ArrayDec, ArrAssignment]:
-        arr_name = Identifier(symbol=self.current_token.lexeme)
-        name= arr_name.symbol
+        pos_start = [self.current_token.line, self.current_token.column]
+        var_name_size = len(self.current_token.lexeme)
+        id_pos_end = [self.current_token.line, self.current_token.column + var_name_size - 1]
+        arr_name = Identifier(self.current_token.lexeme, pos_start, id_pos_end)
+        name = arr_name.symbol
         self.current_token = self.get_next_token() # eat id
         self.skip_spaces()
         arr_exist = self.is_array(name) or self.is_params(name)
-        
         if arr_exist:
             join_token = self.find_token_in_line('join')
             if join_token:
-                return self.parse_join2d(scope, arr_name)
+                return self.parse_join2d(scope, arr_name, pos_start)
             
             join_token = self.find_token_in_line('drop')
             if join_token:
-                return self.parse_drop2d(scope, arr_name)
+                return self.parse_drop2d(scope, arr_name, pos_start)
 
         dimensions = []
         while self.current_token and self.current_token.token == '[':
@@ -740,6 +769,7 @@ class Semantic:
                 
             self.skip_spaces()
             self.expect("]", "Expected ']' to close array dimension declaration.")
+            pos_end = [self.current_token.line, self.current_token.column - 1]
             self.skip_spaces()
             
         if self.current_token.token == ':':
@@ -749,15 +779,16 @@ class Semantic:
                 if arr_exist:
                     raise SemanticError(f"DeclarationError: Identifier '{name}' was already declared.")
                 else:
-                    values = self.parse_array_values(dimensions, scope)
+                    values, pos_end = self.parse_array_values(dimensions, scope)
                     self.declare_id(name, "an array", len(dimensions))
-                    return ArrayDec(arr_name, dimensions, values, False, scope)
+                    return ArrayDec(arr_name, dimensions, values, False, scope, None, pos_start, pos_end)
             else:
                 if arr_exist:
                     if all(dim is not None for dim in dimensions):
                         value = self.parse_expr(scope)
-                        lhs = ArrElement(arr_name, dimensions)
-                        return ArrAssignment(lhs, ':', value)
+                        lhs = ArrElement(arr_name, dimensions, pos_start, pos_end)
+                        pos_end = value.pos_end
+                        return ArrAssignment(lhs, ':', value, pos_start, pos_end)
                     else:
                         raise SemanticError(f"AssignmentError: Index must not be blank for array index assignment for array name '{arr_name.symbol}'.")
                 else:
@@ -769,8 +800,9 @@ class Semantic:
             if arr_exist:
                 if all(dim is not None for dim in dimensions):
                     value = self.parse_expr(scope)
-                    lhs = ArrElement(arr_name, dimensions)
-                    return ArrAssignment(lhs, operator, value)
+                    lhs = ArrElement(arr_name, dimensions, pos_start, pos_end)
+                    pos_end = value.pos_end
+                    return ArrAssignment(lhs, operator, value, pos_start, pos_end)
                 else:
                     raise SemanticError(f"AssignmentError: Index must not be blank for array index assignment for array name '{arr_name.symbol}'.")
             else:
@@ -786,6 +818,7 @@ class Semantic:
                 inner_values = self.parse_inner_arr_values(scope)
                 values.append(inner_values)
                 self.expect("]", "Expected ']' to close array values.")
+                pos_end = [self.current_token.line, self.current_token.column - 1]
                 self.skip_spaces()
                 if self.current_token.token == ',':
                     self.current_token = self.get_next_token()  # eat ,
@@ -807,6 +840,7 @@ class Semantic:
             inner_values = self.parse_inner_arr_values(scope)
             values = inner_values
             self.expect("]", "Expected ']' to close array values.")
+            pos_end = [self.current_token.line, self.current_token.column - 1]
             self.skip_spaces()
             if self.current_token.token == ',':
                 raise SemanticError(
@@ -818,7 +852,7 @@ class Semantic:
                     f"ArraySizeError: Expected {expected_dims[0]} elements, but got {len(values)}."
                 )
         
-        return values
+        return values, pos_end
 
     def parse_inner_arr_values(self, scope):
         inner_values = []
@@ -834,7 +868,8 @@ class Semantic:
         return inner_values
    
     def parse_arr_redec(self, name, scope):
-        dimensions=self.get_dimensions(name)
+        pos_start = [self.current_token.line, self.current_token.column]
+        dimensions=self.get_dimensions(name.symbol)
         self.current_token = self.get_next_token() # eat id
         self.skip_spaces()
         self.expect(":", "Expected ':' after array name for array re-decleration.")
@@ -844,40 +879,51 @@ class Semantic:
         elif dimensions == 2:
             dimensions = [None, None]
         if self.current_token and self.current_token.token == '[':
-            values = self.parse_array_values(dimensions, scope)
-            return ArrayRedec(name, dimensions, values, False, scope)
+            values, pos_end = self.parse_array_values(dimensions, scope)
+            return ArrayRedec(name, dimensions, values, False, scope, pos_start, pos_end) 
         elif re.match(r'^id\d+$', self.current_token.token):
+            id_pos_start = [self.current_token.line, self.current_token.column]
             rhs_name = self.current_token.lexeme
+            rhs_name_size = len(rhs_name)
+            id_pos_end = [self.current_token.line, self.current_token.column + rhs_name_size - 1]
+            rhs_name_node = Identifier(self.current_token.lexeme, id_pos_start, id_pos_end)
             la_token = self.look_ahead()
             if la_token.token == '(':
                 if not self.lookup_id_type(rhs_name, "a function"):
                     raise SemanticError(f"NameError: Function '{rhs_name}' does not exist.")
                 values = self.parse_func_call(scope)
-                return ArrayRedec(name, dimensions, values, False, scope)
+                pos_end = values.pos_end
+                return ArrayRedec(name, dimensions, values, False, scope, pos_start, pos_end)
             self.current_token = self.get_next_token() # eat id
             self.skip_whitespace()
             info = self.lookup_identifier(rhs_name)
             if info:
                 info = self.get_identifier_info(rhs_name)
                 if info["type"] == 'a parameter':
-                    self.declare_id(name, "an array")
-                    return ArrayRedec(name, dimensions, rhs_name, False, scope)
+                    self.declare_id(name.symbol, "an array")
+                    return ArrayRedec(name, dimensions, rhs_name_node, False, scope, pos_start, id_pos_end)
                 elif info["type"] != "an array":
-                    raise SemanticError(f"RedeclarationError: Array '{name}' is being redeclared with"
+                    raise SemanticError(f"RedeclarationError: Array '{name.symbol}' is being redeclared with"
                                         " non-array element.")
                 else:
-                    return ArrayRedec(name, dimensions, rhs_name, False, scope)
+                    return ArrayRedec(name, dimensions, rhs_name_node, False, scope, pos_start, id_pos_end)
+            else:
+                raise SemanticError(f"NameError: Array '{rhs_name}' does not exist.")
         else:
-            raise SemanticError(f"RedeclarationError: Array '{name}' is being redeclared with"
+            raise SemanticError(f"RedeclarationError: Array '{name.symbol}' is being redeclared with"
                                 " non-array element.")
 
     ########## STRUCTS ##########
     def parse_globalstruct(self) -> Union[StructDec, GlobalStructDec]:
+        pos_start = [self.current_token.line, self.current_token.column]
         self.current_token = self.get_next_token() # eat build
         self.skip_spaces()
         if not self.current_token or not re.match(r'^id\d+$', self.current_token.token):
                 raise SemanticError("Expected struct name after 'build'.")
-        struct_name = Identifier(self.current_token.lexeme)
+        id_pos_start = [self.current_token.line, self.current_token.column]
+        var_name_size = len(self.current_token.lexeme)
+        id_pos_end = [self.current_token.line, self.current_token.column + var_name_size - 1]
+        struct_name = Identifier(self.current_token.lexeme, id_pos_start, id_pos_end)
         self.current_token = self.get_next_token() # eat id
         self.skip_whitespace()
         if self.current_token.token == '{':
@@ -891,14 +937,17 @@ class Semantic:
             if struct_name.symbol in self.globalstruct:
                 raise SemanticError(f"NameError: Global struct '{struct_name.symbol}' was already declared.")
             self.globalstruct.append(struct_name.symbol)
-            return GlobalStructDec(struct_name)
+            return GlobalStructDec(struct_name, pos_start, id_pos_end)
 
     def parse_struct(self, scope) -> StructDec:
         self.current_token = self.get_next_token() # eat build
         self.skip_spaces()
         if not self.current_token or not re.match(r'^id\d+$', self.current_token.token):
                 raise SemanticError("Expected struct name after 'build'.")
-        struct_name = Identifier(self.current_token.lexeme)
+        id_pos_start = [self.current_token.line, self.current_token.column]
+        var_name_size = len(self.current_token.lexeme)
+        id_pos_end = [self.current_token.line, self.current_token.column + var_name_size - 1] 
+        struct_name = Identifier(self.current_token.lexeme, id_pos_start, id_pos_end)
         if self.lookup_identifier(struct_name.symbol):
             info = self.get_identifier_info(struct_name.symbol)
             raise SemanticError(f"22 NameError: Identifier '{struct_name.symbol}' is already declared as {info["type"]}.")
@@ -917,7 +966,10 @@ class Semantic:
             datatype = self.current_token.token
             self.current_token = self.get_next_token()  # eat datatype
             self.skip_spaces()
-            field_name = Identifier(self.current_token.lexeme)  
+            id_pos_start = [self.current_token.line, self.current_token.column]
+            var_name_size = len(self.current_token.lexeme)
+            id_pos_end = [self.current_token.line, self.current_token.column + var_name_size - 1]
+            field_name = Identifier(self.current_token.lexeme, id_pos_start, id_pos_end)  
             self.current_token = self.get_next_token()  # eat id
             self.skip_spaces()
             value = None
@@ -925,7 +977,7 @@ class Semantic:
                 self.current_token = self.get_next_token()  # eat :
                 self.skip_spaces()
                 value = self.parse_expr(scope) 
-                fields.append(StructFields(field_name, value, datatype))
+                fields.append(StructFields(field_name, value, datatype, id_pos_start, value.pos_end))
                 if self.lookup_identifier(field_name.symbol):
                     info = self.get_identifier_info(field_name.symbol)
                     raise SemanticError(f"23 NameError: Field name '{field_name.symbol}' cannot be used since it is already declared as {info["type"]}.")
@@ -934,7 +986,7 @@ class Semantic:
                 fields_table.append(field_name.symbol)
                 self.skip_whitespace()
             else:
-                fields.append(StructFields(field_name, None, datatype))
+                fields.append(StructFields(field_name, None, datatype, id_pos_start, id_pos_end))
                 if self.lookup_identifier(field_name.symbol):
                     info = self.get_identifier_info(field_name.symbol)
                     raise SemanticError(f"24 NameError: Field name '{field_name.symbol}' cannot be used since it is already declared as {info["type"]}.")
@@ -957,6 +1009,7 @@ class Semantic:
         return StructDec(struct_name, fields, scope)
 
     def parse_struct_inst(self, scope) -> StructInst:
+        pos_start = [self.current_token.line, self.current_token.column]
         self.current_token = self.get_next_token()  # eat 'access'
         self.skip_spaces()
         if not self.current_token or not re.match(r'^id\d+$', self.current_token.token):
@@ -967,11 +1020,15 @@ class Semantic:
                 pass
             else:
                 raise SemanticError(f"NameError: Struct '{struct_parent}' is not defined.")
+        
         self.current_token = self.get_next_token()  # eat id
         self.skip_spaces()
         if not self.current_token or not re.match(r'^id\d+$', self.current_token.token):
             raise SemanticError("Expected struct instance name after struct name.")
-        inst_name = Identifier(self.current_token.lexeme)
+        id_pos_start = [self.current_token.line, self.current_token.column]
+        var_name_size = len(self.current_token.lexeme)
+        id_pos_end = [self.current_token.line, self.current_token.column + var_name_size - 1]
+        inst_name = Identifier(self.current_token.lexeme, id_pos_start, id_pos_end)
         if self.lookup_identifier(inst_name.symbol):
             info = self.get_identifier_info(inst_name.symbol)
             raise SemanticError(f"23 NameError: Identifier '{inst_name.symbol}' is already declared as {info["type"]}.")
@@ -984,6 +1041,7 @@ class Semantic:
             while self.current_token.token != ',':
                 value = self.parse_expr(scope)
                 values.append(value)
+                pos_end = value.pos_end
                 self.skip_spaces()
                 if self.current_token.token == ',':
                     self.current_token = self.get_next_token()  # eat ','
@@ -997,19 +1055,22 @@ class Semantic:
             raise SemanticError(f"12 NameError: Identifier {inst_name.symbol}' was "
                                 f"already declared as {info["type"]}.") 
         self.declare_id(inst_name.symbol, "a struct instance")
-        return StructInst(inst_name, struct_parent, values, False)
+        return StructInst(inst_name, struct_parent, values, False, pos_start, pos_end)
 
     def parse_inst_ass(self, scope) -> InstAssignment:
-        struct_inst_name = Identifier(self.current_token.lexeme)
+        pos_start = [self.current_token.line, self.current_token.column]
+        var_name_size = len(self.current_token.lexeme)
+        id_pos_end = [self.current_token.line, self.current_token.column + var_name_size - 1]
+        struct_inst_name = Identifier(self.current_token.lexeme, pos_start, id_pos_end)
         self.current_token = self.get_next_token() # eat id
         
         join_token = self.find_token_in_line('join')
         if join_token:
-            return self.parse_join(scope, struct_inst_name)
+            return self.parse_join(scope, struct_inst_name, pos_start)
         
         join_token = self.find_token_in_line('drop') 
         if join_token:
-            return self.parse_drop(scope, struct_inst_name)
+            return self.parse_drop(scope, struct_inst_name, pos_start)
 
         if self.lookup_identifier(struct_inst_name.symbol):
             info = self.get_identifier_info(struct_inst_name.symbol)
@@ -1023,7 +1084,10 @@ class Semantic:
         self.current_token = self.get_next_token() # eat .
         if not self.current_token or not re.match(r'^id\d+$', self.current_token.token):
             raise SemanticError("Expected struct instance field name after struct instance name.")
-        inst_field_name = Identifier(self.current_token.lexeme)
+        id_pos_start = [self.current_token.line, self.current_token.column]
+        var_name_size = len(self.current_token.lexeme)
+        id_pos_end = [self.current_token.line, self.current_token.column + var_name_size - 1]
+        inst_field_name = Identifier(self.current_token.lexeme, id_pos_start, id_pos_end)
         left = StructInstField(struct_inst_name, inst_field_name)
         self.current_token = self.get_next_token() # eat id
         self.skip_spaces()
@@ -1031,7 +1095,8 @@ class Semantic:
         self.current_token = self.get_next_token() # eat operator
         self.skip_spaces()
         value = self.parse_expr(scope)
-        return InstAssignment(left, operator, value)
+        pos_end = value.pos_end
+        return InstAssignment(left, operator, value, pos_start, pos_end)
 
     ########## IMMO ############
     def parse_immo(self, scope):
@@ -1054,7 +1119,10 @@ class Semantic:
                 raise SemanticError(f"5 Unexpected token found during parsing: {la_token}")  
             
     def parse_immo_var(self, scope) -> Union[VarDec, BatchVarDec]:
-        var_names = [Identifier(symbol=self.current_token.lexeme)]  
+        pos_start = [self.current_token.line, self.current_token.column]
+        var_name_size = len(self.current_token.lexeme)
+        id_pos_end = [self.current_token.line, self.current_token.column + var_name_size - 1]
+        var_names = [Identifier(self.current_token.lexeme, pos_start, id_pos_end)]  
         name = self.current_token.lexeme
         self.current_token = self.get_next_token() # eat id
         self.skip_spaces()
@@ -1065,7 +1133,10 @@ class Semantic:
             if not self.current_token or not re.match(r'^id\d+$', self.current_token.token):
                 raise SemanticError("Expected variable name after ','.")
             
-            var_names.append(Identifier(symbol=self.current_token.lexeme))
+            id_pos_start = [self.current_token.line, self.current_token.column]
+            var_name_size = len(self.current_token.lexeme)
+            id_pos_end = [self.current_token.line, self.current_token.column + var_name_size - 1]
+            var_names.append(Identifier(self.current_token.lexeme, id_pos_start, id_pos_end))
             self.current_token = self.get_next_token() # eat id
             self.skip_spaces()
 
@@ -1073,6 +1144,7 @@ class Semantic:
                 self.current_token = self.get_next_token() # eat :
                 self.skip_spaces()
                 value = self.parse_expr(scope)
+                pos_end = value.pos_end
                 if scope not in self.var_list:
                     self.var_list[scope] = []
                 for var in var_names:
@@ -1081,7 +1153,7 @@ class Semantic:
                         raise SemanticError(f"13 NameError: Identifier '{var.symbol}' is already declared as {info["type"]}.")  
                     self.declare_id(var.symbol, "a variable")
                 self.skip_spaces()
-                return BatchVarDec(declarations=[VarDec(var, value, True, scope) for var in var_names])
+                return BatchVarDec([VarDec(var, value, True, scope) for var in var_names], False, pos_start, pos_end)
             
         self.current_token = self.get_next_token() # eat :
         self.skip_spaces()
@@ -1096,7 +1168,11 @@ class Semantic:
             if not self.current_token or not re.match(r'^id\d+$', self.current_token.token):
                 raise SemanticError("Expected variable name after ','.")
             
-            var_names.append(Identifier(symbol=self.current_token.lexeme))
+            id_pos_start = [self.current_token.line, self.current_token.column]
+            var_name_size = len(self.current_token.lexeme)
+            id_pos_end = [self.current_token.line, self.current_token.column + var_name_size - 1]
+            
+            var_names.append(Identifier(self.current_token.lexeme, id_pos_start, id_pos_end))
             variable_name = self.current_token.lexeme
             self.current_token = self.get_next_token() # eat id
             self.skip_spaces()
@@ -1117,17 +1193,25 @@ class Semantic:
                     info = self.get_identifier_info(var.symbol)
                     raise SemanticError(f"14 NameError: Identifier '{var.symbol}' is already declared as {info["type"]}.")  
                 self.declare_id(var.symbol, "a variable")
-            return BatchVarDec(declarations=[VarDec(var, values_table[var.symbol]['values'], True, scope) for var in var_names])
+            return BatchVarDec(
+                declarations=[
+                    VarDec(var, values_table[var.symbol]['values'], True, scope, var.pos_start, values_table[var.symbol]['values'].pos_end)
+                    for var in var_names
+                ]
+            )
         else:
             var = var_names[0]
             if self.lookup_identifier(var.symbol):
                 info = self.get_identifier_info(var.symbol)
                 raise SemanticError(f"15 NameError: Identifier '{var.symbol}' is already declared as {info["type"]}.")    
             self.declare_id(var.symbol, "a variable")
-            return VarDec(var, value, True, scope)
+            return VarDec(var, value, True, scope, pos_start, value.pos_end)
 
     def parse_immo_arr(self, scope) -> ArrayDec:
-        arr_name = Identifier(self.current_token.lexeme)
+        pos_start = [self.current_token.line, self.current_token.column]
+        var_name_size = len(self.current_token.lexeme)
+        id_pos_end = [self.current_token.line, self.current_token.column + var_name_size - 1]
+        arr_name = Identifier(self.current_token.lexeme, pos_start, id_pos_end)
         name=arr_name.symbol
         if self.lookup_identifier(name):
             info = self.get_identifier_info(name)
@@ -1149,11 +1233,12 @@ class Semantic:
             
         self.expect(":", "Expected ':' in array initialization or modification.")
         self.skip_spaces()
-        values = self.parse_array_values(dimensions, scope)
+        values, pos_end = self.parse_array_values(dimensions, scope)
         self.declare_id(name, "an array", len(dimensions))
-        return ArrayDec(arr_name, dimensions, values, True, scope)
+        return ArrayDec(arr_name, dimensions, values, True, scope, None, pos_start, pos_end)
     
     def parse_immo_inst(self, scope) -> ImmoInstDec:
+        pos_start = [self.current_token.line, self.current_token.column]
         self.current_token = self.get_next_token()  # eat 'access'
         self.skip_spaces()
         if not self.current_token or not re.match(r'^id\d+$', self.current_token.token):
@@ -1168,7 +1253,10 @@ class Semantic:
         self.skip_spaces()
         if not self.current_token or not re.match(r'^id\d+$', self.current_token.token):
             raise SemanticError("Expected struct instance name after struct name.")
-        inst_name = Identifier(self.current_token.lexeme)
+        id_pos_start = [self.current_token.line, self.current_token.column]
+        var_name_size = len(self.current_token.lexeme)
+        id_pos_end = [self.current_token.line, self.current_token.column + var_name_size - 1]
+        inst_name = Identifier(self.current_token.lexeme, id_pos_start, id_pos_end)
         self.current_token = self.get_next_token()  # eat id
         self.skip_spaces()
         values = []
@@ -1177,6 +1265,7 @@ class Semantic:
         while self.current_token.token != ',':
             value = self.parse_expr(scope)
             values.append(value)
+            pos_end = value.pos_end
             self.skip_spaces()
             if self.current_token.token == ',':
                 self.current_token = self.get_next_token()  # eat ','
@@ -1189,11 +1278,14 @@ class Semantic:
             info = self.get_identifier_info(inst_name.symbo)
             raise SemanticError(f"17 NameError: Identifier '{inst_name.symbo}' is already declared as {info["type"]}.")
         self.declare_id(inst_name.symbol, "a struct instance")
-        return StructInst(inst_name, struct_parent, values, True)
+        return StructInst(inst_name, struct_parent, values, True, pos_start, pos_end)
 
     ########## ASS #############
     def parse_var_ass(self, scope) -> VarAssignment:
-        var_name = Identifier(symbol=self.current_token.lexeme)
+        pos_start = [self.current_token.line, self.current_token.column]
+        var_name_size = len(self.current_token.lexeme)
+        id_pos_end = [self.current_token.line, self.current_token.column + var_name_size - 1]
+        var_name = Identifier(self.current_token.lexeme, pos_start, id_pos_end)
         name = self.current_token.lexeme
         if not self.lookup_identifier(name):
             raise SemanticError(f"NameError: Variable '{name}' does not exist.")
@@ -1203,38 +1295,47 @@ class Semantic:
         self.current_token = self.get_next_token() # eat operator
         self.skip_spaces()
         value = self.parse_expr(scope)
-        return VarAssignment(var_name, operator, value)
+        pos_end = value.pos_end
+        return VarAssignment(var_name, operator, value, pos_start, pos_end)
 
     ########## EXPR ############
     def parse_expr(self, scope) -> Expr:
         self.skip_spaces()
-        return self.parse_or_expr(scope)
+        pos_start = [self.current_token.line, self.current_token.column]
+        return self.parse_or_expr(scope, pos_start)
     
-    def parse_or_expr(self, scope) -> Expr:
+    def parse_or_expr(self, scope, pos_start=None) -> Expr:
         self.skip_spaces()
-        left = self.parse_and_expr(scope)
+        expr_pos_start = [self.current_token.line, self.current_token.column]
+        left = self.parse_and_expr(scope, pos_start)
         while self.current_token and self.current_token.token in ['OR', '||']:
             operator = self.current_token.token
             self.current_token = self.get_next_token()
             self.skip_spaces()
-            right = self.parse_and_expr(scope)
-            left = BinaryExpr(left=left, right=right, operator=operator)
+            pos_start = [self.current_token.line, self.current_token.column]
+            right = self.parse_and_expr(scope, pos_start)
+            expr_pos_end = right.pos_end
+            left = BinaryExpr(left, operator, right, expr_pos_start, expr_pos_end)
         return left
     
-    def parse_and_expr(self, scope) -> Expr:
+    def parse_and_expr(self, scope, pos_start=None) -> Expr:
         self.skip_spaces()
-        left = self.parse_relat_expr(scope)
+        expr_pos_start = [self.current_token.line, self.current_token.column]
+        left = self.parse_relat_expr(scope, expr_pos_start)
         while self.current_token and self.current_token.token in ['AND', '&&']:
             operator = self.current_token.token
             self.current_token = self.get_next_token()
             self.skip_spaces()
-            right = self.parse_relat_expr(scope)
-            left = BinaryExpr(left=left, right=right, operator=operator)
+            pos_start = [self.current_token.line, self.current_token.column]
+            right = self.parse_relat_expr(scope, pos_start)
+            expr_pos_end = right.pos_end
+            left = BinaryExpr(left, operator, right, expr_pos_start, expr_pos_end)
         return left
     
-    def parse_relat_expr(self, scope) -> Expr:
+    def parse_relat_expr(self, scope, pos_start=None) -> Expr:
         self.skip_spaces()
-        left = self.parse_additive_expr(scope)
+        expr_pos_start = [self.current_token.line, self.current_token.column]
+        left = self.parse_additive_expr(scope, expr_pos_start)
         if not self.current_token or self.current_token.token not in ['<', '>', '<=', '>=', '==', '!=']:
             return left
 
@@ -1243,63 +1344,77 @@ class Semantic:
             operator = self.current_token.token
             self.current_token = self.get_next_token()
             self.skip_spaces()
-            right = self.parse_additive_expr(scope)
-            expr.append(BinaryExpr(left=left, right=right, operator=operator))
+            pos_start = [self.current_token.line, self.current_token.column]
+            right = self.parse_additive_expr(scope, pos_start)
+            expr_pos_end = right.pos_end
+            expr.append(BinaryExpr(left, operator, right, expr_pos_start, expr_pos_end))
             left = right
 
-        return ChainRelatExpr(expr)
+        return ChainRelatExpr(expr, expr_pos_start, expr_pos_end)
     
-    def parse_additive_expr(self, scope) -> Expr:
+    def parse_additive_expr(self, scope, pos_start=None) -> Expr:
         self.skip_spaces()
-        left = self.parse_multiplicative_expr(scope)
+        expr_pos_start = [self.current_token.line, self.current_token.column]
+        left = self.parse_multiplicative_expr(scope, expr_pos_start)
 
         while self.current_token and self.current_token.token in '+-':
             operator = self.current_token.token
             self.current_token = self.get_next_token()
             self.skip_spaces()
-            right = self.parse_multiplicative_expr(scope)
-            left = BinaryExpr(left=left, right=right, operator=operator)
+            pos_start = [self.current_token.line, self.current_token.column]
+            right = self.parse_multiplicative_expr(scope, pos_start)
+            expr_pos_end = right.pos_end
+            left = BinaryExpr(left, operator, right, expr_pos_start, expr_pos_end)
         return left
 
-    def parse_multiplicative_expr(self, scope) -> Expr:
+    def parse_multiplicative_expr(self, scope, pos_start=None) -> Expr:
         self.skip_spaces()
-        left = self.parse_not_expr(scope)
+        expr_pos_start = [self.current_token.line, self.current_token.column]
+        left = self.parse_not_expr(scope, expr_pos_start)
 
         while self.current_token and self.current_token.token in "/*%":
             operator = self.current_token.token
             self.current_token = self.get_next_token()
             self.skip_spaces()
-            right = self.parse_not_expr(scope)
-            left = BinaryExpr(left=left, right=right, operator=operator)  
+            pos_start = [self.current_token.line, self.current_token.column]
+            right = self.parse_not_expr(scope, pos_start)
+            expr_pos_end = right.pos_end
+            left = BinaryExpr(left, operator, right, expr_pos_start, expr_pos_end)
 
         return left  
     
-    def parse_not_expr(self, scope) -> Expr:
+    def parse_not_expr(self, scope, pos_start=None) -> Expr:
         self.skip_spaces()
 
         if self.current_token and self.current_token.token == '!':
+            expr_pos_start = [self.current_token.line, self.current_token.column]
             operator = self.current_token.token
             self.current_token = self.get_next_token()
             self.skip_spaces()
-            operand = self.parse_exp_expr(scope)
-            return UnaryExpr(operator=operator, operand=operand)
+            pos_start = [self.current_token.line, self.current_token.column]
+            operand = self.parse_exp_expr(scope, pos_start)
+            expr_pos_end = operand.pos_end
+            return UnaryExpr(operator, operand, expr_pos_start, expr_pos_end)
 
-        return self.parse_exp_expr(scope)
+        return self.parse_exp_expr(scope, pos_start)
     
-    def parse_exp_expr(self, scope) -> Expr:
+    def parse_exp_expr(self, scope, pos_start=None) -> Expr:
         self.skip_spaces()
-        left = self.parse_primary_expr(scope)
+        expr_pos_start = [self.current_token.line, self.current_token.column]
+        left = self.parse_primary_expr(scope, None, expr_pos_start)
 
         while self.current_token and self.current_token.token == '^':
             operator = self.current_token.token
             self.current_token = self.get_next_token()
             self.skip_spaces()
-            right = self.parse_exp_expr(scope)
-            left = BinaryExpr(left=left, right=right, operator=operator)  
+            pos_start = [self.current_token.line, self.current_token.column]
+            right = self.parse_exp_expr(scope, pos_start)
+            expr_pos_end = right.pos_end
+            left = BinaryExpr(left, operator, right, expr_pos_start, expr_pos_end)
 
         return left 
 
-    def parse_primary_expr(self, scope, is_func_call=None) -> Expr:
+    def parse_primary_expr(self, scope, is_func_call=None, pos_start=None) -> Expr:
         self.skip_spaces()
         if not self.current_token:
             raise SemanticError("Unexpected end of input during parsing!")
@@ -1310,18 +1425,21 @@ class Semantic:
             tk= 'id'
 
         if tk == 'id':
-            identifier = Identifier(self.current_token.lexeme)
+            id_size = len(self.current_token.lexeme)
+            id_pos_end=[self.current_token.line, self.current_token.column + id_size - 1]
+            identifier = Identifier(self.current_token.lexeme, pos_start, id_pos_end)
+            new_pos_start = [self.current_token.line, self.current_token.column]
             self.current_token = self.get_next_token()
             self.skip_spaces()
             if self.current_token.token == '.':
                 
                 join_token = self.find_token_in_line('drop')
                 if join_token:
-                    return self.parse_drop(scope, identifier)
+                    return self.parse_drop(scope, identifier, new_pos_start)
 
                 join_token = self.find_token_in_line('seek')
                 if join_token:
-                    return self.parse_seek(scope, identifier)
+                    return self.parse_seek(scope, identifier, new_pos_start)
                 
                 if not self.lookup_identifier(identifier.symbol):
                     raise SemanticError(f"NameError: Struct instance '{identifier.symbol}' does not exist.")
@@ -1339,7 +1457,9 @@ class Semantic:
                 if not re.match(r'^id\d+$', self.current_token.token):
                     raise SemanticError("Expected 'id' after '.' in accessing a struct instance field.")
                 field = Identifier(symbol=self.current_token.lexeme)
-                identifier = StructInstField(identifier, field)
+                field_size = len(self.current_token.lexeme)
+                pos_end = [self.current_token.line, self.current_token.column + field_size - 1]
+                identifier = StructInstField(identifier, field, new_pos_start, pos_end)
                 self.current_token = self.get_next_token()
                 self.skip_spaces()
             elif self.current_token.token == '[':
@@ -1348,12 +1468,11 @@ class Semantic:
                 if arr_exist:
                     join_token = self.find_token_in_line('drop')
                     if join_token:
-                        return self.parse_drop2d(scope, identifier)
+                        return self.parse_drop2d(scope, identifier, new_pos_start)
                     
                     join_token = self.find_token_in_line('seek')
                     if join_token:
-                        return self.parse_seek2d(scope, identifier)
-                
+                        return self.parse_seek2d(scope, identifier, new_pos_start)
                 
                 dimensions = []
                 if not self.lookup_identifier(identifier.symbol):
@@ -1377,19 +1496,22 @@ class Semantic:
                         dimensions.append(dim)
                         self.skip_spaces()
                         self.expect("]", "Expected ']' to close array dimension.")
+                        pos_end = [self.current_token.line, self.current_token.column - 1]
                         self.skip_spaces()
                 
-                identifier = ArrElement(identifier, dimensions)
+                identifier = ArrElement(identifier, dimensions, new_pos_start, pos_end)
             elif self.current_token.token == '(':
                 if not self.lookup_id_type(identifier.symbol, "a function"):
                     raise SemanticError(f"NameError: Function '{identifier.symbol}' does not exist.")
+                arg_pos_start = [self.current_token.line, self.current_token.column]
                 self.current_token = self.get_next_token() # eat ( 
                 self.skip_spaces()
-                args = []       
+                arg_pos = [self.current_token.line, self.current_token.column]
+                args = []     
                 while self.current_token.token != ')':
                     la_token = self.look_ahead()
                     if la_token.token == ',' or la_token.token == ')':
-                        arg = self.parse_primary_expr(scope, 'func_call')
+                        arg = self.parse_primary_expr(scope, 'func_call', arg_pos)
                     else:
                         arg = self.parse_expr(scope)
                     args.append(arg)
@@ -1397,9 +1519,10 @@ class Semantic:
                     if self.current_token.token == ',':
                         self.current_token = self.get_next_token() # eat ,
                         self.skip_spaces()
+                pos_end = [self.current_token.line, self.current_token.column]
                 self.current_token = self.get_next_token() # eat )
                 self.skip_spaces()
-                identifier = FuncCallStmt(identifier, args)
+                identifier = FuncCallStmt(identifier, args, pos_start, pos_end, arg_pos_start, pos_end)
             elif self.current_token.token == 'xp_formatting':
                 if not self.lookup_id_type(identifier.symbol, "a variable"):
                     raise SemanticError(f"NameError: Variable '{identifier.symbol}' does not exist.")
@@ -1407,9 +1530,10 @@ class Semantic:
                 if not re.match(r'^\.\d+f$', value):
                     raise SemanticError(f"FormatError: Invalid format specifier '{value}'.")
                 digit = int(value[1])
+                xp_format_end = [self.current_token.line, self.current_token.column + 2]
                 self.current_token = self.get_next_token() # eat format 
                 self.skip_spaces()
-                return XpFormatting(identifier, digit)
+                return XpFormatting(identifier, digit, new_pos_start, xp_format_end)
             else:
                 if not self.lookup_identifier(identifier.symbol):
                     raise SemanticError(f"NameError: Variable '{identifier.symbol}' does not exist.")
@@ -1430,16 +1554,23 @@ class Semantic:
 
             return identifier
         elif tk == 'hp_ltr':
-            literal = HpLiteral(value=self.current_token.lexeme)
+            ltr_pos_start = [self.current_token.line, self.current_token.column]
+            ltr_size = len(self.current_token.lexeme)
+            ltr_pos_end = [self.current_token.line, self.current_token.column + ltr_size - 1]
+            literal = HpLiteral(self.current_token.lexeme, ltr_pos_start, ltr_pos_end)
             self.current_token = self.get_next_token()
             self.skip_spaces()
             return literal
         elif tk == 'xp_ltr':
-            literal = XpLiteral(value=self.current_token.lexeme)
+            ltr_pos_start = [self.current_token.line, self.current_token.column]
+            ltr_size = len(self.current_token.lexeme)
+            ltr_pos_end = [self.current_token.line, self.current_token.column + ltr_size - 1]
+            literal = XpLiteral(self.current_token.lexeme, ltr_pos_start, ltr_pos_end)
             self.current_token = self.get_next_token()
             self.skip_spaces()
             return literal
         elif re.match(r'^comms_ltr', tk) :
+            ltr_pos_start = [self.current_token.line, self.current_token.column]
             value = re.sub(r'^"(.*)"$', r'\1', self.current_token.lexeme)
             print(value)
             open_braces = 0
@@ -1500,26 +1631,34 @@ class Semantic:
                     if isinstance(result, SemanticError):
                         raise SemanticError(f"Error in placeholder {i+1}: {str(result)}")
                     results.append(result)
-                literal = FormattedCommsLiteral(value, placeholders, results)
+                ltr_size = len(self.current_token.lexeme) - 1
+                ltr_pos_end = [self.current_token.line, self.current_token.column + ltr_size]
+                literal = FormattedCommsLiteral(value, placeholders, results, ltr_pos_start, ltr_pos_end)
                 self.current_token = self.get_next_token()
                 self.skip_spaces()
                 return literal
 
-            literal = CommsLiteral(final_value)
+            ltr_size = len(self.current_token.lexeme) - 1
+            ltr_pos_end = [self.current_token.line, self.current_token.column + ltr_size]
+            literal = CommsLiteral(final_value, ltr_pos_start, ltr_pos_end)
             self.current_token = self.get_next_token()
             self.skip_spaces()
             return literal
         elif tk == 'flag_ltr':
+            ltr_pos_start = [self.current_token.line, self.current_token.column]
+            ltr_size = len(self.current_token.lexeme)
             lexeme = self.current_token.lexeme 
             if lexeme == 'true':
                 value = True
             else:
                 value = False
-            literal = FlagLiteral(value)
+            ltr_pos_end = [self.current_token.line, self.current_token.column + ltr_size - 1]
+            literal = FlagLiteral(value, ltr_pos_start, ltr_pos_end)
             self.current_token = self.get_next_token()
             self.skip_spaces()
             return literal
         elif tk == '(':
+            expr_pos_start = [self.current_token.line, self.current_token.column]
             self.current_token = self.get_next_token()
             self.skip_spaces()
             value = self.parse_expr(scope)  
@@ -1533,11 +1672,13 @@ class Semantic:
                 if not re.match(r'^\.\d+f$', format_str):
                     raise SemanticError(f"FormatError: Invalid format specifier '{format_str}'.")
                 digit = int(format_str[1])
+                expr_pos_end = [self.current_token.line, self.current_token.column + 2]
                 self.current_token = self.get_next_token() # eat format 
                 self.skip_spaces()
-                return XpFormatting(value, digit)
+                return XpFormatting(value, digit, expr_pos_start, expr_pos_end)
             return value
         elif tk == '-':
+            ltr_pos_start = [self.current_token.line, self.current_token.column]
             self.current_token = self.get_next_token()
             self.skip_spaces()
             if self.current_token and self.current_token.token == '(':
@@ -1545,19 +1686,23 @@ class Semantic:
                 self.skip_spaces()
                 expr = self.parse_expr(scope)
                 self.expect(')', "Unexpected token found inside parenthesized expression. Expected closing parenthesis.")
+                ltr_pos_end = [self.current_token.line, self.current_token.column-1]
                 self.skip_spaces()
-                return UnaryExpr(operator='-', operand=expr)
+                return UnaryExpr('-', expr, ltr_pos_start, ltr_pos_end)
             else:
                 expr = self.parse_expr(scope)
                 if expr.kind not in ['Identifier', 'ArrayElement', 'StructInstField']:
                     raise SemanticError("UnaryError: Invalid expression after unary operator.")
-                return UnaryExpr(operator='-', operand=expr)
+                return UnaryExpr('-', expr, ltr_pos_start, expr.pos_end)
         elif tk == 'dead':
+            ltr_pos_start = [self.current_token.line, self.current_token.column]
+            ltr_pos_end = [self.current_token.line, self.current_token.column + 3]
             self.current_token = self.get_next_token()
             self.skip_spaces()
-            return DeadLiteral(None, None)
+            return DeadLiteral(None, None, ltr_pos_start, ltr_pos_end)
         elif tk == 'load' or tk == 'loadNum':
             prompt_msg = None
+            func_pos_start = [self.current_token.line, self.current_token.column]
             self.current_token = self.get_next_token() # eat load
             if self.current_token.token != '(':
                 raise SemanticError("LoadError: Missing parentheses.")
@@ -1570,61 +1715,74 @@ class Semantic:
                 self.skip_spaces()
             if self.current_token.token != ')':
                 raise SemanticError("LoadError: Missing parentheses.")
+            func_pos_end = [self.current_token.line, self.current_token.column]
             self.current_token = self.get_next_token() # eat )
             self.skip_spaces()
             if tk == 'load':
-                return Load(prompt_msg)
+                return Load(prompt_msg, func_pos_start, func_pos_end)
             else:
-                return LoadNum(prompt_msg)
+                return LoadNum(prompt_msg, func_pos_start, func_pos_end)
         elif tk == 'rounds':
+            func_pos_start = [self.current_token.line, self.current_token.column]
             self.current_token = self.get_next_token() # eat rounds
             self.expect('(', "Expected '(' after 'rounds'.")
             self.skip_spaces()
-            value = self.parse_primary_expr(scope, 'rounds')
+            arg_pos = [self.current_token.line, self.current_token.column]
+            value = self.parse_primary_expr(scope, 'rounds', arg_pos)
             if value.kind not in ['Identifier', 'ArrayElement', 'StructInstField', 'FuncCallStmt',
                                   'CommsLiteral', 'ToCommsStmt']: 
                 raise SemanticError("ArgumentError: Invalid rounds argument.")
             self.skip_spaces()
             self.expect(')', "Expected ')' after rounds arguments.")
+            func_pos_end = [self.current_token.line, self.current_token.column-1]
             self.skip_spaces()
-            return RoundStmt(value)
+            return RoundStmt(value, func_pos_start, func_pos_end)
         elif tk in ('levelUp', 'levelDown'):
+            func_pos_start = [self.current_token.line, self.current_token.column]
             self.current_token = self.get_next_token()  # consume levelUp or levelDown
             self.expect('(', f"Expected '(' after '{tk}'.")
             self.skip_spaces()
-            value = self.parse_primary_expr(scope)
+            arg_pos = [self.current_token.line, self.current_token.column]
+            value = self.parse_primary_expr(scope, None, arg_pos)
             valid_kinds = ['Identifier', 'ArrayElement', 'StructInstField', 'FuncCallStmt',
                            'ToCommsStmt']  
             if value.kind not in valid_kinds:
                 raise SemanticError(f"ArgumentError: Invalid '{tk}' argument.")
             self.skip_spaces()
             self.expect(')', f"Expected ')' after '{tk}' arguments.")
+            func_pos_end = [self.current_token.line, self.current_token.column - 1]
             self.skip_spaces()
-            return LevelStmt(value, tk == 'levelUp')
+            return LevelStmt(value, tk == 'levelUp', func_pos_start, func_pos_end)
         elif tk in ('toHp', 'toXp'):
+            func_pos_start = [self.current_token.line, self.current_token.column]
             self.current_token = self.get_next_token()  # consume toHp or toHp
             self.expect('(', f"Expected '(' after '{tk}'.")
             self.skip_spaces()
-            value = self.parse_primary_expr(scope)
+            arg_pos = [self.current_token.line, self.current_token.column]
+            value = self.parse_primary_expr(scope,None,arg_pos)
             valid_kinds = ['Identifier', 'ArrayElement', 'StructInstField'] 
             if value.kind not in valid_kinds:
                 raise SemanticError(f"ArgumentError: Invalid '{tk}' argument.")
             self.skip_spaces()
             self.expect(')', f"Expected ')' after '{tk}' arguments.")
+            func_pos_end = [self.current_token.line, self.current_token.column - 1]
             self.skip_spaces()
-            return ToNumStmt(value, tk == 'toHp')
+            return ToNumStmt(value, tk == 'toHp', func_pos_start, func_pos_end)
         elif tk == 'toComms':
+            func_pos_start = [self.current_token.line, self.current_token.column]
             self.current_token = self.get_next_token()  # consume toComms
             self.expect('(', f"Expected '(' after '{tk}'.")
             self.skip_spaces()
-            value = self.parse_primary_expr(scope)
+            arg_pos = [self.current_token.line, self.current_token.column]
+            value = self.parse_primary_expr(scope, None, arg_pos)
             valid_kinds = ['Identifier', 'ArrayElement', 'StructInstField'] 
             if value.kind not in valid_kinds:
                 raise SemanticError(f"ArgumentError: Invalid '{tk}' argument.")
             self.skip_spaces()
             self.expect(')', f"Expected ')' after '{tk}' arguments.")
+            func_pos_end = [self.current_token.line, self.current_token.column - 1]
             self.skip_spaces()
-            return ToCommsStmt(value)
+            return ToCommsStmt(value, func_pos_start, func_pos_end)
         else:
             raise SemanticError(f"6 Unexpected token found during parsing: {tk}")
         
@@ -1758,19 +1916,24 @@ class Semantic:
 
     ########## LOOPS #############
     def parse_for(self,scope) -> ForStmt:
+        pos_start = [self.current_token.line, self.current_token.column]
         self.current_token = self.get_next_token() # eat for
         self.skip_spaces()
         if not self.current_token or not re.match(r'^id\d+$', self.current_token.token):
                 raise SemanticError("ForError: Expected variable name after for keyword.")
-        name = self.current_token.lexeme
-        if not self.lookup_id_type(name, "a variable"):
-            raise SemanticError(f"NameError: Variable '{name}' is not defined.")
+        init_pos_start = [self.current_token.line, self.current_token.column]
+        var_name_size = len(self.current_token.lexeme)
+        id_pos_end = [self.current_token.line, self.current_token.column + var_name_size - 1]
+        name = Identifier(self.current_token.lexeme, init_pos_start, id_pos_end)
+        if not self.lookup_id_type(name.symbol, "a variable"):
+            raise SemanticError(f"NameError: Variable '{name.symbol}' is not defined.")
         self.current_token = self.get_next_token() # eat id
         self.skip_spaces()
         self.expect(":", "ForError: Expected ':' after identifier in loop control initialization.")
         self.skip_spaces()
         init_value = self.parse_expr(scope)
-        initialization = VarAssignment(name, ":", init_value)
+        pos_end = init_value.pos_end
+        initialization = VarAssignment(name, ":", init_value, init_pos_start, pos_end)
         self.skip_spaces()
         self.expect(",", "ForError: Expected ',' after loop control initialization.")
         self.skip_spaces()
@@ -1780,7 +1943,10 @@ class Semantic:
         self.skip_spaces()
         if not self.current_token or not re.match(r'^id\d+$', self.current_token.token):
                 raise SemanticError("ForError: Expected variable name after loop condition.")
-        upd_name = Identifier(self.current_token.lexeme)
+        id_pos_start = [self.current_token.line, self.current_token.column]
+        var_name_size = len(self.current_token.lexeme)
+        id_pos_end = [self.current_token.line, self.current_token.column + var_name_size - 1]
+        upd_name = Identifier(self.current_token.lexeme, id_pos_start, id_pos_end)
         if not self.lookup_id_type(upd_name.symbol, "a variable"):
             raise SemanticError(f"NameError: Variable '{upd_name.symbol}' is not defined.")
         self.current_token = self.get_next_token() # eat id
@@ -1789,7 +1955,7 @@ class Semantic:
         self.current_token = self.get_next_token() # eat operator
         self.skip_spaces()
         upd_value = self.parse_expr(scope)
-        update = VarAssignment(upd_name, operator, upd_value)
+        update = VarAssignment(upd_name, operator, upd_value, id_pos_start, upd_value.pos_end)
         self.skip_whitespace()
         self.expect("{", "Expected '{' to open a for loop statement's body.")
         self.skip_whitespace()
@@ -1803,10 +1969,11 @@ class Semantic:
             if isinstance(stmt, RecallStmt):
                 self.recall_stmts.append(stmt)
         self.expect("}", "Expected '}' to close a for loop statement's body.")
+        pos_end = [self.current_token.line, self.current_token.column-1]
         self.skip_whitespace()
         self.pop_scope()
         self.loop_flag = False
-        return ForStmt(initialization, condition, update, body)
+        return ForStmt(initialization, condition, update, body, pos_start, pos_end)
     
     def parse_while(self,scope) -> GrindWhileStmt:
         self.current_token = self.get_next_token() # eat while
@@ -1857,6 +2024,7 @@ class Semantic:
     ########## BUILT-IN FUNCS ###########
     def parse_shoot(self, scope) -> ShootStmt:
         is_Next = False
+        pos_start = [self.current_token.line, self.current_token.column]
         if self.current_token.token == 'shootNxt':
             is_Next = True
         self.current_token = self.get_next_token() # eat shoot or shootNxt
@@ -1869,10 +2037,11 @@ class Semantic:
         value = self.parse_expr(scope)
         self.skip_spaces()
         self.expect(")", "Expected closing parentheses in function call.")
+        pos_end = [self.current_token.line, self.current_token.column-1]
         self.skip_whitespace()
-        return ShootStmt(value, is_Next)
+        return ShootStmt(value, is_Next, pos_start, pos_end)
 
-    def parse_join(self, scope, name) -> JoinStmt:
+    def parse_join(self, scope, name, pos_start) -> JoinStmt:
         if self.lookup_identifier(name.symbol):
             info = self.get_identifier_info(name.symbol)
             if info["type"] != "an array" and info["type"] != "a parameter":
@@ -1898,8 +2067,9 @@ class Semantic:
             self.expect("]", "Expects ']' to close array row values.")
             self.skip_spaces()
             self.expect(")", "Expects ')' after to close join arguments.")
+            pos_end = [self.current_token.line, self.current_token.column-1]
             self.skip_whitespace()
-            return JoinStmt(name, values, 2)
+            return JoinStmt(name, values, 2, pos_start, pos_end)
         else:
             if dimensions is None or dimensions == 1:
                 pass
@@ -1910,10 +2080,11 @@ class Semantic:
             value = self.parse_expr(scope)
             self.skip_spaces()
             self.expect(")", "Expects ')' after to close join arguments.")
+            pos_end = [self.current_token.line, self.current_token.column-1]
             self.skip_whitespace()
-            return JoinStmt(name, value, 1)
+            return JoinStmt(name, value, 1, pos_start, pos_end)
 
-    def parse_join2d(self, scope, arr_name) -> JoinStmt:
+    def parse_join2d(self, scope, arr_name, pos_start) -> JoinStmt:
         self.expect("[", "Expects '[' to specify row index of two-dimensional array.")
         self.skip_spaces()
         if self.current_token.token == ']':
@@ -1940,10 +2111,11 @@ class Semantic:
         value = self.parse_expr(scope)
         self.skip_spaces()
         self.expect(")", "Expects ')' after to close join arguments.")
+        pos_end = [self.current_token.line, self.current_token.column-1]
         self.skip_whitespace()
-        return JoinStmt(arr_name, value, 2, dim)
+        return JoinStmt(arr_name, value, 2, pos_start, pos_end, dim)
 
-    def parse_drop(self, scope, name) -> DropStmt:
+    def parse_drop(self, scope, name, pos_start) -> DropStmt:
         if self.lookup_identifier(name.symbol):
             info = self.get_identifier_info(name.symbol)
             if info["type"] != "an array" and info["type"] != "a parameter":
@@ -1964,10 +2136,11 @@ class Semantic:
             index = value
             self.skip_spaces()
         self.expect(")", "Expects ')' after to close drop arguments.")
+        pos_end = [self.current_token.line, self.current_token.column-1]
         self.skip_whitespace()
-        return DropStmt(name, index, dimensions)
+        return DropStmt(name, index, dimensions, pos_start, pos_end)
     
-    def parse_drop2d(self, scope, arr_name) -> DropStmt:
+    def parse_drop2d(self, scope, arr_name, pos_start) -> DropStmt:
         self.expect("[", "Expects '[' to specify row index of two-dimensional array.")
         self.skip_spaces()
         if self.current_token.token == ']':
@@ -1995,10 +2168,11 @@ class Semantic:
             index = value
             self.skip_spaces()
         self.expect(")", "Expects ')' after to close drop arguments.")
+        pos_end = [self.current_token.line, self.current_token.column-1]
         self.skip_whitespace()
-        return DropStmt(arr_name, index, dimensions, dim)
+        return DropStmt(arr_name, index, dimensions, pos_start, pos_end, dim)
 
-    def parse_seek(self, scope, name) -> SeekStmt:
+    def parse_seek(self, scope, name, pos_start) -> SeekStmt:
         if self.lookup_identifier(name.symbol):
             info = self.get_identifier_info(name.symbol)
             if info["type"] != "an array" and info["type"] != "a parameter":
@@ -2024,8 +2198,9 @@ class Semantic:
             self.expect("]", "Expects ']' to close array row values.")
             self.skip_spaces()
             self.expect(")", "Expects ')' after to close seek arguments.")
+            pos_end = [self.current_token.line, self.current_token.column-1]
             self.skip_whitespace()
-            return SeekStmt(name, values, 2)
+            return SeekStmt(name, values, 2, pos_start, pos_end)
         else:
             if dimensions is None or dimensions == 1:
                 pass
@@ -2036,10 +2211,11 @@ class Semantic:
             value = self.parse_expr(scope)
             self.skip_spaces()
             self.expect(")", "Expects ')' after to close seek arguments.")
+            pos_end = [self.current_token.line, self.current_token.column-1]
             self.skip_whitespace()
-            return SeekStmt(name, value, 1)
+            return SeekStmt(name, value, 1, pos_start, pos_end)
         
-    def parse_seek2d(self, scope, arr_name) -> SeekStmt:
+    def parse_seek2d(self, scope, arr_name, pos_start) -> SeekStmt:
         self.expect("[", "Expects '[' to specify row index of two-dimensional array.")
         self.skip_spaces()
         if self.current_token.token == ']':
@@ -2066,13 +2242,15 @@ class Semantic:
         value = self.parse_expr(scope)
         self.skip_spaces()
         self.expect(")", "Expects ')' after to close seek arguments.")
+        pos_end = [self.current_token.line, self.current_token.column-1]
         self.skip_whitespace()
-        return SeekStmt(arr_name, value, 2, dim)
+        return SeekStmt(arr_name, value, 2, pos_start, pos_end, dim)
 
 def check(fn, text):
     lexer = Lexer(fn, text)
     if text == "":
         return "No code in the module.", {}
+
     tokens, error = lexer.make_tokens()
 
     if error:
@@ -2089,6 +2267,7 @@ def check(fn, text):
     #print(result)
 
     if isinstance(result, SemanticError):
+        result.source_code = text.splitlines()
         return str(result), {}
     
     try:
@@ -2099,6 +2278,7 @@ def check(fn, text):
         analyzer.visit(result)
         table = analyzer.symbol_table
     except SemanticError as e:
+        e.source_code = text.splitlines()
         return str(e), {}
 
     return result, table

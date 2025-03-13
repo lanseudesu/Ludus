@@ -120,49 +120,65 @@ class BlockStmt(Stmt):
         self.statements = statements
 
 class BinaryExpr(Expr):
-    def __init__(self, left: Expr, operator: str, right: Expr):
+    def __init__(self, left: Expr, operator: str, right: Expr, pos_start=None, pos_end=None):
         super().__init__(NodeType.BINARY_EXPR)
         self.left = left
         self.operator = operator
         self.right = right
+        self.pos_start = pos_start
+        self.pos_end = pos_end
         
 class Identifier(Expr):
-    def __init__(self, symbol: str):
+    def __init__(self, symbol: str, pos_start=None, pos_end=None):
         super().__init__(NodeType.IDENTIFIER)
         self.symbol = symbol
+        self.pos_start = pos_start
+        self.pos_end = pos_end
 
 class HpLiteral(Expr):
-    def __init__(self, value):
+    def __init__(self, value, pos_start=None, pos_end=None):
         super().__init__(NodeType.HP_LITERAL)
         self.value = int(value)
+        self.pos_start = pos_start
+        self.pos_end = pos_end
 
 class XpLiteral(Expr):
-    def __init__(self, value):
+    def __init__(self, value, pos_start=None, pos_end=None):
         super().__init__(NodeType.XP_LITERAL)
         self.value = float(value)
+        self.pos_start = pos_start
+        self.pos_end = pos_end
 
 class CommsLiteral(Expr):
-    def __init__(self, value):
+    def __init__(self, value, pos_start=None, pos_end=None):
         super().__init__(NodeType.COMMS_LITERAL)
         self.value = str(value)
+        self.pos_start = pos_start
+        self.pos_end = pos_end
 
 class FormattedCommsLiteral(Expr):
-    def __init__(self, value, placeholders, expressions):
+    def __init__(self, value, placeholders, expressions, pos_start=None, pos_end=None):
         super().__init__(NodeType.FORM_COMMS_LITERAL)
         self.value = str(value)              
         self.placeholders = placeholders     
         self.expressions = expressions 
+        self.pos_start = pos_start
+        self.pos_end = pos_end
 
 class FlagLiteral(Expr):
-    def __init__(self, value: bool):
+    def __init__(self, value: bool, pos_start=None, pos_end=None):
         super().__init__(NodeType.FLAG_LITERAL)
         self.value = value
+        self.pos_start = pos_start
+        self.pos_end = pos_end
 
 class DeadLiteral(Expr):
-    def __init__(self, value: None, datatype: str):
+    def __init__(self, value: None, datatype: str, pos_start=None, pos_end=None):
         super().__init__(NodeType.DEAD_LITERAL)
         self.value = value
         self.datatype = datatype
+        self.pos_start = pos_start
+        self.pos_end = pos_end
 
     def get_expected_type(self):
         type_map = {
@@ -174,15 +190,19 @@ class DeadLiteral(Expr):
         return type_map.get(self.datatype, None)
 
 class UnaryExpr(Expr):
-    def __init__(self, operator: str, operand: Expr):
+    def __init__(self, operator: str, operand: Expr, pos_start=None, pos_end=None):
         super().__init__(NodeType.UNARY_EXPR)
         self.operator = operator
         self.operand = operand
+        self.pos_start = pos_start
+        self.pos_end = pos_end
 
 class ChainRelatExpr(Expr):
-    def __init__(self, expressions: List[Expr]):
+    def __init__(self, expressions: List[Expr], pos_start=None, pos_end=None):
         super().__init__(NodeType.CHAIN_RELAT_EXPR)
         self.expressions = expressions
+        self.pos_start = pos_start
+        self.pos_end = pos_end
 
 class PlayFunc(Stmt):
     def __init__(self, body: BlockStmt):
@@ -198,22 +218,26 @@ class FunctionDec(Stmt):
         self.body = body
 
 class VarDec(Stmt):
-    def __init__(self, name: Identifier, value: Expr, immo: bool, scope: str):
+    def __init__(self, name: Identifier, value: Expr, immo: bool, scope: str, pos_start=None, pos_end=None):
         super().__init__(NodeType.VAR_DEC)
         self.name = name
         self.value = value
         self.immo = immo
         self.scope = scope
+        self.pos_start = pos_start
+        self.pos_end = pos_end
 
 class BatchVarDec(Stmt):
-    def __init__(self, declarations: list[Stmt], batch_ver1=False):
+    def __init__(self, declarations: list[Stmt], batch_ver1, pos_start, pos_end):
         super().__init__(NodeType.BATCH_VAR_DEC)
         self.declarations = declarations
         self.batch_ver1 = batch_ver1
+        self.pos_start = pos_start
+        self.pos_end = pos_end
 
 class ArrayDec(Stmt):
     def __init__(self, name: Identifier, dimensions: List[Optional[int]], 
-                 elements: List[Expr], immo: bool, scope: str, datatype=None):
+                 elements: List[Expr], immo: bool, scope: str, datatype=None, pos_start=None, pos_end=None,):
         super().__init__(NodeType.ARRAY_DEC)
         self.name = name
         self.dimensions = dimensions
@@ -221,16 +245,20 @@ class ArrayDec(Stmt):
         self.immo = immo
         self.scope = scope
         self.datatype = datatype
+        self.pos_start = pos_start
+        self.pos_end = pos_end
 
 class ArrayRedec(Stmt):
     def __init__(self, name: Identifier, dimensions: List[Optional[int]], 
-                 elements: List[Expr], immo: bool, scope: str):
+                 elements: List[Expr], immo: bool, scope: str, pos_start=None, pos_end=None):
         super().__init__(NodeType.ARRAY_REDEC)
         self.name = name
         self.dimensions = dimensions
         self.elements = elements
         self.immo = immo
         self.scope = scope
+        self.pos_start = pos_start
+        self.pos_end = pos_end
 
 class AssignmentStmt(Stmt):
     def __init__(self, kind: str):
@@ -238,31 +266,39 @@ class AssignmentStmt(Stmt):
         self.kind = kind
 
 class ArrElement(Expr):
-    def __init__(self, left: Identifier, index: Expr):
+    def __init__(self, left: Identifier, index: Expr, pos_start=None, pos_end=None):
         super().__init__(NodeType.ARR_ELEMENT)
         self.left = left
         self.index = index
+        self.pos_start = pos_start
+        self.pos_end = pos_end
 
 class ArrAssignment(AssignmentStmt):
-    def __init__(self, left: ArrElement, operator: str, right: Expr):
+    def __init__(self, left: ArrElement, operator: str, right: Expr, pos_start=None, pos_end=None):
         super().__init__(NodeType.ARR_ASS_STMT)
         self.left = left
         self.operator = operator
         self.right = right
+        self.pos_start = pos_start
+        self.pos_end = pos_end
 
 class VarAssignment(AssignmentStmt):
-    def __init__(self, left: Identifier, operator: str, right: Expr):
+    def __init__(self, left: Identifier, operator: str, right: Expr, pos_start=None, pos_end=None):
         super().__init__(NodeType.VAR_ASS_STMT)
         self.left = left
         self.operator = operator
         self.right = right
+        self.pos_start = pos_start
+        self.pos_end = pos_end
 
 class StructFields(Stmt):
-    def __init__(self, name: Identifier, value: Expr, datatype: str):
+    def __init__(self, name: Identifier, value: Expr, datatype: str, pos_start=None, pos_end=None):
         super().__init__(NodeType.STRUCT_FIELD)
         self.name = name
         self.value = value
         self.datatype = datatype
+        self.pos_start = pos_start
+        self.pos_end = pos_end
 
 class StructDec(Stmt):
     def __init__(self, name: Identifier, body: List[StructFields], scope: str):
@@ -272,12 +308,14 @@ class StructDec(Stmt):
         self.scope = scope
 
 class StructInst(Stmt):
-    def __init__(self, name: Identifier, parent: str, body: List[Expr], immo: bool):
+    def __init__(self, name: Identifier, parent: str, body: List[Expr], immo: bool, pos_start=None, pos_end=None):
         super().__init__(NodeType.STRUCT_INST)
         self.name = name
         self.parent = parent
         self.body = body
         self.immo = immo
+        self.pos_start = pos_start
+        self.pos_end = pos_end
 
 class StructInstField(Expr):
     def __init__(self, instance: Identifier, field: Identifier):
@@ -286,11 +324,13 @@ class StructInstField(Expr):
         self.field = field
 
 class InstAssignment(AssignmentStmt):
-    def __init__(self, left: StructInstField, operator: str, right: Expr):
+    def __init__(self, left: StructInstField, operator: str, right: Expr, pos_start=None, pos_end=None):
         super().__init__(NodeType.INST_ASS_STMT)
         self.left = left
         self.operator = operator
         self.right = right
+        self.pos_start = pos_start
+        self.pos_end = pos_end
 
 class ImmoInstDec(Stmt):
     def __init__(self, name: Identifier, parent: str, body: List[StructFields]):
@@ -300,9 +340,11 @@ class ImmoInstDec(Stmt):
         self.body = body
 
 class GlobalStructDec(Stmt):
-    def __init__(self, name: Identifier):
+    def __init__(self, name: Identifier, pos_start, pos_end):
         super().__init__(NodeType.GLOBAL_STRUCT_DEC)
         self.name = name
+        self.pos_start = pos_start
+        self.pos_end = pos_end
 
 class IfStmt(Stmt):
     def __init__(self, condition, then_branch, elif_branches=None, else_branch=None):
@@ -341,12 +383,14 @@ class CheckpointStmt(Stmt):
 
 class ForStmt(Stmt):
     def __init__(self, initialization: VarAssignment, condition: Expr, 
-                 update: VarAssignment, body: List[Stmt]):
+                 update: VarAssignment, body: List[Stmt], pos_start=None, pos_end=None):
         super().__init__(NodeType.FOR_STMT)
         self.initialization = initialization
         self.condition = condition
         self.update = update
         self.body = body
+        self.pos_start = pos_start
+        self.pos_end = pos_end
 
 class GrindWhileStmt(Stmt):
     def __init__(self, condition: Expr, body: List[Stmt], is_grind=False):
@@ -381,10 +425,14 @@ class GlobalFuncBody(Stmt):
         self.recall_stmts = recall_stmts
     
 class FuncCallStmt(Stmt):
-    def __init__(self, name: Identifier, args: List[Expr]):
+    def __init__(self, name: Identifier, args: List[Expr], pos_start=None, pos_end=None, arg_pos_start=None, arg_pos_end=None):
         super().__init__(NodeType.FUNC_CALL)
         self.name = name
         self.args = args
+        self.pos_start = pos_start
+        self.pos_end = pos_end
+        self.arg_pos_start = arg_pos_start
+        self.arg_pos_end = arg_pos_end
 
 class ArrayOrVar(Stmt):
     def __init__(self, lhs_name: str, statements: List[Stmt]):
@@ -393,73 +441,95 @@ class ArrayOrVar(Stmt):
         self.statements = statements
 
 class Load(Expr):
-    def __init__(self, prompt_msg: str):
+    def __init__(self, prompt_msg: str, pos_start=None, pos_end=None):
         super().__init__(NodeType.LOAD_STR)
         self.prompt_msg = prompt_msg
+        self.pos_start = pos_start
+        self.pos_end = pos_end
 
 class LoadNum(Expr):
-    def __init__(self, prompt_msg: str):
+    def __init__(self, prompt_msg: str, pos_start=None, pos_end=None):
         super().__init__(NodeType.LOAD_NUM)
         self.prompt_msg = prompt_msg
+        self.pos_start = pos_start
+        self.pos_end = pos_end
 
 class ShootStmt(Stmt):
-    def __init__(self, element, is_Next=False):
+    def __init__(self, element, is_Next=False, pos_start=None, pos_end=None):
         super().__init__(NodeType.SHOOT)
         self.element = element
         self.is_Next = is_Next
+        self.pos_start = pos_start
+        self.pos_end = pos_end
 
 class XpFormatting(Expr):
-    def __init__(self, lhs, digits):
+    def __init__(self, lhs, digits, pos_start=None, pos_end=None):
         super().__init__(NodeType.XP_FORMAT)
         self.lhs = lhs
         self.digits = digits
+        self.pos_start = pos_start
+        self.pos_end = pos_end
 
 class WipeStmt(Stmt):
     def __init__(self):
         super().__init__(NodeType.WIPE)
 
 class JoinStmt(Stmt):
-    def __init__(self, arr_name, value, dimensions, row_index=None):
+    def __init__(self, arr_name, value, dimensions, pos_start, pos_end, row_index=None):
         super().__init__(NodeType.JOIN_STMT)
         self.arr_name = arr_name
         self.value = value
         self.dimensions = dimensions
+        self.pos_start = pos_start
+        self.pos_end = pos_end
         self.row_index = row_index
 
 class DropStmt(Stmt):
-    def __init__(self, arr_name, elem_index, dimensions, row_index=None):
+    def __init__(self, arr_name, elem_index, dimensions, pos_start, pos_end, row_index=None):
         super().__init__(NodeType.DROP_STMT)
         self.arr_name = arr_name
         self.elem_index = elem_index
         self.dimensions = dimensions
+        self.pos_start = pos_start
+        self.pos_end = pos_end
         self.row_index = row_index
 
 class SeekStmt(Stmt):
-    def __init__(self, arr_name, value, dimensions, row_index=None):
+    def __init__(self, arr_name, value, dimensions, pos_start=None, pos_end=None, row_index=None):
         super().__init__(NodeType.SEEK_STMT)
         self.arr_name = arr_name
         self.value = value
         self.dimensions = dimensions
+        self.pos_start = pos_start
+        self.pos_end = pos_end
         self.row_index = row_index
 
 class RoundStmt(Stmt):
-    def __init__(self, value):
+    def __init__(self, value, pos_start=None, pos_end=None):
         super().__init__(NodeType.ROUND_STMT)
         self.value = value
+        self.pos_start = pos_start
+        self.pos_end = pos_end
 
 class LevelStmt(Stmt):
-    def __init__(self, value, up_or_down):
+    def __init__(self, value, up_or_down, pos_start=None, pos_end=None):
         super().__init__(NodeType.LEVEL_STMT)
         self.value = value
         self.up_or_down = up_or_down
+        self.pos_start = pos_start
+        self.pos_end = pos_end
 
 class ToNumStmt(Stmt):
-    def __init__(self, value, hp_or_xp):
+    def __init__(self, value, hp_or_xp, pos_start=None, pos_end=None):
         super().__init__(NodeType.TO_NUM_STMT)
         self.value = value
         self.hp_or_xp = hp_or_xp
+        self.pos_start = pos_start
+        self.pos_end = pos_end
 
 class ToCommsStmt(Stmt):
-    def __init__(self, value):
+    def __init__(self, value, pos_start=None, pos_end=None):
         super().__init__(NodeType.TO_COMMS_STMT)
         self.value = value
+        self.pos_start = pos_start
+        self.pos_end = pos_end

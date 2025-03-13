@@ -141,9 +141,11 @@ class Parser:
         col_num = self.current_token.column
         error_line = self.source_code[line_num - 1]  
 
-        underline = " " * (col_num - 1) + "^" * len(self.current_token.lexeme)
+        expanded_line = error_line.replace('\t', ' ' * 4)
+        adjusted_col_num = len(expanded_line[:col_num].replace('\t', ' ' * 4))
+        underline = " " * (adjusted_col_num - 1) + "^" * len(self.current_token.lexeme)
 
-        return (f"{error_line}\n{underline}")
+        return f"{expanded_line}\n{underline}"
 
 def parse(fn, text):
     lexer = Lexer(fn, text)

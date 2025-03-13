@@ -182,21 +182,21 @@ def eval_binary_expr(binop, symbol_table):
         elif isinstance(rhs, float):
             lhs = 0.0
         else:
-            raise SemanticError("TypeError: Cannot mix comms and numeric types in an expression.")
+            raise SemanticError("TypeError: Cannot mix comms and numeric types in an expression.", binop.pos_start, binop.pos_end)
     elif not isinstance(lhs, UnresolvedNumber) and isinstance(rhs, UnresolvedNumber):
         if isinstance(lhs, int) or isinstance(lhs, bool):
             rhs = 0
         elif isinstance(lhs, float):
             rhs = 0.0
         else:
-            raise SemanticError("TypeError: Cannot mix comms and numeric types in an expression.")
+            raise SemanticError("TypeError: Cannot mix comms and numeric types in an expression.", binop.pos_start, binop.pos_end)
     elif isinstance(lhs, UnresolvedNumber) and isinstance(rhs, UnresolvedNumber):
         if binop.operator in ['+', '-', '*', '/']:
             return UnresolvedNumber()
         elif binop.operator in ['<', '>', '<=', '>=', '==', '!=']:
             return eval_relational_expr(0, 0, binop.operator)  
         else:
-            raise SemanticError(f"TypeError: Operation '{binop.operator}' not supported for unresolved numbers.")
+            raise SemanticError(f"TypeError: Operation '{binop.operator}' not supported for unresolved numbers.", binop.pos_start, binop.pos_end)
 
     if isinstance(rhs, list):
         if len(rhs) > 1:
@@ -220,24 +220,27 @@ def eval_binary_expr(binop, symbol_table):
         raise SemanticError("TypeError: Cannot mix comms and flags in an expression.")
 
     if isinstance(lhs, str) != isinstance(rhs, str):
-        raise SemanticError("TypeError: Cannot mix comms and numeric types in an expression.")
+        raise SemanticError("TypeError: Cannot mix comms and numeric types in an expression.", binop.pos_start, binop.pos_end)
 
     if binop.operator in ['<', '>', '<=', '>=', '==', '!=']:
         if isinstance(lhs, str) and isinstance(rhs, str):
             return eval_relat_str(lhs, rhs, binop.operator)
         return eval_relational_expr(lhs, rhs, binop.operator)
 
+    if lhs is None or rhs is None:
+        raise SemanticError("TypeError: 'dead' types cannot be used as an operand.", binop.pos_start, binop.pos_end)
+    
     if isinstance(lhs, str) and isinstance(rhs, str):
         return eval_concat(lhs, rhs, binop.operator)
 
-    return eval_numeric_binary_expr(lhs, rhs, binop.operator)
+    return eval_numeric_binary_expr(lhs, rhs, binop.operator, binop)
 
 def eval_concat(lhs, rhs, operator):
     if operator != '+':
         raise SemanticError("TypeError: Only valid operator between comms is '+'.")
     return lhs + rhs
 
-def eval_numeric_binary_expr(lhs, rhs, operator):
+def eval_numeric_binary_expr(lhs, rhs, operator, binop):
     # print(f"lhs -> {lhs}")
     # print(f"rhs -> {rhs}")
     
@@ -265,7 +268,7 @@ def eval_numeric_binary_expr(lhs, rhs, operator):
                     raise SemanticError("ZeroDivisionError: Modulo by zero is not allowed.")
                 result = lhs % rhs
             else:
-                raise SemanticError("ModuloError: Only hp values can be used in modulo operation.")
+                raise SemanticError("ModuloError: Only hp values can be used in modulo operation.", binop.pos_start, binop.pos_end)
         return result
     except TypeError as e:
         error_message = str(e)
