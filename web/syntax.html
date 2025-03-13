@@ -15,31 +15,50 @@
 <body>
   <nav class="navbar">
     <div class="nav-left">
-        <div class="nav-logo">Ludus</div>
+        <div class="nav-logo">
+            <span class="brackets">[</span>L<span class="brackets">]</span>udus</div>
         <ul class="nav-files">
             <li><a href="#files">Files</a></li>
-            <button class="run-button" onclick="syntaxAnalyzer()">
-                <span class="run-icon">▷</span> 
-                <span class="run-text">Run</span>
+            <button class="run-button">
+                <li><a href="index.html" onclick = "preserveText()">▷ Run</a></li>
             </button>
         </ul>
     </div>
-    
+   
     <ul class="nav-links">
-        <li><a href="index.html" onclick = "preserveText()">Code-Gen</a></li>
-        <li><a href="lexerpage.html" onclick = "preserveText()">Lexer</a></li>
+        <li><a href="lexerpage.html" onclick = "preserveText()">Lexical</a></li>
         <li><a href="syntax.html" onclick = "preserveText()">Syntax</a></li>
         <li><a href="semantic_page.html" onclick = "preserveText()">Semantic</a></li>
     </ul>
+    <script>
+        window.addEventListener("DOMContentLoaded", () => {
+            if (window.location.href.includes("syntax.html")) {
+                console.log("Running Syntax analyzer after navigation...");
+                syntaxAnalyzer();
+                lexicalAnalyzer();
+            }
+        });
+        </script>
   </nav>
-    <div class="master_box2">
-        <div class="code-editor-wrapper2">
-            <div class="line-numbers" id="lineNumbers"></div>
-            <textarea id="editor" class="code-editor"></textarea>
-        </div>
-        <div class="error_box2">
-            <textarea id="error2" readonly></textarea>
-        </div>
+  <div class="master_box">
+    <div class="code-editor-wrapper">
+        <div class="line-numbers" id="lineNumbers"></div>
+        <textarea id="editor" class="code-editor"></textarea>
     </div>
+    <div class="lexeme_token">
+      <div class="lexeme_token_inner">
+        <div class="lexeme_master">
+              <h2>Lexemes</h2>
+              <div id="lexeme" class="lexeme" onscroll="lexemeTokenScroll('lexeme')" contenteditable="false"></div>
+        </div>
+        <div class="token_master">
+              <h2>Tokens</h2>
+              <div id="token" class="token" onscroll="lexemeTokenScroll('token')" contenteditable="false"></div>
+          </div>
+      </div>
+      <div class="error_box">
+          <h2>Errors</h2>
+          <textarea id="error2" readonly></textarea>
+      </div>
 </body>
 </html>

@@ -103,7 +103,12 @@ function updateError(errors) {
 eel.expose(updateTerminal);
 function updateTerminal(result) {
     const errorArea = document.getElementById("error2");
-    if (errorArea) errorArea.value = result; 
+    if (!errorArea) return;
+    if (typeof result !== "string" || result.includes("{") || result.includes("SymbolTable")) {
+        console.warn("Ignoring non-error message:", result);
+        return;
+    }
+    errorArea.value = result; 
 }
 
 eel.expose(clearError);
