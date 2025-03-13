@@ -15,9 +15,11 @@ class SemanticError(Exception):
     def generate_error_message(self):
         if not self.source_code:
             return f"Semantic Error: {self.message}"
-        line_num = self.pos_start[0]
-        start_col = self.pos_start[1]
-        end_col = self.pos_end[1]
+        
+        if not self.pos_end:
+            line_num = self.pos_start
+        else:
+            line_num = self.pos_start[0]
 
         try:
             error_line = self.source_code[line_num - 1]
@@ -26,6 +28,15 @@ class SemanticError(Exception):
 
         expanded_line = error_line.replace('\t', ' ' * 4)
 
+        if not self.pos_end:
+            stripped_line = expanded_line.strip()
+            start_index = expanded_line.index(stripped_line[0])
+            underline = " " * start_index + "^" * len(stripped_line)
+            return f"Semantic Error found on line {line_num}:\n\n{expanded_line}\n{underline}\n\n{self.message}"
+
+        start_col = self.pos_start[1]
+        end_col = self.pos_end[1]
+        
         adjusted_start_col = len(expanded_line[:start_col].replace('\t', ' ' * 4))
         adjusted_end_col = len(expanded_line[:end_col].replace('\t', ' ' * 4))
 

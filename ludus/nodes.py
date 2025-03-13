@@ -318,10 +318,12 @@ class StructInst(Stmt):
         self.pos_end = pos_end
 
 class StructInstField(Expr):
-    def __init__(self, instance: Identifier, field: Identifier):
+    def __init__(self, instance: Identifier, field: Identifier, pos_start=None, pos_end=None):
         super().__init__(NodeType.STRUCT_INST_FIELD)
         self.instance = instance
         self.field = field
+        self.pos_start = pos_start
+        self.pos_end = pos_end
 
 class InstAssignment(AssignmentStmt):
     def __init__(self, left: StructInstField, operator: str, right: Expr, pos_start=None, pos_end=None):
@@ -411,10 +413,12 @@ class RecallStmt(Stmt):
         self.expressions = expressions
 
 class GlobalFuncDec(Stmt):
-    def __init__(self, name: Identifier, params: List[Stmt]):
+    def __init__(self, name: Identifier, params: List[Stmt], pos_start=None, pos_end=None):
         super().__init__(NodeType.GLOBAL_FUNC_NAME)
         self.name = name
         self.params = params
+        self.pos_start = pos_start
+        self.pos_end = pos_end
 
 class GlobalFuncBody(Stmt):
     def __init__(self, name: Identifier, params: List[Stmt], body: BlockStmt, recall_stmts: List[RecallStmt]):

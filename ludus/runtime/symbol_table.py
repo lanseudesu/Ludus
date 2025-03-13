@@ -110,25 +110,25 @@ class SymbolTable:
             "recall": recall_stmts
         }
     
-    def lookup(self, name: str, scope_to_check=None):
+    def lookup(self, name: str, start=None, end=None, scope_to_check=None):
         if scope_to_check:
             for scope in reversed(scope_to_check):
                 if name in scope:
                     value = scope[name]
                     if isinstance(value, Expr): 
-                        raise SemanticError(f"NameError: Identifier '{name}' is not defined before use.")
+                        raise SemanticError(f"NameError: Identifier '{name}' is not defined before use.", start, end)
                     return value  
 
-            raise SemanticError(f"NameError: Identifier '{name}' is not defined.")
+            raise SemanticError(f"NameError: Identifier '{name}' is not defined.", start, end)
         
         for scope in reversed(self.scope_stack):
             if name in scope:
                 value = scope[name]
                 if isinstance(value, Expr): 
-                    raise SemanticError(f"NameError: Identifier '{name}' is not defined before use.")
+                    raise SemanticError(f"NameError: Identifier '{name}' is not defined before use.", start, end)
                 return value  
 
-        raise SemanticError(f"NameError: Identifier '{name}' is not defined.")
+        raise SemanticError(f"NameError: Identifier '{name}' is not defined.", start, end)
     
     def __repr__(self):
         return "SymbolTable:\n" + "\n".join(

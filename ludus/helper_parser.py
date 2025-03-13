@@ -3,12 +3,14 @@ from .nodes import *
 import re
 
 class Helper:
-    def __init__(self, tokens, scope_stack, func_flag):
+    def __init__(self, tokens, scope_stack, func_flag, start, end):
         self.tokens = tokens
         self.current_token_index = 0
         self.current_token = self.get_next_token()
         self.scope_stack = scope_stack
         self.func_flag = func_flag
+        self.start = start
+        self.end = end
 
     def lookup_identifier(self, name):
         for scope in reversed(self.scope_stack):
@@ -23,14 +25,14 @@ class Helper:
                 if info["type"] == id_type:
                     return True
                 else:
-                    raise SemanticError(f"1 NameError: Identifier '{name}' is already declared as {info["type"]}.")
+                    raise SemanticError(f"NameError: Identifier '{name}' is already declared as {info["type"]}.", self.start, self.end)
         return False
     
     def get_identifier_info(self, name):
         for scope in reversed(self.scope_stack):
             if name in scope:
                 return scope[name]  
-        raise SemanticError(f"Identifier '{name}' not declared.")
+        raise SemanticError(f"NameError: Identifier '{name}' not declared.", self.start, self.end)
     
     def get_next_token(self):
         if self.current_token_index < len(self.tokens):
@@ -47,7 +49,7 @@ class Helper:
         prev_token = self.current_token
         self.current_token = self.get_next_token()
         if not prev_token or prev_token.token != token_type:
-            raise SemanticError(f"Parser Error: {error_message}")
+            raise SemanticError(f"ParserError: {error_message}", self.start, self.end)
         
     def look_ahead(self):
         la_token_index = self.current_token_index 
@@ -63,7 +65,7 @@ class Helper:
         self.skip_spaces()
         expr = self.parse_or_expr(scope)
         if self.current_token and self.current_token.token not in [')', ']']:
-            raise SemanticError(f"Unexpected token found during parsing: {self.current_token.token}")
+            raise SemanticError(f"ParserError: Unexpected token found during parsing: {self.current_token.token}", self.start, self.end)
         print(expr)
         return expr
     
@@ -75,7 +77,7 @@ class Helper:
             self.current_token = self.get_next_token()
             self.skip_spaces()
             right = self.parse_and_expr(scope)
-            left = BinaryExpr(left=left, right=right, operator=operator)
+            left = BinaryExpr(left, operator, right, self.start, self.end)
         return left
     
     def parse_and_expr(self, scope) -> Expr:
@@ -86,7 +88,7 @@ class Helper:
             self.current_token = self.get_next_token()
             self.skip_spaces()
             right = self.parse_relat_expr(scope)
-            left = BinaryExpr(left=left, right=right, operator=operator)
+            left = BinaryExpr(left, operator, right, self.start, self.end)
         return left
     
     def parse_relat_expr(self, scope) -> Expr:
@@ -101,10 +103,10 @@ class Helper:
             self.current_token = self.get_next_token()
             self.skip_spaces()
             right = self.parse_additive_expr(scope)
-            expr.append(BinaryExpr(left=left, right=right, operator=operator))
+            expr.append(BinaryExpr(left, operator, right, self.start, self.end))
             left = right
 
-        return ChainRelatExpr(expr)
+        return ChainRelatExpr(expr, self.start, self.end)
     
     def parse_additive_expr(self, scope) -> Expr:
         self.skip_spaces()
@@ -115,7 +117,7 @@ class Helper:
             self.current_token = self.get_next_token()
             self.skip_spaces()
             right = self.parse_multiplicative_expr(scope)
-            left = BinaryExpr(left=left, right=right, operator=operator)
+            left = BinaryExpr(left, operator, right, self.start, self.end)
         return left
 
     def parse_multiplicative_expr(self, scope) -> Expr:
@@ -127,7 +129,7 @@ class Helper:
             self.current_token = self.get_next_token()
             self.skip_spaces()
             right = self.parse_not_expr(scope)
-            left = BinaryExpr(left=left, right=right, operator=operator)  
+            left = BinaryExpr(left, operator, right, self.start, self.end)  
 
         return left  
     
@@ -139,7 +141,7 @@ class Helper:
             self.current_token = self.get_next_token()
             self.skip_spaces()
             operand = self.parse_exp_expr()
-            return UnaryExpr(operator=operator, operand=operand)
+            return UnaryExpr(operator, operand, self.start, self.end)
 
         return self.parse_exp_expr(scope)
     
@@ -152,14 +154,14 @@ class Helper:
             self.current_token = self.get_next_token()
             self.skip_spaces()
             right = self.parse_exp_expr(scope)
-            left = BinaryExpr(left=left, right=right, operator=operator)  
+            left = BinaryExpr(left, operator, right, self.start, self.end)  
 
         return left 
 
     def parse_primary_expr(self, scope, is_func_call=False) -> Expr:
         self.skip_spaces()
         if not self.current_token:
-            raise SemanticError("Unexpected end of input during parsing!")
+            raise SemanticError("ParserError: Unexpected end of input during parsing!", self.start, self.end)
         
         tk = self.current_token.token
 
@@ -167,12 +169,12 @@ class Helper:
             tk= 'id'
 
         if tk == 'id':
-            identifier = Identifier(symbol=self.current_token.lexeme)
+            identifier = Identifier(self.current_token.lexeme, self.start, self.end)
             self.current_token = self.get_next_token()
             self.skip_spaces()
             if self.current_token and self.current_token.token == '.':
                 if not self.lookup_identifier(identifier.symbol):
-                    raise SemanticError(f"NameError: Struct instance '{identifier.symbol}' does not exist.")
+                    raise SemanticError(f"NameError: Struct instance '{identifier.symbol}' does not exist.", self.start, self.end)
                 
                 info = self.get_identifier_info(identifier.symbol)
                 allowed_types = {"a struct instance"}
@@ -180,21 +182,21 @@ class Helper:
                     allowed_types.add("a parameter")
                 
                 if info["type"] not in allowed_types:
-                    raise SemanticError(f"18 NameError: Identifier '{identifier.symbol}' is already declared as {info['type']}")
+                    raise SemanticError(f"NameError: Identifier '{identifier.symbol}' is already declared as {info['type']}", self.start, self.end)
                 
                 self.current_token = self.get_next_token()
                 self.skip_spaces()
                 if self.current_token:
                     if not re.match(r'^id\d+$', self.current_token.token):
-                        raise SemanticError("Expected 'id' after '.' in accessing a struct instance field.")
-                field = Identifier(symbol=self.current_token.lexeme)
-                identifier = StructInstField(identifier, field)
+                        raise SemanticError("ParserError: Expected 'id' after '.' in accessing a struct instance field.", self.start, self.end)
+                field = Identifier(self.current_token.lexeme, self.start, self.end)
+                identifier = StructInstField(identifier, field, self.start, self.end)
                 self.current_token = self.get_next_token()
                 self.skip_spaces()
             elif self.current_token and self.current_token.token == '[':
                 dimensions = []
                 if not self.lookup_identifier(identifier.symbol):
-                    raise SemanticError(f"NameError: Array '{identifier.symbol}' does not exist.")
+                    raise SemanticError(f"NameError: Array '{identifier.symbol}' does not exist.", self.start, self.end)
                 
                 info = self.get_identifier_info(identifier.symbol)
                 allowed_types = {"an array"}
@@ -202,13 +204,13 @@ class Helper:
                     allowed_types.add("a parameter")
 
                 if info["type"] not in allowed_types:
-                    raise SemanticError(f"19 NameError: Identifier '{identifier.symbol}' is already declared as {info['type']}")
+                    raise SemanticError(f"NameError: Identifier '{identifier.symbol}' is already declared as {info['type']}", self.start, self.end)
 
                 while self.current_token and self.current_token.token == '[':
                     self.current_token = self.get_next_token() #eat [
                     self.skip_spaces
                     if self.current_token and self.current_token.token == ']':
-                        raise SemanticError("IndexError: Index cannot be empty.")
+                        raise SemanticError("IndexError: Index cannot be empty.", self.start, self.end)
                     else:
                         dim = self.parse_expr(scope)
                         dimensions.append(dim)
@@ -216,10 +218,10 @@ class Helper:
                         self.expect("]", "Expected ']' to close array dimension.")
                         self.skip_spaces()
                 
-                identifier = ArrElement(identifier, dimensions)
+                identifier = ArrElement(identifier, dimensions, self.start, self.end)
             elif self.current_token and self.current_token.token == '(':
                 if not self.lookup_id_type(identifier.symbol, "a function"):
-                    raise SemanticError(f"NameError: Function '{identifier.symbol}' does not exist.")
+                    raise SemanticError(f"NameError: Function '{identifier.symbol}' does not exist.", self.start, self.end)
                 self.current_token = self.get_next_token() # eat ( 
                 self.skip_spaces()
                 args = []       
@@ -236,20 +238,20 @@ class Helper:
                         self.skip_spaces()
                 self.current_token = self.get_next_token() # eat )
                 self.skip_spaces()
-                identifier = FuncCallStmt(identifier, args)
+                identifier = FuncCallStmt(identifier, args, self.start, self.end)
             elif self.current_token and self.current_token.token == 'xp_formatting':
                 if not self.lookup_id_type(identifier.symbol, "a variable"):
-                    raise SemanticError(f"NameError: Variable '{identifier.symbol}' does not exist.")
+                    raise SemanticError(f"NameError: Variable '{identifier.symbol}' does not exist.", self.start, self.end)
                 value = re.sub(r'^"(.*)"$', r'\1', self.current_token.lexeme)
                 if not re.match(r'^\.\d+f$', value):
-                    raise SemanticError(f"FormatError: Invalid format specifier '{value}'.")
+                    raise SemanticError(f"FormatError: Invalid format specifier '{value}'.", self.start, self.end)
                 digit = int(value[1])
                 self.current_token = self.get_next_token() # eat format 
                 self.skip_spaces()
-                return XpFormatting(identifier, digit)
+                return XpFormatting(identifier, digit, self.start, self.end)
             else:
                 if not self.lookup_identifier(identifier.symbol):
-                    raise SemanticError(f"NameError: Variable '{identifier.symbol}' does not exist.")
+                    raise SemanticError(f"NameError: Variable '{identifier.symbol}' does not exist.", self.start, self.end)
                 
                 info = self.get_identifier_info(identifier.symbol)
                 allowed_types = {"a variable"}
@@ -261,22 +263,22 @@ class Helper:
                     allowed_types.add("a struct instance")
 
                 if info["type"] not in allowed_types:
-                    raise SemanticError(f"20 NameError: Identifier '{identifier.symbol}' is already declared as {info['type']}")
+                    raise SemanticError(f"NameError: Identifier '{identifier.symbol}' is already declared as {info['type']}", self.start, self.end)
 
             return identifier
         elif tk == 'hp_ltr':
-            literal = HpLiteral(value=self.current_token.lexeme)
+            literal = HpLiteral(self.current_token.lexeme, self.start, self.end)
             self.current_token = self.get_next_token()
             self.skip_spaces()
             return literal
         elif tk == 'xp_ltr':
-            literal = XpLiteral(value=self.current_token.lexeme)
+            literal = XpLiteral(self.current_token.lexeme, self.start, self.end)
             self.current_token = self.get_next_token()
             self.skip_spaces()
             return literal
         elif re.match(r'^comms_ltr', tk) :
             value = re.sub(r'^"(.*)"$', r'\1', self.current_token.lexeme)
-            literal = CommsLiteral(value)
+            literal = CommsLiteral(value, self.start, self.end)
             self.current_token = self.get_next_token()
             self.skip_spaces()
             return literal
@@ -286,7 +288,7 @@ class Helper:
                 value = True
             else:
                 value = False
-            literal = FlagLiteral(value)
+            literal = FlagLiteral(value, self.start, self.end)
             self.current_token = self.get_next_token()
             self.skip_spaces()
             return literal
@@ -296,17 +298,17 @@ class Helper:
             value = self.parse_expr(scope)  
             #print(value)
             if value.kind == 'XpFormatting':
-                raise SemanticError("FormatError: xp formatting cannot be used as a value within a parentheses.")
+                raise SemanticError("FormatError: xp formatting cannot be used as a value within a parentheses.", self.start, self.end)
             self.expect(')', "Unexpected token found inside parenthesised expression. Expected closing parenthesis.")
             self.skip_spaces()
             if self.current_token and self.current_token.token == 'xp_formatting':
                 format_str = re.sub(r'^"(.*)"$', r'\1', self.current_token.lexeme)
                 if not re.match(r'^\.\d+f$', format_str):
-                    raise SemanticError(f"FormatError: Invalid format specifier '{format_str}'.")
+                    raise SemanticError(f"FormatError: Invalid format specifier '{format_str}'.", self.start, self.end)
                 digit = int(format_str[1])
                 self.current_token = self.get_next_token() # eat format 
                 self.skip_spaces()
-                return XpFormatting(value, digit)
+                return XpFormatting(value, digit, self.start, self.end)
             return value
         elif tk == '-':
             self.current_token = self.get_next_token()
@@ -317,17 +319,17 @@ class Helper:
                 expr = self.parse_expr(scope)
                 self.expect(')', "Unexpected token found inside parenthesized expression. Expected closing parenthesis.")
                 self.skip_spaces()
-                return UnaryExpr(operator='-', operand=expr)
+                return UnaryExpr('-', expr, self.start, self.end)
             elif re.match(r'^id\d+$', self.current_token.token):
-                identifier = Identifier(symbol=self.current_token.lexeme)
+                identifier = Identifier(self.current_token.lexeme, self.start, self.end)
                 self.current_token = self.get_next_token()
                 self.skip_spaces()
-                return UnaryExpr(operator='-', operand=identifier)
+                return UnaryExpr('-', identifier, self.start, self.end)
         elif tk == 'dead':
             self.current_token = self.get_next_token()
             self.skip_spaces()
-            return DeadLiteral(None, None)
+            return DeadLiteral(None, None, self.start, self.end)
         elif tk == 'load' or tk == 'loadNum':
-            raise SemanticError(f"LoadError: Cannot use load or loadNum function within string literals.")
+            raise SemanticError(f"ValueError: Cannot use load or loadNum function within string literals.", self.start, self.end)
         else:
-            raise SemanticError(f"6 Unexpected token found during parsing: {tk}")
+            raise SemanticError(f"ParserError: Unexpected token found during parsing: {tk}", self.start, self.end)

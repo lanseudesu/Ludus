@@ -227,7 +227,7 @@ class SemanticAnalyzer(ASTVisitor):
         elif isinstance(node.value, DeadLiteral):
             val_type = node.value.datatype
         elif isinstance(node.value, Identifier) and value == None:
-            id_val = self.symbol_table.lookup(node.value.symbol)
+            id_val = self.symbol_table.lookup(node.value.symbol, node.value.pos_start, node.value.pos_end)
             val_type = id_val["type"]
         else:
             val_type = self.TYPE_MAP.get(type(value), str(type(value)))
@@ -254,12 +254,12 @@ class SemanticAnalyzer(ASTVisitor):
             if "parent" in new_val:
                 raise SemanticError(f"ValueError: Trying to assign a struct instance to a variable: '{node.left.symbol}'.", node.right.pos_start, node.right.pos_end)
 
-        value = self.symbol_table.lookup(node.left.symbol)
+        value = self.symbol_table.lookup(node.left.symbol, node.left.pos_start, node.left.pos_end)
         
         if not isinstance(value, dict):
             datatype = self.TYPE_MAP.get(type(value), str(type(value)))
             self.symbol_table.define_var(node.left.symbol, value, datatype, False)
-            value = self.symbol_table.lookup(node.left.symbol)
+            value = self.symbol_table.lookup(node.left.symbol, node.left.pos_start, node.left.pos_end)
 
         if "value" not in value:
             raise SemanticError(f"ValueError: Mismatched values — trying to assign a single value to a list object: '{node.left.symbol}'.", node.pos_start, node.pos_end)
@@ -357,6 +357,7 @@ class SemanticAnalyzer(ASTVisitor):
 
         for var_dec in node.declarations:
             name = var_dec.left.symbol if var_dec.kind == 'VarAssignmentStmt' else var_dec.name.symbol
+            name_node = var_dec.left if var_dec.kind == 'VarAssignmentStmt' else var_dec.name
             kind = var_dec.right if var_dec.kind == 'VarAssignmentStmt' else var_dec.value
 
             if kind.kind == 'FuncCallStmt':
@@ -380,7 +381,7 @@ class SemanticAnalyzer(ASTVisitor):
                             raise SemanticError(f"ValueError: Function '{kind.name.symbol}' recalls more than one value.", var_dec.value.pos_start, var_dec.value.pos_end)
 
             self.visit(var_dec)
-            value = self.symbol_table.lookup(name)
+            value = self.symbol_table.lookup(name, name_node.pos_start, name_node.pos_end)
             if variable_type and variable_type != value["type"]:
                 value_node = var_dec.right if var_dec.kind == 'VarAssignmentStmt' else var_dec.value
                 if not node.batch_ver1:
@@ -418,17 +419,20 @@ class SemanticAnalyzer(ASTVisitor):
         if declaration.kind == 'VarDec':
             self.symbol_table.define_var(var_name.symbol, value, val_type, declaration.immo)
         else:
-            info = self.symbol_table.lookup(var_name.symbol)
+            info = self.symbol_table.lookup(var_name.symbol, var_name.pos_start, var_name.pos_end)
             if info["immo"]:
                 raise SemanticError(f"ImmoError: '{var_name.symbol}' is declared as an immutable variable.", var_name.pos_start, var_name.pos_end)
             if val_type != info["type"]:
                 raise SemanticError(f"TypeError: Type mismatch for variable '{var_name.symbol}'. Expected '{info['type']}', got '{val_type}'.", node.pos_start, node.pos_end)
             self.symbol_table.define_var(var_name.symbol, value, val_type, info["immo"])
 
-    ###### VARIABLES #########
+    ###### ARRAYS #########
     def visit_ArrayAssignmentStmt(self, node: ArrAssignment):
+        if node.right.kind in {'LoadNum', 'Load'} and node.operator != ':':
+            raise SemanticError(f"ValueError: loadNum and load function cannot be used in compound assignment statements.", node.right.pos_start, node.right.pos_end)
+        
         lhs_name = node.left.left.symbol
-        lhs_info = self.symbol_table.lookup(lhs_name)
+        lhs_info = self.symbol_table.lookup(lhs_name, node.left.pos_start, node.left.pos_end)
         if not isinstance(lhs_info, dict) or "dimensions" not in lhs_info:
             raise SemanticError(f"TypeError: '{lhs_name}' is not an array.", node.left.pos_start, node.left.pos_end)
         lhs_immo = lhs_info["immo"]
@@ -444,6 +448,8 @@ class SemanticAnalyzer(ASTVisitor):
         
         target = lhs_data
         for i, idx in enumerate(node.left.index[:-1]):
+            if idx.kind in {'LoadNum', 'Load'}:
+                raise SemanticError(f"IndexError: loadNum and load function cannot be used as index expression.", idx.pos_start, idx.pos_end)
             idx_val = evaluate(idx, self.symbol_table)
             if not isinstance(idx_val, int):
                 raise SemanticError(f"IndexError: Array index must always evaluate to a positive hp value.", idx.pos_start, idx.pos_end)
@@ -452,6 +458,8 @@ class SemanticAnalyzer(ASTVisitor):
             target = target[idx_val]
 
         final_idx = node.left.index[-1]
+        if final_idx.kind in {'LoadNum', 'Load'}:
+                raise SemanticError(f"IndexError: loadNum and load function cannot be used as index expression.", final_idx.pos_start, final_idx.pos_end)
         final_idx_val = evaluate(final_idx, self.symbol_table)
         if not isinstance(final_idx_val, int):
                 raise SemanticError(f"IndexError: Array index must always evaluate to a positive hp value.", final_idx.pos_start, final_idx.pos_end)
@@ -481,6 +489,8 @@ class SemanticAnalyzer(ASTVisitor):
                 raise SemanticError("TypeError: Using loadNum function to assign a non-numeric array element.", node.right.pos_start, node.right.pos_end)
 
         if node.operator in ['+=', '-=', '*=', '/=', '%=']:
+            i
+            
             if (isinstance(value, str) and isinstance(target[final_idx_val], bool)) or (isinstance(value, bool) and isinstance(target[final_idx_val], str)):
                 raise SemanticError("TypeError: Cannot mix comms and flags in an expression.", node.pos_start, node.pos_end)
 
@@ -527,9 +537,9 @@ class SemanticAnalyzer(ASTVisitor):
     
     def visit_ArrayRedec(self, node: ArrayRedec):
         arr_name = node.name.symbol
-        arr_info = self.symbol_table.lookup(arr_name)
+        arr_info = self.symbol_table.lookup(arr_name, node.name.pos_start, node.name.pos_end)
         if not isinstance(arr_info, dict) or "dimensions" not in arr_info:
-            raise SemanticError(f"TypeError: '{arr_name}' is not an array.", node.pos_start, node.pos_end)
+            raise SemanticError(f"TypeError: '{arr_name}' is not an array.", node.name.pos_start, node.name.pos_end)
         arr_immo = arr_info["immo"]
         arr_type = arr_info["type"]
         arr_dimensions = arr_info["dimensions"]
@@ -537,7 +547,7 @@ class SemanticAnalyzer(ASTVisitor):
             raise SemanticError(f"ImmoError: '{arr_name}' is declared as an immutable array.", node.name.pos_start, node.name.pos_end)
 
         if isinstance(node.elements, Identifier):
-            rhs_arr = self.symbol_table.lookup(node.elements.symbol)
+            rhs_arr = self.symbol_table.lookup(node.elements.symbol, node.elements.pos_start, node.elements.pos_end)
             if not isinstance(rhs_arr, dict) or "elements" not in rhs_arr:
                 raise SemanticError(f"ValueError: '{node.elements.symbol}' is not an array.", node.elements.pos_start, node.elements.pos_end)
             
@@ -598,7 +608,7 @@ class SemanticAnalyzer(ASTVisitor):
     
     def visit_JoinStmt(self, node: JoinStmt):
         arr_name = node.arr_name.symbol
-        arr_info = self.symbol_table.lookup(arr_name)
+        arr_info = self.symbol_table.lookup(arr_name, node.arr_name.pos_start, node.arr_name.pos_end)
         if not isinstance(arr_info, dict) or "dimensions" not in arr_info:
             raise SemanticError(f"TypeError: '{arr_name}' is not an array.", node.arr_name.pos_start, node.arr_name.pos_end)
         arr_immo = arr_info["immo"]
@@ -683,7 +693,7 @@ class SemanticAnalyzer(ASTVisitor):
 
     def visit_DropStmt(self, node: DropStmt, is_Return=False):
         arr_name = node.arr_name.symbol   
-        arr_info = self.symbol_table.lookup(arr_name)
+        arr_info = self.symbol_table.lookup(arr_name, node.arr_name.pos_start, node.arr_name.pos_end)
         if not isinstance(arr_info, dict) or "dimensions" not in arr_info:
             raise SemanticError(f"TypeError: '{arr_name}' is not an array.", node.pos_start, node.pos_end)
         arr_immo = arr_info["immo"]
@@ -766,7 +776,7 @@ class SemanticAnalyzer(ASTVisitor):
 
     def visit_SeekStmt(self, node: SeekStmt):
         arr_name = node.arr_name.symbol
-        arr_info = self.symbol_table.lookup(arr_name)
+        arr_info = self.symbol_table.lookup(arr_name, node.arr_name.pos_start, node.arr_name.pos_end)
         if not isinstance(arr_info, dict) or "dimensions" not in arr_info:
             raise SemanticError(f"TypeError: '{arr_name}' is not an array.", node.pos_start, node.pos_end)
         arr_type = arr_info["type"]
@@ -843,9 +853,10 @@ class SemanticAnalyzer(ASTVisitor):
         
         return len(info)
 
+    ###### STRUCTS #########
     def visit_StructInst(self, node: StructInst):
-        structinst = self.symbol_table.lookup(node.name.symbol)
-        structparent = self.symbol_table.lookup(structinst["parent"])
+        structinst = self.symbol_table.lookup(node.name.symbol, node.name.pos_start, node.name.pos_end)
+        structparent = self.symbol_table.lookup(structinst["parent"], node.pos_start, node.pos_end)
         
         fields = structinst["fields"]
         field_names = list(structparent.keys())
@@ -886,7 +897,10 @@ class SemanticAnalyzer(ASTVisitor):
         pass
 
     def visit_InstAssignmentStmt(self, node: InstAssignment):
-        structinst = self.symbol_table.lookup(node.left.instance.symbol)
+        if node.right.kind in {'LoadNum', 'Load'} and node.operator != ':':
+            raise SemanticError(f"ValueError: loadNum and load function cannot be used in compound assignment statements.", node.right.pos_start, node.right.pos_end)
+        
+        structinst = self.symbol_table.lookup(node.left.instance.symbol, node.left.instance.pos_start, node.left.instance.pos_end)
         if not isinstance(structinst, dict) or "fields" not in structinst:
             raise SemanticError(f"TypeError: '{node.left.instance.symbol}' is not a struct instance.", node.left.instance.pos_start, node.left.instance.pos_end)
         
@@ -897,8 +911,6 @@ class SemanticAnalyzer(ASTVisitor):
         new_field = node.left.field.symbol
         
         if new_field not in field_names:
-            start = node.pos_start[1] + len(node.left.instance.symbol) + 1
-            end = start + len(new_field) - 1
             raise SemanticError(f"NameError: Field '{new_field}' does not exist "
                                 f"in struct instance '{node.left.instance.symbol}'.", node.left.field.pos_start, node.left.field.pos_end)
         
@@ -975,6 +987,7 @@ class SemanticAnalyzer(ASTVisitor):
         
         self.symbol_table.define_structinst(node.left.instance.symbol, structinst["parent"], structinst["fields"], structinst["immo"])
 
+    ###### COND #########
     def visit_IfStmt(self, node: IfStmt):
         conditions = []
         if_condition = evaluate(node.condition, self.symbol_table)
@@ -1050,14 +1063,15 @@ class SemanticAnalyzer(ASTVisitor):
                 return
         self.symbol_table.exit_scope()
 
+    ###### LOOP #########
     def visit_ForStmt(self, node: ForStmt):
         val_name = node.initialization.left.symbol
-        value = self.symbol_table.lookup(val_name)
+        value = self.symbol_table.lookup(val_name, node.initialization.left.pos_start, node.initialization.left.pos_end)
 
         if not isinstance(value, dict):
             datatype = self.TYPE_MAP.get(type(value), str(type(value)))
             self.symbol_table.define_var(val_name, value, datatype, False)
-            value = self.symbol_table.lookup(node.left.symbol)
+            value = self.symbol_table.lookup(node.left.symbol, node.left.pos_start, node.left.pos_end)
 
         if "value" not in value:
             raise SemanticError(f"ValueError: Mismatched types — trying to assign a single value from to a list object, '{val_name}'", 
@@ -1132,6 +1146,7 @@ class SemanticAnalyzer(ASTVisitor):
                     continue 
         self.symbol_table.exit_scope()
     
+    ###### FUNCS #########
     def visit_BlockStmt(self, node: BlockStmt):
         self.symbol_table.restore_scope(len(self.symbol_table.scope_stack))
         for stmt in node.statements:
@@ -1161,7 +1176,7 @@ class SemanticAnalyzer(ASTVisitor):
         
         self.symbol_table.restore_scope_func(node.name.symbol)
        
-        info = self.symbol_table.lookup(node.name.symbol)
+        info = self.symbol_table.lookup(node.name.symbol, node.name.pos_start, node.name.pos_end)
         if not info:
             raise SemanticError(f"NameError: Function '{node.name.symbol}' is not defined.", node.name.pos_start, node.name.pos_end)
 
@@ -1227,6 +1242,8 @@ class SemanticAnalyzer(ASTVisitor):
         else:
             for expr in node.expressions:
                 print(expr)
+                if expr.kind in {'Load', 'LoadNum'}:
+                    raise SemanticError(f"ValueError: Using load and loadNum in recall is not allowed.", node.pos_start, node.pos_end)
                 if expr == []:
                     self.recall_values.append([])
                     self.recall_flag = True
@@ -1234,6 +1251,7 @@ class SemanticAnalyzer(ASTVisitor):
                 self.recall_values.append(evaluate(expr, self.symbol_table))
         self.recall_flag = True
 
+    ###### BUILT-IN #########
     def visit_ShootStmt(self, node: ShootStmt):
         if node.element.kind in ['Load', 'LoadNum']:
             raise SemanticError("UnsupportedArgumentError: load and loadNum function are an invalid argument for shoot and shootNxt function.", node.element.pos_start, node.element.pos_end)

@@ -14,6 +14,14 @@ def evaluate(ast_node, symbol_table):
     from .traverser import SemanticAnalyzer 
     traverser = SemanticAnalyzer(symbol_table)
 
+    TYPE_MAP = {
+        int: "hp",
+        float: "xp",
+        str: "comms",
+        bool: "flag",
+        dict: "array"
+    }
+
     if ast_node.kind == "HpLiteral":
         return ast_node.value
     elif ast_node.kind == "XpLiteral":
@@ -27,8 +35,8 @@ def evaluate(ast_node, symbol_table):
     elif ast_node.kind == "ChainRelatExpr":
         return eval_chain_relat_expr(ast_node, symbol_table)
     elif ast_node.kind == "Identifier":
-        value = symbol_table.lookup(ast_node.symbol)
-        print(value)
+        value = symbol_table.lookup(ast_node.symbol, ast_node.pos_start, ast_node.pos_end)
+        # print(value)
         if value is None:
             return value
         if not isinstance(value, dict):
@@ -37,54 +45,81 @@ def evaluate(ast_node, symbol_table):
             return value["value"]
         elif "elements" in value or "fields" in value:
             return value
+    
     elif ast_node.kind == 'StructInstField':
-        structinst = symbol_table.lookup(ast_node.instance.symbol)
+        
+        structinst = symbol_table.lookup(ast_node.instance.symbol, ast_node.instance.pos_start, ast_node.instance.pos_end)
         if not isinstance(structinst, dict) or "fields" not in structinst:
-            raise SemanticError(f"TypeError: '{ast_node.instance.symbol}' is not a struct instance.")
+            raise SemanticError(f"TypeError: '{ast_node.instance.symbol}' is not a struct instance.", 
+                                ast_node.instance.pos_start, ast_node.instance.pos_end)
         for fld in structinst["fields"]:
             if fld["name"] == ast_node.field.symbol:
                 return fld["value"]
-        raise SemanticError(f"NameError: Field '{ast_node.field.symbol}' is not defined in struct instance '{ast_node.instance.symbol}'.")
+        raise SemanticError(f"NameError: Field '{ast_node.field.symbol}' is not defined in struct instance '{ast_node.instance.symbol}'.", 
+                            ast_node.instance.pos_start, ast_node.instance.pos_end)
+    
     elif ast_node.kind == 'ArrayElement':
         arr_name = ast_node.left.symbol
-        arr = symbol_table.lookup(arr_name)
+        arr = symbol_table.lookup(arr_name, ast_node.left.pos_start, ast_node.left.pos_end)
+
         if not isinstance(arr, dict) or "dimensions" not in arr:
-            raise SemanticError(f"TypeError: '{arr_name}' is not an array.")
+            raise SemanticError(f"TypeError: '{arr_name}' is not an array.", 
+                                ast_node.left.pos_start, ast_node.left.pos_end)
         if len(ast_node.index) != len(arr["dimensions"]):
-            raise SemanticError(f"ArrayIndexError: Incorrect number of dimensions for {arr_name}.")
+            raise SemanticError(f"ArrayIndexError: Incorrect number of dimensions for {arr_name}.", 
+                                ast_node.index.pos_start, ast_node.index.pos_end)
+        
         target = arr["elements"]
         for i, idx in enumerate(ast_node.index[:-1]):
-            idx = evaluate(idx, symbol_table)
-            if idx < 0 or idx >= len(target):
-                raise SemanticError(f"ArrayIndexError: Index {idx} out of bounds for dimension {i} of array '{arr_name}'.")
-            target = target[idx]
-        final_idx = ast_node.index[-1]
-        final_idx = evaluate(final_idx, symbol_table)
-        if final_idx < 0 or final_idx >= len(target):
-            raise SemanticError(f"ArrayIndexError: Index {final_idx} out of bounds for final dimension of array '{arr_name}'.")
+            if idx.kind in {'LoadNum', 'Load'}:
+                raise SemanticError(f"IndexError: loadNum and load function cannot be used as index expression.", idx.pos_start, idx.pos_end)
+            idx_val = evaluate(idx, symbol_table)
+            
+            if not isinstance(idx_val, int):
+                raise SemanticError(f"IndexError: Array index must always evaluate to a positive hp value.", idx.pos_start, idx.pos_end)
+            
+            if idx_val < 0 or idx_val >= len(target):
+                raise SemanticError(f"ArrayIndexError: Index {idx_val} out of bounds for dimension {i} of array '{arr_name}'.", idx.pos_start, idx.pos_end)
+            target = target[idx_val]
         
-        return target[final_idx]
+        final_idx = ast_node.index[-1]
+        if final_idx.kind in {'LoadNum', 'Load'}:
+            raise SemanticError(f"IndexError: loadNum and load function cannot be used as index expression.", final_idx.pos_start, final_idx.pos_end)
+        final_idx_val = evaluate(final_idx, symbol_table)
+        if not isinstance(final_idx_val, int):
+            raise SemanticError(f"IndexError: Array index must always evaluate to a positive hp value.", final_idx.pos_start, final_idx.pos_end)
+        if final_idx_val < 0 or final_idx_val >= len(target):
+            raise SemanticError(f"ArrayIndexError: Index {final_idx_val} out of bounds for final dimension of array '{arr_name}'.", final_idx.pos_start, final_idx.pos_end)
+        
+        return target[final_idx_val]
+    
     elif ast_node.kind == "DeadLiteral":
         return None
+    
     elif ast_node.kind == "UnaryExpr":
+        if ast_node.operand.kind in {'LoadNum', 'Load'}:
+            raise SemanticError(f"InvalidOperand: loadNum and load function cannot be used as unary operand.", ast_node.operand.pos_start, ast_node.operand.pos_end)
+        
         operand = evaluate(ast_node.operand, symbol_table)
+        op_type = TYPE_MAP.get(type(operand), str(type(operand)))
         if ast_node.operator == '-':
             if not isinstance(operand, (int, float, bool)):
-                raise SemanticError(f"TypeError: Cannot apply '-' to non-numeric type: {type(operand).__name__}") # gawing hp xp and stuff
+                raise SemanticError(f"TypeError: Cannot apply '-' to non-numeric type: {op_type}", ast_node.operand.pos_start, ast_node.operand.pos_end) 
             return -operand
         elif ast_node.operator == '!':
             if not isinstance(operand, bool):
-                raise SemanticError(f"TypeError: Cannot apply '!' to non-flag type: {type(operand).__name__}")
+                raise SemanticError(f"TypeError: Cannot apply '!' to non-flag type: {op_type}", ast_node.operand.pos_start, ast_node.operand.pos_end)
             return not operand
         else:
             raise SemanticError(f"Unknown unary operator: {ast_node.operator}")
+    
     elif ast_node.kind == "FuncCallStmt":
-        value = symbol_table.lookup(ast_node.name.symbol)
+        value = symbol_table.lookup(ast_node.name.symbol, ast_node.name.pos_start, ast_node.name.pos_end)
         recall = value["recall"]
         if recall == []:
-            raise SemanticError(f"Function '{ast_node.name.symbol}' does not return a value.")
+            raise SemanticError(f"RecallError: Function '{ast_node.name.symbol}' does not return a value.", ast_node.pos_start, ast_node.pos_end)
         if all(rec.expressions == ["void"] for rec in recall):
-            raise SemanticError(f"Function '{ast_node.name.symbol}' does not return a value.")
+            raise SemanticError(f"RecallError: Function '{ast_node.name.symbol}' does not return a value.", ast_node.pos_start, ast_node.pos_end)
         
         result = traverser.visit_FuncCallStmt(ast_node, True)
         # print(f"yoyo {result}")
@@ -94,24 +129,27 @@ def evaluate(ast_node, symbol_table):
     elif ast_node.kind == "LoadNum":
         return UnresolvedNumber()
     elif ast_node.kind == "XpFormatting":
+        if ast_node.lhs.kind in {'Load', 'LoadNum'}:
+            raise SemanticError(f"FormatError: 'load' and 'loadNum' function are not allowed in xp formatting.", ast_node.pos_start, ast_node.pos_end)
+        
         value = evaluate(ast_node.lhs, symbol_table)
         print (f"xp format val = {value}")
         if not isinstance(value, dict):
             if value is None:
-                raise SemanticError("FormatError: Cannot use xp formatting on a dead value.")
+                raise SemanticError("FormatError: Cannot use xp formatting on a dead value.", ast_node.pos_start, ast_node.pos_end)
             elif not isinstance(value, float):
-                raise SemanticError("FormatError: Using xp formatting on a non-xp value.")
+                raise SemanticError("FormatError: Using xp formatting on a non-xp value.", ast_node.pos_start, ast_node.pos_end)
             formatted_digits = f".{ast_node.digits}f"
             formatted = f"{value:{formatted_digits}}"  
             print(f"formatted {formatted}")
             return formatted
         else:
             if "elements" in value or "fields" in value:
-                raise SemanticError("FormatError: Using xp formatting on a non-xp value.")
+                raise SemanticError("FormatError: Using xp formatting on a non-xp value.", ast_node.pos_start, ast_node.pos_end)
             elif value["type"] != "xp":
-                raise SemanticError("FormatError: Using xp formatting on a non-xp value.")
+                raise SemanticError("FormatError: Using xp formatting on a non-xp value.", ast_node.pos_start, ast_node.pos_end)
             elif value["value"] is None:
-                raise SemanticError("FormatError: Cannot use xp formatting on a dead value.")
+                raise SemanticError("FormatError: Cannot use xp formatting on a dead value.", ast_node.pos_start, ast_node.pos_end)
             formatted_digits = f".{ast_node.digits}f"
             formatted = f"{value:{formatted_digits}}"  
             print(f"formatted {formatted}")
@@ -119,6 +157,8 @@ def evaluate(ast_node, symbol_table):
     elif ast_node.kind == "FormCommsLiteral":
         evaluated_values = []
         for expr in ast_node.expressions:
+            if expr.kind in {'Load', 'LoadNum'}:
+                raise SemanticError(f"FormatError: 'load' and 'loadNum' function are not allowed as placeholders.", expr.pos_start, expr.pos_end)
             result = evaluate(expr, symbol_table)  
             print(f"res {result}")
             if not isinstance(result, dict):
@@ -141,7 +181,7 @@ def evaluate(ast_node, symbol_table):
                 else:
                     result='true'  
             elif "elements" in result or "fields" in result:
-                raise SemanticError("TypeError: Cannot format a list object within a comms literal.")
+                raise SemanticError("TypeError: Cannot format a list object within a comms literal.", expr.pos_start, expr.pos_end)
             evaluated_values.append(str(result))  
 
         formatted = ast_node.value
@@ -172,7 +212,7 @@ def evaluate(ast_node, symbol_table):
 
 def eval_binary_expr(binop, symbol_table):
     if binop.left.kind in {'Load', 'LoadNum'} or binop.right.kind in {'Load', 'LoadNum'}:
-        raise SemanticError("LoadError: Cannot use load or loadNum function in a binary expression.")
+        raise SemanticError("OperandError: Cannot use load or loadNum function in a binary expression.", binop.pos_start, binop.pos_end)
     lhs = evaluate(binop.left, symbol_table)
     rhs = evaluate(binop.right, symbol_table)
     
@@ -200,21 +240,21 @@ def eval_binary_expr(binop, symbol_table):
 
     if isinstance(rhs, list):
         if len(rhs) > 1:
-            raise SemanticError("TypeError: Cannot use list in an expression.")
+            raise SemanticError("TypeError: Cannot use list in an expression.", binop.pos_start, binop.pos_end)
         rhs = rhs[0]
     if isinstance(lhs, list):
         if len(lhs) > 1:
-            raise SemanticError("TypeError: Cannot use list in an expression.")
+            raise SemanticError("TypeError: Cannot use list in an expression.", binop.pos_start, binop.pos_end)
         lhs = lhs[0]
     
     if isinstance(rhs, dict) or isinstance(lhs, dict):
-        raise SemanticError("TypeError: Trying to use a list object in an expression.")
+        raise SemanticError("TypeError: Trying to use a list object in an expression.", binop.pos_start, binop.pos_end)
 
     if binop.operator in ['AND', 'OR', '&&', '||']:
         if isinstance(lhs, bool) and isinstance(rhs, bool):
             return eval_logic_expr(lhs, rhs, binop.operator)
         else:
-            raise SemanticError("TypeError: Only flag values can be used as operands on logical expressions.")
+            raise SemanticError("TypeError: Only flag values can be used as operands on logical expressions.", binop.pos_start, binop.pos_end)
 
     if (isinstance(lhs, str) and isinstance(rhs, bool)) or (isinstance(lhs, bool) and isinstance(rhs, str)):
         raise SemanticError("TypeError: Cannot mix comms and flags in an expression.")
@@ -224,21 +264,18 @@ def eval_binary_expr(binop, symbol_table):
 
     if binop.operator in ['<', '>', '<=', '>=', '==', '!=']:
         if isinstance(lhs, str) and isinstance(rhs, str):
-            return eval_relat_str(lhs, rhs, binop.operator)
-        return eval_relational_expr(lhs, rhs, binop.operator)
+            return eval_relat_str(lhs, rhs, binop.operator, binop)
+        return eval_relational_expr(lhs, rhs, binop.operator, binop)
 
     if lhs is None or rhs is None:
         raise SemanticError("TypeError: 'dead' types cannot be used as an operand.", binop.pos_start, binop.pos_end)
     
     if isinstance(lhs, str) and isinstance(rhs, str):
-        return eval_concat(lhs, rhs, binop.operator)
+        if binop.operator != '+':
+            raise SemanticError("TypeError: Only valid operator between comms is '+'.", binop.pos_start, binop.pos_end)
+        return lhs + rhs
 
     return eval_numeric_binary_expr(lhs, rhs, binop.operator, binop)
-
-def eval_concat(lhs, rhs, operator):
-    if operator != '+':
-        raise SemanticError("TypeError: Only valid operator between comms is '+'.")
-    return lhs + rhs
 
 def eval_numeric_binary_expr(lhs, rhs, operator, binop):
     # print(f"lhs -> {lhs}")
@@ -256,16 +293,16 @@ def eval_numeric_binary_expr(lhs, rhs, operator, binop):
         elif operator == "/":
             if isinstance(lhs, int) and isinstance(rhs, int):
                 if rhs == 0:
-                    raise SemanticError("ZeroDivisionError: Division by zero is not allowed")
+                    raise SemanticError("ZeroDivisionError: Division by zero is not allowed", binop.pos_start, binop.pos_end)
                 result = int(lhs / rhs)
             else:
                 if rhs == 0 or rhs == 0.0:
-                    raise SemanticError("ZeroDivisionError: Division by zero is not allowed")
+                    raise SemanticError("ZeroDivisionError: Division by zero is not allowed", binop.pos_start, binop.pos_end)
                 result = lhs / rhs
         else:
             if isinstance(lhs, int) and isinstance(rhs, int):
                 if rhs == 0:
-                    raise SemanticError("ZeroDivisionError: Modulo by zero is not allowed.")
+                    raise SemanticError("ZeroDivisionError: Modulo by zero is not allowed.", binop.pos_start, binop.pos_end)
                 result = lhs % rhs
             else:
                 raise SemanticError("ModuloError: Only hp values can be used in modulo operation.", binop.pos_start, binop.pos_end)
@@ -273,41 +310,41 @@ def eval_numeric_binary_expr(lhs, rhs, operator, binop):
     except TypeError as e:
         error_message = str(e)
         if "unsupported operand type(s)" in error_message and "'NoneType'" in error_message:
-            raise SemanticError("TypeError: 'dead' types cannot be used as an operand.")
+            raise SemanticError("TypeError: 'dead' types cannot be used as an operand.", binop.pos_start, binop.pos_end)
         else:
             raise SemanticError(error_message)
     
-def eval_relational_expr(lhs, rhs, operator):
+def eval_relational_expr(lhs, rhs, operator, binop):
     if operator == '<':
         if lhs is None or rhs is None:
-            raise SemanticError("TypeError: 'dead' types cannot be used as an operand in '<' operation.")
+            raise SemanticError("TypeError: 'dead' types cannot be used as an operand in '<' operation.", binop.pos_start, binop.pos_end)
         return lhs < rhs
     elif operator == '>':
         if lhs is None or rhs is None:
-            raise SemanticError("TypeError: 'dead' types cannot be used as an operand in '>' operation.")
+            raise SemanticError("TypeError: 'dead' types cannot be used as an operand in '>' operation.", binop.pos_start, binop.pos_end)
         return lhs > rhs
     elif operator == '<=':
         if lhs is None or rhs is None:
-            raise SemanticError("TypeError: 'dead' types cannot be used as an operand in '<=' operation.")
+            raise SemanticError("TypeError: 'dead' types cannot be used as an operand in '<=' operation.", binop.pos_start, binop.pos_end)
         return lhs <= rhs
     elif operator == '>=':
         if lhs is None or rhs is None:
-            raise SemanticError("TypeError: 'dead' types cannot be used as an operand in '>=' operation.")
+            raise SemanticError("TypeError: 'dead' types cannot be used as an operand in '>=' operation.", binop.pos_start, binop.pos_end)
         return lhs >= rhs
     elif operator == '==':
         return lhs == rhs
     elif operator == '!=':
         return lhs != rhs
     else:
-        raise SemanticError(f"Unknown relational operator: {operator}.")
+        raise SemanticError(f"Unknown relational operator: {operator}.", binop.pos_start, binop.pos_end)
     
-def eval_relat_str(lhs, rhs, operator):
+def eval_relat_str(lhs, rhs, operator, binop):
     if operator == '==':
         return lhs == rhs
     elif operator == '!=':
         return lhs != rhs
     else:
-        raise SemanticError("TypeError: Only valid relational operator between comms is '==' and '!='.")
+        raise SemanticError("TypeError: Only valid relational operator between comms is '==' and '!='.", binop.pos_start, binop.pos_end)
     
 def eval_chain_relat_expr(chain_expr, symbol_table):
     result = True

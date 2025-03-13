@@ -13,7 +13,7 @@ class Semantic:
         self.tokens = tokens
         self.current_token_index = 0
         self.current_token = self.get_next_token()
-        self.globalstruct = []
+        self.globalstruct = {}
         self.global_func = {}
         self.scope_stack = [{}]
         self.loop_flag = False
@@ -51,25 +51,25 @@ class Semantic:
                 return True
         return False
     
-    def lookup_id_type(self, name, id_type):
+    def lookup_id_type(self, name, id_type, node):
         for scope in reversed(self.scope_stack):
             if name  in scope:
-                info = self.get_identifier_info(name)
+                info = self.get_identifier_info(name, node)
                 if info["type"] == id_type:
                     return True
                 else:
-                    raise SemanticError(f"1 NameError: Identifier '{name}' is already declared as {info["type"]}.")
+                    raise SemanticError(f"1 NameError: Identifier '{name}' is already declared as {info["type"]}.", node.pos_start, node.pos_end)
         return False
     
-    def get_identifier_info(self, name):
+    def get_identifier_info(self, name, node):
         for scope in reversed(self.scope_stack):
             if name in scope:
                 return scope[name]  
-        raise SemanticError(f"Identifier '{name}' not declared.")
+        raise SemanticError(f"Identifier '{name}' not declared.", node.pos_start, node.pos_end)
     
-    def is_array(self, name):
+    def is_array(self, name, node):
         if self.lookup_identifier(name):
-            info = self.get_identifier_info(name)
+            info = self.get_identifier_info(name, node)
             if info["type"] == "an array":
                 return True
             else:
@@ -77,9 +77,9 @@ class Semantic:
         else:
             return False
         
-    def is_params(self, name):
+    def is_params(self, name, node):
         if self.lookup_identifier(name):
-            info = self.get_identifier_info(name)
+            info = self.get_identifier_info(name, node)
             if info["type"] == "a parameter":
                 return True
             else:
@@ -87,10 +87,10 @@ class Semantic:
         else:
             return False
     
-    def get_dimensions(self, name):
-        info = self.get_identifier_info(name)
+    def get_dimensions(self, name, node):
+        info = self.get_identifier_info(name, node)
         if info["type"] != "an array":
-            raise SemanticError(f"Identifier '{name}' is not an array")
+            raise SemanticError(f"Identifier '{name}' is not an array", node.pos_start, node.pos_end)
         return info["dimensions"]
 
     def get_next_token(self):
@@ -110,9 +110,11 @@ class Semantic:
 
     def expect(self, token_type, error_message):
         prev_token = self.current_token
+        start = [prev_token.line, prev_token.column]
+        end = [prev_token.line, prev_token.column]
         self.current_token = self.get_next_token()
         if not prev_token or prev_token.token != token_type:
-            raise SemanticError(f"Parser Error: {error_message}")
+            raise SemanticError(f"ParserError: {error_message}", start, end)
         
     def look_ahead(self):
         la_token_index = self.current_token_index 
@@ -148,20 +150,25 @@ class Semantic:
                 if self.current_token and re.match(r'^id\d+$', self.current_token.token):
                     la_token = self.look_ahead()
                     name = self.current_token.lexeme
+                    name_start = [self.current_token.line, self.current_token.column]
+                    name_end = [self.current_token.line, self.current_token.column + len(name) - 1]
+                    name_node = Identifier(name, name_start, name_end)
                     if la_token is not None and la_token.token in [':',',']: 
                         if self.lookup_identifier(name):
-                            info = self.get_identifier_info(name)
-                            raise SemanticError(f"2 NameError: Identifier {name}' was "
-                                                f"already declared as {info["type"]}.")
+                            info = self.get_identifier_info(name, name_node)
+                            raise SemanticError(f"NameError: Identifier {name}' was "
+                                                f"already declared as {info["type"]}.", name_start, name_end)
                         program.body.append(self.parse_var_init("global"))
                     elif la_token is not None and la_token.token == '[':  
                         if self.lookup_identifier(name):
-                            info = self.get_identifier_info(name)
-                            raise SemanticError(f"3 NameError: Identifier {name}' was "
-                                                f"already declared as {info["type"]}.")
+                            info = self.get_identifier_info(name, name_node)
+                            raise SemanticError(f"NameError: Identifier {name}' was "
+                                                f"already declared as {info["type"]}.", name_start, name_end)
                         program.body.append(self.parse_array("global"))
                     else:
-                        raise SemanticError(f"1 Unexpected token found during parsing: {la_token.token}")
+                        start = [la_token.line, la_token.column]
+                        end = [la_token.line, la_token.column]
+                        raise SemanticError(f"ParserError: Unexpected token found during parsing: {la_token.token}", start, end)
                 elif self.current_token and self.current_token.token in ['hp','xp','comms','flag']:
                     program.body.append(self.var_or_arr("global"))
                 elif self.current_token and self.current_token.token == 'immo':
@@ -176,28 +183,40 @@ class Semantic:
                 elif self.current_token and self.current_token.token == 'gameOver':
                     break
                 else:
-                    raise SemanticError(f"2 Unexpected token found during parsing: {self.current_token.token}")
+                    start = [self.current_toke.line, self.current_toke.column]
+                    end = [self.current_toke.line, self.current_toke.column]
+                    raise SemanticError(f"ParserError: Unexpected token found during parsing: {self.current_token.token}", self.current_token.line)
             if self.global_func:
-                first_func = next(iter(self.global_func))  
-                raise SemanticError(f"FunctionError: Function '{first_func}' was declared but not initialized.")
+                first_func = next(iter(self.global_func))
+                start = self.global_func[first_func]["start"]  
+                end = self.global_func[first_func]["end"]  
+                raise SemanticError(f"FunctionError: Function '{first_func}' was declared but not initialized.", start, end)
             if self.globalstruct:
-                raise SemanticError(f"StructError: Global struct '{self.globalstruct[0]}' was declared but not initialized.")
+                first_struct = next(iter(self.globalstruct))
+                start = self.globalstruct[first_struct]["start"]  
+                end = self.globalstruct[first_struct]["end"]  
+                raise SemanticError(f"StructError: Global struct '{first_struct}' was declared but not initialized.", start, end)
         
         except SemanticError as e:
             return e
         return program
                 
     def parse_func(self) -> Union[GlobalFuncDec, GlobalFuncBody]: 
+        pos_start = [self.current_token.line, self.current_token.column]
         self.current_token = self.get_next_token() # eat generate
         self.skip_spaces()
         if not self.current_token or not re.match(r'^id\d+$', self.current_token.token):
-                raise SemanticError("Expected struct name after 'generate'.")
-        func_name = Identifier(self.current_token.lexeme)
+                raise SemanticError("ParserError: Expected function name after 'generate'.", self.current_token.line)
+        name = self.current_token.lexeme
+        name_start = [self.current_token.line, self.current_token.column]
+        name_end = [self.current_token.line, self.current_token.column + len(name)- 1]
+        func_name = Identifier(name, name_start, name_end) 
+        
         if self.lookup_identifier(func_name.symbol):
-            info = self.get_identifier_info(func_name.symbol)
+            info = self.get_identifier_info(func_name.symbol, func_name)
             if info["type"] != "a function":
                 raise SemanticError(f"NameError: Function name '{func_name.symbol}' was "
-                                    f"already declared as {info["type"]}.")
+                                    f"already declared as {info["type"]}.", name_start, name_end)
         self.declare_id(func_name.symbol, "a function")
         self.current_token = self.get_next_token() # eat id
         self.skip_spaces()
@@ -207,13 +226,17 @@ class Semantic:
         params = []
         while self.current_token.token != ')':
             if not self.current_token or not re.match(r'^id\d+$', self.current_token.token):
-                raise SemanticError("Expected parameter name after inside parantheses.")
+                raise SemanticError("ParserError: Expected parameter name after inside parantheses.", self.current_token.line)
             param_name = self.current_token.lexeme
             if param_name in param_names:
-                raise SemanticError(f"ParamError: Duplicate parameter names: '{param_name}'")
+                raise SemanticError(f"ParamaterError: Duplicate parameter names: '{param_name}'",
+                                    [self.current_token.line, self.current_token.column], 
+                                    [self.current_token.line, self.current_token.column + len(param_name) - 1])
             param_names.append(param_name)
             if self.lookup_identifier(param_name):
-                raise SemanticError("ParamError: Parameter's name cannot be the same with a global element.")
+                raise SemanticError("ParamaneterError: Parameter's name cannot be the same with a global element.",
+                                    [self.current_token.line, self.current_token.column], 
+                                    [self.current_token.line, self.current_token.column + len(param_name) - 1])
             self.current_token = self.get_next_token() # eat id
             self.skip_spaces()
             if self.current_token.token == ':':
@@ -229,27 +252,29 @@ class Semantic:
                 self.current_token = self.get_next_token() # eat ,
                 self.skip_spaces()
 
+        pos_end = [self.current_token.line, self.current_token.column]
         self.current_token = self.get_next_token() # eat )
         self.skip_whitespace()
 
+        node = GlobalFuncDec(func_name, params, pos_start, pos_end)
         if self.current_token.token == '{':
             if func_name.symbol in self.global_func:
                 existing_params = self.global_func[func_name.symbol]["params"]
 
                 if str(existing_params) != str(params):
-                    raise SemanticError(
-                        f"Parameter mismatch for function '{func_name.symbol}'. "
-                    )
+                    raise SemanticError(f"ParameterError: Parameter mismatch for function '{func_name.symbol}'. ", pos_start, pos_end)
                 del self.global_func[func_name.symbol]
                 return self.create_func(func_name, params)
-            raise SemanticError(f"NameError: User-defined function '{func_name.symbol}' was not declared.")
+            raise SemanticError(f"NameError: User-defined function '{func_name.symbol}' was not declared.", name_start, name_end)
         else:
             if func_name.symbol in self.global_func:
-                raise SemanticError(f"NameError: User-defined function '{func_name.symbol}' was already declared.")
+                raise SemanticError(f"NameError: User-defined function '{func_name.symbol}' was already declared.", name_start, name_end)
             self.global_func[func_name.symbol] = {
-                "params" : params
+                "params" : params,
+                "start" : pos_start,
+                "end" : pos_end,
             }
-            return GlobalFuncDec(func_name, params)
+            return node
     
     def create_func(self, name, params) -> GlobalFuncBody:
         self.push_scope()
@@ -278,7 +303,7 @@ class Semantic:
         self.skip_whitespace()
         self.push_scope()
         if not self.current_token or self.current_token.token != "play":
-            raise SemanticError("Expected function declaration keyword 'play'.")
+            raise SemanticError("ParserError: Expected function declaration keyword 'play'.", self.current_token.line)
 
         if self.current_token and self.current_token.token == 'play':
             self.current_token = self.get_next_token() # eat play
@@ -300,6 +325,7 @@ class Semantic:
     
     def parse_stmt(self, scope) -> Stmt:
         self.skip_whitespace()
+        line_start = [self.current_token.line, self.current_token.column]
 
         ###### decs and ass ######
         if self.current_token and re.match(r'^id\d+$', self.current_token.token):
@@ -316,9 +342,10 @@ class Semantic:
                 if self.current_token.lexeme in self.global_func:
                     return self.parse_func_call(scope)
                 else:
-                    raise SemanticError(f"FunctionCallError: Function {self.current_token.lexeme} does not exist.")
+                    raise SemanticError(f"NameError: Function {self.current_token.lexeme} does not exist.", line_start, 
+                                        [self.current_token.line, self.current_token.column + len(self.current_token.lexeme) - 1])
             else:
-                raise SemanticError(f"3 Unexpected token found during parsing: {la_token.token}")
+                raise SemanticError(f"ParserError: Unexpected token found during parsing: {la_token.token}", self.current_token.line)
         elif self.current_token and self.current_token.token in ['hp','xp','comms','flag']:
             return self.var_or_arr(scope)
         elif self.current_token and self.current_token.token == 'build':
@@ -336,19 +363,23 @@ class Semantic:
         
         ###### loop control ######
         elif self.current_token and self.current_token.token == 'resume':
+            line = [self.current_token.line, self.current_token.column]
             if self.flank_flag or self.loop_flag:
                 self.current_token = self.get_next_token()
                 self.skip_whitespace()
                 return ResumeStmt()
             else:
-                raise SemanticError(f"ResumeError: Cannot use resume statement if not within a flank choice body.")
+                raise SemanticError(f"ResumeError: Cannot use resume statement if not within a flank choice body or loop body.",
+                                    line, [self.current_token.line, self.current_token.column + 5])
         elif self.current_token and self.current_token.token == 'checkpoint':
+            line = [self.current_token.line, self.current_token.column]
             if self.loop_flag:
                 self.current_token = self.get_next_token()
                 self.skip_whitespace()
                 return CheckpointStmt()
             else:
-                raise SemanticError(f"ResumeError: Cannot use checkpoint statement if not within a loop body.")
+                raise SemanticError(f"CheckpointError: Cannot use checkpoint statement if not within a loop body.",
+                                    line, [self.current_token.line, self.current_token.column + 9])
        
        ###### loops ######
         elif self.current_token and self.current_token.token == 'for':
@@ -359,10 +390,12 @@ class Semantic:
              return self.parse_while(scope)
         
         elif self.current_token and self.current_token.token == 'recall':
+             line = [self.current_token.line, self.current_token.column]
              if self.func_flag:
                 return self.parse_recall(scope)
              else:
-                raise SemanticError(f"RecallError: Cannot use recall if not within a user-defined function body.")
+                raise SemanticError(f"RecallError: Cannot use recall if not within a user-defined function body.",
+                                    line, [self.current_token.line, self.current_token.column + 5])
         
         ###### built-in funcs ######
         elif self.current_token and self.current_token.token in ['shoot', 'shootNxt']:
@@ -375,7 +408,7 @@ class Semantic:
             self.skip_whitespace()
             return WipeStmt()
         else:
-            raise SemanticError(f"4 Unexpected token found during parsing: {self.current_token.token}")
+            raise SemanticError(f"ParserError: Unexpected token found during parsing: {self.current_token.token}", self.current_token.line)
 
     def parse_recall(self, scope) -> RecallStmt:
         self.current_token = self.get_next_token() # eat recall
@@ -408,8 +441,8 @@ class Semantic:
         var_name_size = len(self.current_token.lexeme)
         id_pos_end = [self.current_token.line, self.current_token.column + var_name_size - 1]
         func_name = Identifier(self.current_token.lexeme, pos_start, id_pos_end)
-        if not self.lookup_id_type(func_name.symbol, "a function"):
-            raise SemanticError(f"NameError: Function '{func_name.symbol}' does not exist.")
+        if not self.lookup_id_type(func_name.symbol, "a function", func_name):
+            raise SemanticError(f"NameError: Function '{func_name.symbol}' does not exist.", pos_start, id_pos_end)
         self.current_token = self.get_next_token() # eat id
         arg_pos_start = [self.current_token.line, self.current_token.column]
         self.expect("(", "Expects '(' after function name.")
@@ -440,21 +473,24 @@ class Semantic:
         self.skip_spaces()
 
         if not self.current_token or not re.match(r'^id\d+$', self.current_token.token):
-            raise SemanticError("Expected variable name.")
+            raise SemanticError("ParserError: Expected variable name.", self.current_token.line)
     
         la_token = self.look_ahead()
         name = self.current_token.lexeme
+        name_start = [self.current_token.line, self.current_token.column]
+        name_end = [self.current_token.line, self.current_token.column + len(name) - 1]
+        name_node = Identifier(name, name_start, name_end)
         if la_token is not None and la_token.token == '[':  
             if self.lookup_identifier(name):
-                info = self.get_identifier_info(name)
-                raise SemanticError(f"4 NameError: Identifier {name}' was "
-                                    f"already declared as {info["type"]}.")
+                info = self.get_identifier_info(name, name_node)
+                raise SemanticError(f"NameError: Identifier {name}' was "
+                                    f"already declared as {info["type"]}.", name_start, name_end)
             return self.parse_empty_array(datatype, scope, pos_start)
         else:
             if self.lookup_identifier(name):
-                info = self.get_identifier_info(name)
+                info = self.get_identifier_info(name, name_node)
                 raise SemanticError(f"5 NameError: Identifier {name}' was "
-                                    f"already declared as {info["type"]}.")
+                                    f"already declared as {info["type"]}.", name_start, name_end)
             return self.parse_var_dec(datatype, scope, pos_start)
     
     def parse_var_init(self, scope) -> Union[VarDec, BatchVarDec, VarAssignment]:
@@ -464,7 +500,7 @@ class Semantic:
         id_pos_end = [self.current_token.line, self.current_token.column + var_name_size - 1]
         var_names = [Identifier(self.current_token.lexeme, pos_start, id_pos_end)]  
 
-        if self.is_array(name): 
+        if self.is_array(name, var_names[0]): 
             return self.parse_arr_redec(var_names[0], scope)
 
         self.current_token = self.get_next_token() # eat id
@@ -475,7 +511,7 @@ class Semantic:
             self.skip_spaces()
 
             if not self.current_token or not re.match(r'^id\d+$', self.current_token.token):
-                raise SemanticError("Expected variable name after ','.")
+                raise SemanticError("ParserError: Expected variable name after ','.", self.current_token.line)
 
             id_pos_start = [self.current_token.line, self.current_token.column]
             var_name_size = len(self.current_token.lexeme)
@@ -494,13 +530,13 @@ class Semantic:
                 for var in var_names:
                     info = self.lookup_identifier(var.symbol)
                     if info:
-                        info = self.get_identifier_info(var.symbol)
+                        info = self.get_identifier_info(var.symbol, var)
                         if info["type"] == 'a parameter':
                             self.declare_id(var.symbol, "a variable")
                             declarations.append(VarAssignment(var, ":", value, pos_start, pos_end))
                         elif info["type"] != "a variable":
-                            raise SemanticError(f"6 NameError: Identifier {var.symbol}' was "
-                                                f"already declared as {info["type"]}.")
+                            raise SemanticError(f"NameError: Identifier {var.symbol}' was "
+                                                f"already declared as {info["type"]}.", var.pos_start, var.pos_end)
                         else:
                             declarations.append(VarAssignment(var, ":", value, pos_start, pos_end))
                     else:
@@ -516,10 +552,11 @@ class Semantic:
         if self.current_token.token == '[' and self.func_flag:
             info = self.lookup_identifier(name)
             if info:
-                info = self.get_identifier_info(name)
+                name_node = var_names[0]
+                info = self.get_identifier_info(name, name_node)
                 if info["type"] != 'a parameter':
-                    raise SemanticError(f"21 NameError: Identifier {name}' was "
-                                        f"already declared as {info["type"]}.")
+                    raise SemanticError(f"NameError: Identifier {name}' was "
+                                        f"already declared as {info["type"]}.", name_node.pos_start, name_node.pos_end)
                 else:
                     values = []
                     while self.current_token and self.current_token.token != 'newline':
@@ -547,7 +584,7 @@ class Semantic:
             self.skip_spaces()
 
             if not self.current_token or not re.match(r'^id\d+$', self.current_token.token):
-                raise SemanticError("Expected variable name after ','.")
+                raise SemanticError("ParserError: Expected variable name after ','.", self.current_token.line)
             
             id_pos_start = [self.current_token.line, self.current_token.column]
             var_name_size = len(self.current_token.lexeme)
@@ -559,7 +596,7 @@ class Semantic:
             self.skip_spaces()
 
             if not self.current_token or self.current_token.token != ":":
-                raise SemanticError("Expected ':' in variable initialization.")
+                raise SemanticError("ParserError: Expected ':' in variable initialization.", self.current_token.line)
             
             self.current_token = self.get_next_token() # eat :
             self.skip_whitespace()
@@ -574,13 +611,13 @@ class Semantic:
             for var in var_names:
                 info = self.lookup_identifier(var.symbol)
                 if info:
-                    info = self.get_identifier_info(var.symbol)
+                    info = self.get_identifier_info(var.symbol, var)
                     if info["type"] == 'a parameter':
                         self.declare_id(var.symbol, "a variable")
                         declarations.append(VarAssignment(var, ":", values_table[var.symbol]['values'], var.pos_start, values_table[var.symbol]['values'].pos_end))
                     elif info["type"] != "a variable":
-                        raise SemanticError(f"7 NameError: Identifier '{var.symbol}' was "
-                                            f"already declared as {info["type"]}.")
+                        raise SemanticError(f"NameError: Identifier '{var.symbol}' was "
+                                            f"already declared as {info["type"]}.", var.pos_start, var.pos_end)
                     else:
                         declarations.append(VarAssignment(var, ":", values_table[var.symbol]['values'], var.pos_start, values_table[var.symbol]['values'].pos_end))
                 else:
@@ -592,13 +629,13 @@ class Semantic:
             var = var_names[0]
             info = self.lookup_identifier(var.symbol)
             if info:
-                info = self.get_identifier_info(var.symbol)
+                info = self.get_identifier_info(var.symbol, var)
                 if info["type"] != "a variable" and info["type"] != "a parameter":
                     raise SemanticError(f"8 NameError: Identifier '{var.symbol}' was "
-                                        f"already declared as {info["type"]}.")
+                                        f"already declared as {info["type"]}.", var.pos_start, var.pos_end)
                 else:
                     if info["type"] == "a parameter" and isinstance(value, Identifier):
-                        if self.is_array(value.symbol):
+                        if self.is_array(value.symbol, value):
                             return ArrayRedec(var, None, value, False, scope, pos_start, pos_end)
                         return ArrayOrVar(var.symbol, [VarAssignment(var, ':', value, pos_start, pos_end), ArrayRedec(var, None, value, False, scope, pos_start, pos_end)])
                     return VarAssignment(var, ':', value, pos_start, pos_end)
@@ -645,9 +682,9 @@ class Semantic:
         if len(var_names) > 1:
             for var in var_names:
                 if self.lookup_identifier(var.symbol):
-                    info = self.get_identifier_info(var.symbol)
-                    raise SemanticError(f"9 NameError: Identifier {var.symbol}' was "
-                                        f"already declared as {info["type"]}.")  
+                    info = self.get_identifier_info(var.symbol, var)
+                    raise SemanticError(f"NameError: Identifier {var.symbol}' was "
+                                        f"already declared as {info["type"]}.", var.pos_start, var.pos_end)  
                 self.declare_id(var.symbol, "a variable")
             if value != None:
                 return BatchVarDec([VarDec(var, value, False, scope) for var in var_names], False, pos_start, pos_end)
@@ -656,9 +693,9 @@ class Semantic:
         else:
             var = var_names[0]
             if self.lookup_identifier(var.symbol):
-                    info = self.get_identifier_info(var.symbol)
-                    raise SemanticError(f"10 NameError: Identifier {var.symbol}' was "
-                                        f"already declared as {info["type"]}.")    
+                    info = self.get_identifier_info(var.symbol, var)
+                    raise SemanticError(f"NameError: Identifier {var.symbol}' was "
+                                        f"already declared as {info["type"]}.", var.pos_start, var.pos_end)    
             self.declare_id(var.symbol, "a variable")
             if value != None:
                 return VarDec(var, value, False, scope, pos_start, var.pos_end)
@@ -702,7 +739,7 @@ class Semantic:
                 elif dimensions[0] is not None and dimensions[1] is not None:
                     values = [[default_value] * dimensions[1] for _ in range(dimensions[0])]  # arr[int][int]
                 else:
-                    raise SemanticError("DeclarationError: Row and column sizes must both be empty or specified.")
+                    raise SemanticError("ArraySizeError: Row and column sizes must both be empty or specified.", pos_start, pos_end)
             else:
                 if dimensions[0] is None:
                     values = []  # arr[]
@@ -721,12 +758,12 @@ class Semantic:
                 if dimensions[0] is None and dimensions[1] is None:
                     values = None  # arr[][]
                 else:
-                    raise SemanticError("NullPointerError: Null arrays cannot be initialized with specific size.")
+                    raise SemanticError("NullSizeError: Null arrays cannot be initialized with specific size.", pos_start, pos_end)
             else:
                 if dimensions[0] is None:
                     values = None  # arr[]
                 else:
-                    raise SemanticError("NullPointerError: Null arrays cannot be initialized with specific size.")
+                    raise SemanticError("NullSizeError: Null arrays cannot be initialized with specific size.", pos_start, pos_end)
                 
             self.declare_id(name, "an array", len(dimensions))
             return ArrayDec(arr_name, dimensions, values, False, scope, datatype, pos_start, pos_end)      
@@ -739,7 +776,7 @@ class Semantic:
         name = arr_name.symbol
         self.current_token = self.get_next_token() # eat id
         self.skip_spaces()
-        arr_exist = self.is_array(name) or self.is_params(name)
+        arr_exist = self.is_array(name, arr_name) or self.is_params(name, arr_name)
         if arr_exist:
             join_token = self.find_token_in_line('join')
             if join_token:
@@ -755,7 +792,8 @@ class Semantic:
             self.skip_spaces
             if self.current_token and self.current_token.token == ']':
                 if arr_exist:
-                    raise SemanticError("AssignmentError: Index must not be blank for array index assignment.")
+                    raise SemanticError("IndexError: Index must not be blank for array index assignment.", 
+                                        pos_start, [self.current_token.line, self.current_token.column])
                 dimensions.append(None)
             else:
                 dim = self.parse_expr(scope)
@@ -765,7 +803,8 @@ class Semantic:
                     if isinstance(dim, HpLiteral):
                         dimensions.append(dim.value)
                     else:
-                        raise SemanticError("DeclarationError: Array size must be an hp literal only.")
+                        raise SemanticError("ArraySizeError: Array size must be an hp literal only.",
+                                            pos_start, [self.current_token.line, self.current_token.column])
                 
             self.skip_spaces()
             self.expect("]", "Expected ']' to close array dimension declaration.")
@@ -777,9 +816,10 @@ class Semantic:
             self.skip_spaces()
             if self.current_token and self.current_token.token == '[':
                 if arr_exist:
-                    raise SemanticError(f"DeclarationError: Identifier '{name}' was already declared.")
+                    raise SemanticError(f"NameError: Array '{name}' was already declared.",
+                                        pos_start, id_pos_end)
                 else:
-                    values, pos_end = self.parse_array_values(dimensions, scope)
+                    values, pos_end = self.parse_array_values(dimensions, scope, pos_start)
                     self.declare_id(name, "an array", len(dimensions))
                     return ArrayDec(arr_name, dimensions, values, False, scope, None, pos_start, pos_end)
             else:
@@ -790,9 +830,9 @@ class Semantic:
                         pos_end = value.pos_end
                         return ArrAssignment(lhs, ':', value, pos_start, pos_end)
                     else:
-                        raise SemanticError(f"AssignmentError: Index must not be blank for array index assignment for array name '{arr_name.symbol}'.")
+                        raise SemanticError(f"IndexError: Index must not be blank for array index assignment for array name '{arr_name.symbol}'.", pos_start, pos_end)
                 else:
-                    raise SemanticError(f"AssignmentError: Array '{arr_name.symbol}' does not exist.")
+                    raise SemanticError(f"NameError: Array '{arr_name.symbol}' does not exist.", pos_start, id_pos_end)
         else:
             operator = self.current_token.token
             self.current_token = self.get_next_token() #eat operator
@@ -804,11 +844,11 @@ class Semantic:
                     pos_end = value.pos_end
                     return ArrAssignment(lhs, operator, value, pos_start, pos_end)
                 else:
-                    raise SemanticError(f"AssignmentError: Index must not be blank for array index assignment for array name '{arr_name.symbol}'.")
+                    raise SemanticError(f"IndexError: Index must not be blank for array index assignment for array name '{arr_name.symbol}'.", pos_start, pos_end)
             else:
-                raise SemanticError(f"AssignmentError: Array '{arr_name.symbol}' does not exist.")
+                raise SemanticError(f"NameError: Array '{arr_name.symbol}' does not exist.", pos_start, id_pos_end)
 
-    def parse_array_values(self, expected_dims, scope):
+    def parse_array_values(self, expected_dims, scope, pos_start):
         values = []
         self.skip_spaces()
         if len(expected_dims) == 2:
@@ -826,14 +866,12 @@ class Semantic:
                 else:
                     break
             if expected_dims[0] is not None and len(values) != expected_dims[0]:     
-                raise SemanticError(
-                    f"ArraySizeError: Expected {expected_dims[0]} elements, but got {len(values)}."
-                )
+                raise SemanticError(f"ArraySizeError: Expected {expected_dims[0]} elements, but got {len(values)}.",
+                                    pos_start, pos_end)
             for row in values:
                 if expected_dims[1] is not None and len(row) != expected_dims[1]:
-                    raise SemanticError(
-                        f"ArraySizeError: Expected {expected_dims[1]} elements, but got {len(row)}."
-                    )
+                    raise SemanticError(f"ArraySizeError: Expected {expected_dims[1]} elements, but got {len(row)}.",
+                                        pos_start, pos_end)
         else:
             self.expect("[", "Expected '[' for array values.")
             self.skip_spaces()
@@ -844,13 +882,12 @@ class Semantic:
             self.skip_spaces()
             if self.current_token.token == ',':
                 raise SemanticError(
-                    f"ArraySizeError: Redeclaring a one-dimensional array with more than one rows."
-                )
+                    f"ArraySizeError: Redeclaring a one-dimensional array with more than one rows.",
+                                    pos_start, pos_end)
             
             if expected_dims[0] is not None and len(values) != expected_dims[0]:
-                raise SemanticError(
-                    f"ArraySizeError: Expected {expected_dims[0]} elements, but got {len(values)}."
-                )
+                raise SemanticError(f"ArraySizeError: Expected {expected_dims[0]} elements, but got {len(values)}.",
+                                    pos_start, pos_end)
         
         return values, pos_end
 
@@ -859,7 +896,7 @@ class Semantic:
         while self.current_token and self.current_token.token != ']':
             value = self.parse_expr(scope)
             if value.kind not in ["HpLiteral", "XpLiteral", "CommsLiteral", "FlagLiteral"]:
-                 raise SemanticError("Arrays can only be initialied with literal values.")
+                 raise SemanticError("TypeError: Arrays can only be initialied with literal values.", self.current_token.line)
             inner_values.append(value)
             self.skip_spaces()
             if self.current_token.token == ',':
@@ -869,7 +906,7 @@ class Semantic:
    
     def parse_arr_redec(self, name, scope):
         pos_start = [self.current_token.line, self.current_token.column]
-        dimensions=self.get_dimensions(name.symbol)
+        dimensions=self.get_dimensions(name.symbol, name)
         self.current_token = self.get_next_token() # eat id
         self.skip_spaces()
         self.expect(":", "Expected ':' after array name for array re-decleration.")
@@ -879,7 +916,7 @@ class Semantic:
         elif dimensions == 2:
             dimensions = [None, None]
         if self.current_token and self.current_token.token == '[':
-            values, pos_end = self.parse_array_values(dimensions, scope)
+            values, pos_end = self.parse_array_values(dimensions, scope, pos_start)
             return ArrayRedec(name, dimensions, values, False, scope, pos_start, pos_end) 
         elif re.match(r'^id\d+$', self.current_token.token):
             id_pos_start = [self.current_token.line, self.current_token.column]
@@ -889,8 +926,8 @@ class Semantic:
             rhs_name_node = Identifier(self.current_token.lexeme, id_pos_start, id_pos_end)
             la_token = self.look_ahead()
             if la_token.token == '(':
-                if not self.lookup_id_type(rhs_name, "a function"):
-                    raise SemanticError(f"NameError: Function '{rhs_name}' does not exist.")
+                if not self.lookup_id_type(rhs_name, "a function", rhs_name_node):
+                    raise SemanticError(f"NameError: Function '{rhs_name}' does not exist.", id_pos_start, id_pos_end)
                 values = self.parse_func_call(scope)
                 pos_end = values.pos_end
                 return ArrayRedec(name, dimensions, values, False, scope, pos_start, pos_end)
@@ -898,20 +935,20 @@ class Semantic:
             self.skip_whitespace()
             info = self.lookup_identifier(rhs_name)
             if info:
-                info = self.get_identifier_info(rhs_name)
+                info = self.get_identifier_info(rhs_name, rhs_name_node)
                 if info["type"] == 'a parameter':
                     self.declare_id(name.symbol, "an array")
                     return ArrayRedec(name, dimensions, rhs_name_node, False, scope, pos_start, id_pos_end)
                 elif info["type"] != "an array":
-                    raise SemanticError(f"RedeclarationError: Array '{name.symbol}' is being redeclared with"
-                                        " non-array element.")
+                    raise SemanticError(f"ValueError: Array '{name.symbol}' is being redeclared with"
+                                        " non-array element.", id_pos_start, id_pos_end)
                 else:
                     return ArrayRedec(name, dimensions, rhs_name_node, False, scope, pos_start, id_pos_end)
             else:
-                raise SemanticError(f"NameError: Array '{rhs_name}' does not exist.")
+                raise SemanticError(f"NameError: Array '{rhs_name}' does not exist.",  id_pos_start, id_pos_end)
         else:
-            raise SemanticError(f"RedeclarationError: Array '{name.symbol}' is being redeclared with"
-                                " non-array element.")
+            raise SemanticError(f"ValueError: Array '{name.symbol}' is being redeclared with"
+                                " non-array element.", self.current_token.line)
 
     ########## STRUCTS ##########
     def parse_globalstruct(self) -> Union[StructDec, GlobalStructDec]:
@@ -919,38 +956,42 @@ class Semantic:
         self.current_token = self.get_next_token() # eat build
         self.skip_spaces()
         if not self.current_token or not re.match(r'^id\d+$', self.current_token.token):
-                raise SemanticError("Expected struct name after 'build'.")
+                raise SemanticError("ParserError: Expected struct name after 'build'.", self.current_token.line)
         id_pos_start = [self.current_token.line, self.current_token.column]
         var_name_size = len(self.current_token.lexeme)
         id_pos_end = [self.current_token.line, self.current_token.column + var_name_size - 1]
         struct_name = Identifier(self.current_token.lexeme, id_pos_start, id_pos_end)
         self.current_token = self.get_next_token() # eat id
+        node = GlobalStructDec(struct_name, pos_start, id_pos_end)
+
         self.skip_whitespace()
         if self.current_token.token == '{':
-            for item in self.globalstruct:
-                if item == struct_name.symbol:
-                    self.globalstruct.remove(item)
-                    return self.create_struct(struct_name, "global")
+            if struct_name.symbol in self.globalstruct:
+                del self.globalstruct[struct_name.symbol]
+                return self.create_struct(struct_name, "global")
                 
-            raise SemanticError(f"NameError: Global struct '{struct_name.symbol}' was not declared.")
+            raise SemanticError(f"NameError: Global struct '{struct_name.symbol}' was not declared.", id_pos_start, id_pos_end)
         else:
             if struct_name.symbol in self.globalstruct:
-                raise SemanticError(f"NameError: Global struct '{struct_name.symbol}' was already declared.")
-            self.globalstruct.append(struct_name.symbol)
-            return GlobalStructDec(struct_name, pos_start, id_pos_end)
+                raise SemanticError(f"NameError: Global struct '{struct_name.symbol}' was already declared.", id_pos_start, id_pos_end)
+            self.globalstruct[struct_name.symbol] = {
+                "start" : pos_start,
+                "end" : id_pos_end,
+            }
+            return node
 
     def parse_struct(self, scope) -> StructDec:
         self.current_token = self.get_next_token() # eat build
         self.skip_spaces()
         if not self.current_token or not re.match(r'^id\d+$', self.current_token.token):
-                raise SemanticError("Expected struct name after 'build'.")
+                raise SemanticError("ParserError: Expected struct name after 'build'.", self.current_token.line)
         id_pos_start = [self.current_token.line, self.current_token.column]
         var_name_size = len(self.current_token.lexeme)
         id_pos_end = [self.current_token.line, self.current_token.column + var_name_size - 1] 
         struct_name = Identifier(self.current_token.lexeme, id_pos_start, id_pos_end)
         if self.lookup_identifier(struct_name.symbol):
-            info = self.get_identifier_info(struct_name.symbol)
-            raise SemanticError(f"22 NameError: Identifier '{struct_name.symbol}' is already declared as {info["type"]}.")
+            info = self.get_identifier_info(struct_name.symbol, struct_name)
+            raise SemanticError(f"NameError: Identifier '{struct_name.symbol}' is already declared as {info["type"]}.", id_pos_start, id_pos_end)
         
         self.current_token = self.get_next_token() # eat id
         self.skip_whitespace()
@@ -979,19 +1020,19 @@ class Semantic:
                 value = self.parse_expr(scope) 
                 fields.append(StructFields(field_name, value, datatype, id_pos_start, value.pos_end))
                 if self.lookup_identifier(field_name.symbol):
-                    info = self.get_identifier_info(field_name.symbol)
-                    raise SemanticError(f"23 NameError: Field name '{field_name.symbol}' cannot be used since it is already declared as {info["type"]}.")
+                    info = self.get_identifier_info(field_name.symbol, field_name)
+                    raise SemanticError(f"NameError: Field name '{field_name.symbol}' cannot be used since it is already declared as {info["type"]}.", id_pos_start, id_pos_end)
                 if field_name.symbol in fields_table:
-                    raise SemanticError(f"FieldError: Duplicate field name detected: '{field_name.symbol}'.")
+                    raise SemanticError(f"NameError: Duplicate field name detected: '{field_name.symbol}'.", id_pos_start, id_pos_end)
                 fields_table.append(field_name.symbol)
                 self.skip_whitespace()
             else:
                 fields.append(StructFields(field_name, None, datatype, id_pos_start, id_pos_end))
                 if self.lookup_identifier(field_name.symbol):
-                    info = self.get_identifier_info(field_name.symbol)
-                    raise SemanticError(f"24 NameError: Field name '{field_name.symbol}' cannot be used since it is already declared as {info["type"]}.")
+                    info = self.get_identifier_info(field_name.symbol, field_name)
+                    raise SemanticError(f"NameError: Field name '{field_name.symbol}' cannot be used since it is already declared as {info["type"]}.", id_pos_start, id_pos_end)
                 if field_name.symbol in fields_table:
-                    raise SemanticError(f"FieldError: Duplicate field name detected: '{field_name.symbol}'.")
+                    raise SemanticError(f"NameError: Duplicate field name detected: '{field_name.symbol}'.", id_pos_start, id_pos_end)
                 fields_table.append(field_name.symbol)
                 self.skip_whitespace()
             if self.current_token and self.current_token.token == ',':
@@ -1000,11 +1041,11 @@ class Semantic:
         self.current_token = self.get_next_token() # eat }
         self.skip_whitespace()
         if name in self.globalstruct:
-            raise SemanticError(f"NameError: Global struct '{name}' already exists.")
+            raise SemanticError(f"NameError: Global struct '{name}' already exists.", struct_name.pos_start, struct_name.pos_end)
         if self.lookup_identifier(name):
-            info = self.get_identifier_info(name)
-            raise SemanticError(f"11 NameError: Identifier {name}' was "
-                                f"already declared as {info["type"]}.") 
+            info = self.get_identifier_info(name, struct_name)
+            raise SemanticError(f"NameError: Identifier {name}' was "
+                                f"already declared as {info["type"]}.", struct_name.pos_start, struct_name.pos_end) 
         self.declare_id(name, "a struct")
         return StructDec(struct_name, fields, scope)
 
@@ -1013,28 +1054,31 @@ class Semantic:
         self.current_token = self.get_next_token()  # eat 'access'
         self.skip_spaces()
         if not self.current_token or not re.match(r'^id\d+$', self.current_token.token):
-            raise SemanticError("Expected struct name after 'access'.")
+            raise SemanticError("ParserError: Expected struct name after 'access'.", self.current_token.line)
         struct_parent = self.current_token.lexeme
         if not self.lookup_identifier(struct_parent):
             if struct_parent in self.globalstruct:
                 pass
             else:
-                raise SemanticError(f"NameError: Struct '{struct_parent}' is not defined.")
+                raise SemanticError(f"NameError: Struct '{struct_parent}' is not defined.",
+                                    [self.current_token.line, self.current_token.column],
+                                    [self.current_token.line, self.current_token.column + len(struct_parent)-1])
         
         self.current_token = self.get_next_token()  # eat id
         self.skip_spaces()
         if not self.current_token or not re.match(r'^id\d+$', self.current_token.token):
-            raise SemanticError("Expected struct instance name after struct name.")
+            raise SemanticError("ParserError: Expected struct instance name after struct name.", self.current_token.line)
         id_pos_start = [self.current_token.line, self.current_token.column]
         var_name_size = len(self.current_token.lexeme)
         id_pos_end = [self.current_token.line, self.current_token.column + var_name_size - 1]
         inst_name = Identifier(self.current_token.lexeme, id_pos_start, id_pos_end)
         if self.lookup_identifier(inst_name.symbol):
-            info = self.get_identifier_info(inst_name.symbol)
-            raise SemanticError(f"23 NameError: Identifier '{inst_name.symbol}' is already declared as {info["type"]}.")
+            info = self.get_identifier_info(inst_name.symbol, inst_name)
+            raise SemanticError(f"NameError: Identifier '{inst_name.symbol}' is already declared as {info["type"]}.", id_pos_start, id_pos_end)
         self.current_token = self.get_next_token()  # eat id
         self.skip_spaces()
         values = []
+        pos_end = id_pos_end
         if self.current_token.token == ':':
             self.current_token = self.get_next_token()  # eat ':'
             self.skip_spaces()
@@ -1047,13 +1091,9 @@ class Semantic:
                     self.current_token = self.get_next_token()  # eat ','
                     self.skip_spaces()
                     if self.current_token.token == 'newline':
-                        raise SemanticError("Unexpected newline found after struct instance value.")
+                        raise SemanticError("ParserError: Unexpected newline found after struct instance value.", self.current_token.line)
                 elif self.current_token.token == 'newline':
                     break
-        if self.lookup_identifier(inst_name.symbol):
-            info = self.get_identifier_info(inst_name.symbol)
-            raise SemanticError(f"12 NameError: Identifier {inst_name.symbol}' was "
-                                f"already declared as {info["type"]}.") 
         self.declare_id(inst_name.symbol, "a struct instance")
         return StructInst(inst_name, struct_parent, values, False, pos_start, pos_end)
 
@@ -1073,17 +1113,17 @@ class Semantic:
             return self.parse_drop(scope, struct_inst_name, pos_start)
 
         if self.lookup_identifier(struct_inst_name.symbol):
-            info = self.get_identifier_info(struct_inst_name.symbol)
+            info = self.get_identifier_info(struct_inst_name.symbol, struct_inst_name)
             if info["type"] != "a struct instance" and info["type"] != "a parameter":
-                raise SemanticError(f"NameError: Struct instance '{struct_inst_name.symbol}' is not defined.")
+                raise SemanticError(f"NameError: Struct instance '{struct_inst_name.symbol}' is not defined.", pos_start, id_pos_end)
         else:
-            raise SemanticError(f"NameError: Struct instance '{struct_inst_name.symbol}' is not defined.")
+            raise SemanticError(f"NameError: Struct instance '{struct_inst_name.symbol}' is not defined.", pos_start, id_pos_end)
         
         if self.current_token.token != '.':
-            raise SemanticError("Expected '.' after struct instance name.")
+            raise SemanticError("ParserError: Expected '.' after struct instance name.", self.current_token.line)
         self.current_token = self.get_next_token() # eat .
         if not self.current_token or not re.match(r'^id\d+$', self.current_token.token):
-            raise SemanticError("Expected struct instance field name after struct instance name.")
+            raise SemanticError("ParserError: Expected struct instance field name after struct instance name.", self.current_token.line)
         id_pos_start = [self.current_token.line, self.current_token.column]
         var_name_size = len(self.current_token.lexeme)
         id_pos_end = [self.current_token.line, self.current_token.column + var_name_size - 1]
@@ -1107,7 +1147,7 @@ class Semantic:
             return immo_inst
         else:
             if not self.current_token or not re.match(r'^id\d+$', self.current_token.token):
-                raise SemanticError("Expected identifier or 'access' after 'immo'.")
+                raise SemanticError("ParserError: Expected identifier or 'access' after 'immo'.", self.current_token.line)
             la_token = self.look_ahead()
             if la_token is not None and la_token.token in [':',',']:  
                 immo_var = self.parse_immo_var(scope)  
@@ -1116,7 +1156,7 @@ class Semantic:
                 immo_arr = self.parse_immo_arr(scope)
                 return immo_arr
             else:
-                raise SemanticError(f"5 Unexpected token found during parsing: {la_token}")  
+                raise SemanticError(f"ParserError: Unexpected token found during parsing: {la_token}", self.current_token.line)  
             
     def parse_immo_var(self, scope) -> Union[VarDec, BatchVarDec]:
         pos_start = [self.current_token.line, self.current_token.column]
@@ -1131,7 +1171,7 @@ class Semantic:
             self.skip_spaces()
 
             if not self.current_token or not re.match(r'^id\d+$', self.current_token.token):
-                raise SemanticError("Expected variable name after ','.")
+                raise SemanticError("ParserError: Expected variable name after ','.", self.current_token.line)
             
             id_pos_start = [self.current_token.line, self.current_token.column]
             var_name_size = len(self.current_token.lexeme)
@@ -1149,8 +1189,8 @@ class Semantic:
                     self.var_list[scope] = []
                 for var in var_names:
                     if self.lookup_identifier(var.symbol):
-                        info = self.get_identifier_info(var.symbol)
-                        raise SemanticError(f"13 NameError: Identifier '{var.symbol}' is already declared as {info["type"]}.")  
+                        info = self.get_identifier_info(var.symbol, var)
+                        raise SemanticError(f"NameError: Identifier '{var.symbol}' is already declared as {info["type"]}.", var.pos_start, var.pos_end)  
                     self.declare_id(var.symbol, "a variable")
                 self.skip_spaces()
                 return BatchVarDec([VarDec(var, value, True, scope) for var in var_names], False, pos_start, pos_end)
@@ -1166,7 +1206,7 @@ class Semantic:
             self.skip_spaces()
 
             if not self.current_token or not re.match(r'^id\d+$', self.current_token.token):
-                raise SemanticError("Expected variable name after ','.")
+                raise SemanticError("ParserError: Expected variable name after ','.", self.current_token.line)
             
             id_pos_start = [self.current_token.line, self.current_token.column]
             var_name_size = len(self.current_token.lexeme)
@@ -1178,7 +1218,7 @@ class Semantic:
             self.skip_spaces()
 
             if not self.current_token or self.current_token.token != ":":
-                raise SemanticError("Expected ':' in variable initialization.")
+                raise SemanticError("ParserError: Expected ':' in variable initialization.", self.current_token.line)
             
             self.current_token = self.get_next_token() # eat :
             self.skip_spaces()
@@ -1190,8 +1230,8 @@ class Semantic:
         if len(var_names) > 1:
             for var in var_names:
                 if self.lookup_identifier(var.symbol):
-                    info = self.get_identifier_info(var.symbol)
-                    raise SemanticError(f"14 NameError: Identifier '{var.symbol}' is already declared as {info["type"]}.")  
+                    info = self.get_identifier_info(var.symbol, var)
+                    raise SemanticError(f"NameError: Identifier '{var.symbol}' is already declared as {info["type"]}.", var.pos_start, var.pos_end)  
                 self.declare_id(var.symbol, "a variable")
             return BatchVarDec(
                 declarations=[
@@ -1202,8 +1242,8 @@ class Semantic:
         else:
             var = var_names[0]
             if self.lookup_identifier(var.symbol):
-                info = self.get_identifier_info(var.symbol)
-                raise SemanticError(f"15 NameError: Identifier '{var.symbol}' is already declared as {info["type"]}.")    
+                info = self.get_identifier_info(var.symbol, var)
+                raise SemanticError(f"NameError: Identifier '{var.symbol}' is already declared as {info["type"]}.", var.pos_start, var.pos_end)    
             self.declare_id(var.symbol, "a variable")
             return VarDec(var, value, True, scope, pos_start, value.pos_end)
 
@@ -1214,8 +1254,8 @@ class Semantic:
         arr_name = Identifier(self.current_token.lexeme, pos_start, id_pos_end)
         name=arr_name.symbol
         if self.lookup_identifier(name):
-            info = self.get_identifier_info(name)
-            raise SemanticError(f"16 NameError: Identifier '{name}' is already declared as {info["type"]}.")
+            info = self.get_identifier_info(name, arr_name)
+            raise SemanticError(f"NameError: Identifier '{name}' is already declared as {info["type"]}.", pos_start, id_pos_end)
         self.current_token = self.get_next_token() # eat id
         self.skip_spaces()
         dimensions = []
@@ -1224,7 +1264,7 @@ class Semantic:
             self.skip_spaces
             dim = int(self.current_token.lexeme)
             if dim < 2:
-                raise SemanticError(f"ArraySizeError: Expected array size to be greater than 1, but got {dim}.")
+                raise SemanticError(f"ArraySizeError: Expected array size to be greater than 1, but got {dim}.", self.current_token.line)
             dimensions.append(dim)
             self.current_token = self.get_next_token() # eat hp_ltr
             self.skip_spaces()
@@ -1233,7 +1273,7 @@ class Semantic:
             
         self.expect(":", "Expected ':' in array initialization or modification.")
         self.skip_spaces()
-        values, pos_end = self.parse_array_values(dimensions, scope)
+        values, pos_end = self.parse_array_values(dimensions, scope, pos_start)
         self.declare_id(name, "an array", len(dimensions))
         return ArrayDec(arr_name, dimensions, values, True, scope, None, pos_start, pos_end)
     
@@ -1242,17 +1282,19 @@ class Semantic:
         self.current_token = self.get_next_token()  # eat 'access'
         self.skip_spaces()
         if not self.current_token or not re.match(r'^id\d+$', self.current_token.token):
-            raise SemanticError("Expected struct name after 'access'.")
+            raise SemanticError("ParserError: Expected struct name after 'access'.", self.current_token.line)
         struct_parent = self.current_token.lexeme
         if not self.lookup_identifier(struct_parent):
             if struct_parent in self.globalstruct:
                 pass
             else:
-                raise SemanticError(f"NameError: Struct '{struct_parent}' is not defined.")
+                raise SemanticError(f"NameError: Struct '{struct_parent}' is not defined.", 
+                                    [self.current_token.line, self.current_token.column],
+                                    [self.current_token.line, self.current_token.column+len(struct_parent)-1])
         self.current_token = self.get_next_token()  # eat id
         self.skip_spaces()
         if not self.current_token or not re.match(r'^id\d+$', self.current_token.token):
-            raise SemanticError("Expected struct instance name after struct name.")
+            raise SemanticError("ParserError: Expected struct instance name after struct name.", self.current_token.line)
         id_pos_start = [self.current_token.line, self.current_token.column]
         var_name_size = len(self.current_token.lexeme)
         id_pos_end = [self.current_token.line, self.current_token.column + var_name_size - 1]
@@ -1271,12 +1313,12 @@ class Semantic:
                 self.current_token = self.get_next_token()  # eat ','
                 self.skip_spaces()
                 if self.current_token.token == 'newline':
-                    raise SemanticError("Unexpected newline found after struct instance value.")
+                    raise SemanticError("ParserError: Unexpected newline found after struct instance value.", self.current_token.line)
             elif self.current_token.token == 'newline':
                 break
         if self.lookup_identifier(inst_name.symbol):
-            info = self.get_identifier_info(inst_name.symbo)
-            raise SemanticError(f"17 NameError: Identifier '{inst_name.symbo}' is already declared as {info["type"]}.")
+            info = self.get_identifier_info(inst_name.symbol, inst_name)
+            raise SemanticError(f"NameError: Identifier '{inst_name.symbol}' is already declared as {info["type"]}.", id_pos_start, id_pos_end)
         self.declare_id(inst_name.symbol, "a struct instance")
         return StructInst(inst_name, struct_parent, values, True, pos_start, pos_end)
 
@@ -1288,7 +1330,7 @@ class Semantic:
         var_name = Identifier(self.current_token.lexeme, pos_start, id_pos_end)
         name = self.current_token.lexeme
         if not self.lookup_identifier(name):
-            raise SemanticError(f"NameError: Variable '{name}' does not exist.")
+            raise SemanticError(f"NameError: Variable '{name}' does not exist.", pos_start, id_pos_end)
         self.current_token = self.get_next_token() # eat id
         self.skip_spaces()
         operator = self.current_token.token
@@ -1417,7 +1459,7 @@ class Semantic:
     def parse_primary_expr(self, scope, is_func_call=None, pos_start=None) -> Expr:
         self.skip_spaces()
         if not self.current_token:
-            raise SemanticError("Unexpected end of input during parsing!")
+            raise SemanticError("ParserError: Unexpected end of input during parsing!")
         
         tk = self.current_token.token
 
@@ -1425,10 +1467,10 @@ class Semantic:
             tk= 'id'
 
         if tk == 'id':
+            new_pos_start = [self.current_token.line, self.current_token.column]
             id_size = len(self.current_token.lexeme)
             id_pos_end=[self.current_token.line, self.current_token.column + id_size - 1]
-            identifier = Identifier(self.current_token.lexeme, pos_start, id_pos_end)
-            new_pos_start = [self.current_token.line, self.current_token.column]
+            identifier = Identifier(self.current_token.lexeme, new_pos_start, id_pos_end)
             self.current_token = self.get_next_token()
             self.skip_spaces()
             if self.current_token.token == '.':
@@ -1442,28 +1484,29 @@ class Semantic:
                     return self.parse_seek(scope, identifier, new_pos_start)
                 
                 if not self.lookup_identifier(identifier.symbol):
-                    raise SemanticError(f"NameError: Struct instance '{identifier.symbol}' does not exist.")
+                    raise SemanticError(f"NameError: Struct instance '{identifier.symbol}' does not exist.", new_pos_start, id_pos_end)
                 
-                info = self.get_identifier_info(identifier.symbol)
+                info = self.get_identifier_info(identifier.symbol, identifier)
                 allowed_types = {"a struct instance"}
                 if self.func_flag:
                     allowed_types.add("a parameter")
                 
                 if info["type"] not in allowed_types:
-                    raise SemanticError(f"18 NameError: Identifier '{identifier.symbol}' is already declared as {info['type']}")
+                    raise SemanticError(f"NameError: Identifier '{identifier.symbol}' is already declared as {info['type']}", new_pos_start, id_pos_end)
                 
                 self.current_token = self.get_next_token()
                 self.skip_spaces()
                 if not re.match(r'^id\d+$', self.current_token.token):
-                    raise SemanticError("Expected 'id' after '.' in accessing a struct instance field.")
-                field = Identifier(symbol=self.current_token.lexeme)
+                    raise SemanticError("ParserError: Expected 'id' after '.' in accessing a struct instance field.", self.current_token.line)
+                field_start = [self.current_token.line, self.current_token.column]
                 field_size = len(self.current_token.lexeme)
                 pos_end = [self.current_token.line, self.current_token.column + field_size - 1]
+                field = Identifier(self.current_token.lexeme, field_start, pos_end)  
                 identifier = StructInstField(identifier, field, new_pos_start, pos_end)
                 self.current_token = self.get_next_token()
                 self.skip_spaces()
             elif self.current_token.token == '[':
-                arr_exist = self.is_array(identifier.symbol) or self.is_params(identifier.symbol)
+                arr_exist = self.is_array(identifier.symbol, identifier) or self.is_params(identifier.symbol, identifier)
                 
                 if arr_exist:
                     join_token = self.find_token_in_line('drop')
@@ -1476,33 +1519,43 @@ class Semantic:
                 
                 dimensions = []
                 if not self.lookup_identifier(identifier.symbol):
-                    raise SemanticError(f"NameError: Array '{identifier.symbol}' does not exist.")
+                    raise SemanticError(f"NameError: Array '{identifier.symbol}' does not exist.", new_pos_start, id_pos_end)
                 
-                info = self.get_identifier_info(identifier.symbol)
+                info = self.get_identifier_info(identifier.symbol, identifier)
                 allowed_types = {"an array"}
                 if self.func_flag:
                     allowed_types.add("a parameter")
 
                 if info["type"] not in allowed_types:
-                    raise SemanticError(f"19 NameError: Identifier '{identifier.symbol}' is already declared as {info['type']}")
+                    raise SemanticError(f"NameError: Identifier '{identifier.symbol}' is already declared as {info['type']}", new_pos_start, id_pos_end)
 
+                error = None
                 while self.current_token and self.current_token.token == '[':
-                    self.current_token = self.get_next_token() #eat [
-                    self.skip_spaces
+                    self.current_token = self.get_next_token()  # eat '['
+                    self.skip_spaces()
+                    
                     if self.current_token and self.current_token.token == ']':
-                        raise SemanticError("IndexError: Index cannot be empty.")
+                        error = SemanticError("IndexError: Index cannot be empty.")
+                        self.current_token = self.get_next_token()  # eat ']'
+                        self.skip_spaces()
                     else:
                         dim = self.parse_expr(scope)
                         dimensions.append(dim)
                         self.skip_spaces()
                         self.expect("]", "Expected ']' to close array dimension.")
-                        pos_end = [self.current_token.line, self.current_token.column - 1]
-                        self.skip_spaces()
-                
+
+                pos_end = [self.current_token.line, self.current_token.column - 1]
+                self.skip_spaces()
+
+                if error:
+                    error.pos_start = new_pos_start
+                    error.pos_end = pos_end
+                    raise error
+
                 identifier = ArrElement(identifier, dimensions, new_pos_start, pos_end)
             elif self.current_token.token == '(':
-                if not self.lookup_id_type(identifier.symbol, "a function"):
-                    raise SemanticError(f"NameError: Function '{identifier.symbol}' does not exist.")
+                if not self.lookup_id_type(identifier.symbol, "a function", identifier):
+                    raise SemanticError(f"NameError: Function '{identifier.symbol}' does not exist.", new_pos_start, id_pos_end)
                 arg_pos_start = [self.current_token.line, self.current_token.column]
                 self.current_token = self.get_next_token() # eat ( 
                 self.skip_spaces()
@@ -1524,8 +1577,8 @@ class Semantic:
                 self.skip_spaces()
                 identifier = FuncCallStmt(identifier, args, pos_start, pos_end, arg_pos_start, pos_end)
             elif self.current_token.token == 'xp_formatting':
-                if not self.lookup_id_type(identifier.symbol, "a variable"):
-                    raise SemanticError(f"NameError: Variable '{identifier.symbol}' does not exist.")
+                if not self.lookup_id_type(identifier.symbol, "a variable", identifier):
+                    raise SemanticError(f"NameError: Variable '{identifier.symbol}' does not exist.", new_pos_start, id_pos_end)
                 value = re.sub(r'^"(.*)"$', r'\1', self.current_token.lexeme)
                 if not re.match(r'^\.\d+f$', value):
                     raise SemanticError(f"FormatError: Invalid format specifier '{value}'.")
@@ -1536,9 +1589,9 @@ class Semantic:
                 return XpFormatting(identifier, digit, new_pos_start, xp_format_end)
             else:
                 if not self.lookup_identifier(identifier.symbol):
-                    raise SemanticError(f"NameError: Variable '{identifier.symbol}' does not exist.")
+                    raise SemanticError(f"NameError: Variable '{identifier.symbol}' does not exist.", new_pos_start, id_pos_end)
                 
-                info = self.get_identifier_info(identifier.symbol)
+                info = self.get_identifier_info(identifier.symbol, identifier)
                 allowed_types = {"a variable"}
                 if self.func_flag:
                     allowed_types.add("a parameter")
@@ -1550,7 +1603,7 @@ class Semantic:
                     allowed_types.add("an array")
 
                 if info["type"] not in allowed_types:
-                    raise SemanticError(f"20 NameError: Identifier '{identifier.symbol}' is already declared as {info['type']}")
+                    raise SemanticError(f"NameError: Identifier '{identifier.symbol}' is already declared as {info['type']}", new_pos_start, id_pos_end)
 
             return identifier
         elif tk == 'hp_ltr':
@@ -1571,6 +1624,8 @@ class Semantic:
             return literal
         elif re.match(r'^comms_ltr', tk) :
             ltr_pos_start = [self.current_token.line, self.current_token.column]
+            ltr_size = len(self.current_token.lexeme) - 1
+            ltr_pos_end = [self.current_token.line, self.current_token.column + ltr_size]
             value = re.sub(r'^"(.*)"$', r'\1', self.current_token.lexeme)
             print(value)
             open_braces = 0
@@ -1579,6 +1634,8 @@ class Semantic:
             inside_placeholder = False
             final_value = ""
             escaped = False
+            col = self.current_token.column
+            ln = self.current_token.line
 
             for i, char in enumerate(value):
                 if escaped:
@@ -1595,17 +1652,18 @@ class Semantic:
 
                 if char == '{':
                     if inside_placeholder:
-                        raise SemanticError("FormatError: Nested or unexpected '{' found in string literal.")
+                        raise SemanticError("FormatError: Nested or unexpected '{' found in string literal.", [ln, col+i+1], [ln, col+i+1])
                     inside_placeholder = True
                     open_braces += 1
+                    braces_char = col+i+1
                     current_placeholder = ""
                 elif char == '}':
                     if not inside_placeholder:
-                        raise SemanticError("FormatError: Unexpected '}' found in string literal.")
+                        raise SemanticError("FormatError: Unexpected '}' found in string literal.", [ln, col+i+1], [ln, col+i+1])
                     inside_placeholder = False
                     open_braces -= 1
                     if not current_placeholder:
-                        raise SemanticError("FormatError: Empty placeholder '{}' found in string literal.")
+                        raise SemanticError("FormatError: Empty placeholder '{}' found in string literal.", [ln, col+i+1], [ln, col+i+1])
                     placeholders.append(current_placeholder)
                 else:
                     if inside_placeholder:
@@ -1614,22 +1672,23 @@ class Semantic:
                         final_value += char
 
             if open_braces > 0:
-                raise SemanticError("FormatError: Unclosed '{' found in string literal.")
+                raise SemanticError("FormatError: Unclosed '{' found in string literal.", [ln, braces_char], [ln, braces_char])
 
             print(f"Placeholders: {placeholders}")
             print(f"Final string: {final_value}")
             if placeholders:
                 results = []
                 for i, placeholder in enumerate(placeholders):
-                    tokens, error = lexer.run("yo", placeholder)
+                    lexer = Lexer("yo", placeholder)
+                    tokens, error = lexer.make_tokens()
                     if error:
-                        raise SemanticError(f"Lexical error in placeholder {i}: cannot proceed to parsing.\n"+ str(error))
+                        raise SemanticError(f"Lexical error in placeholder {i}: cannot proceed to parsing.\n\n" + "\n\n".join(error), ltr_pos_start, ltr_pos_end)
                     print(tokens)
                     tokens.pop()
-                    helper = Helper(tokens, self.scope_stack, self.func_flag)
+                    helper = Helper(tokens, self.scope_stack, self.func_flag, ltr_pos_start, ltr_pos_end)
                     result = helper.parse_expr(scope)
                     if isinstance(result, SemanticError):
-                        raise SemanticError(f"Error in placeholder {i+1}: {str(result)}")
+                        raise SemanticError(f"Error in placeholder {i+1}: {str(result)}", ltr_pos_start, ltr_pos_end)
                     results.append(result)
                 ltr_size = len(self.current_token.lexeme) - 1
                 ltr_pos_end = [self.current_token.line, self.current_token.column + ltr_size]
@@ -1638,8 +1697,6 @@ class Semantic:
                 self.skip_spaces()
                 return literal
 
-            ltr_size = len(self.current_token.lexeme) - 1
-            ltr_pos_end = [self.current_token.line, self.current_token.column + ltr_size]
             literal = CommsLiteral(final_value, ltr_pos_start, ltr_pos_end)
             self.current_token = self.get_next_token()
             self.skip_spaces()
@@ -1664,13 +1721,15 @@ class Semantic:
             value = self.parse_expr(scope)  
             #print(value)
             if value.kind == 'XpFormatting':
-                raise SemanticError("FormatError: xp formatting cannot be used as a value within a parentheses.")
+                raise SemanticError("FormatError: xp formatting cannot be used as a value within a parentheses.", value.pos_start, value.pos_end)
             self.expect(')', "Unexpected token found inside parenthesised expression. Expected closing parenthesis.")
             self.skip_spaces()
             if self.current_token.token == 'xp_formatting':
                 format_str = re.sub(r'^"(.*)"$', r'\1', self.current_token.lexeme)
                 if not re.match(r'^\.\d+f$', format_str):
-                    raise SemanticError(f"FormatError: Invalid format specifier '{format_str}'.")
+                    raise SemanticError(f"FormatError: Invalid format specifier '{format_str}'."
+                                        [self.current_token.line, self.current_token.column],
+                                        [self.current_token.line, self.current_token.column]+2)
                 digit = int(format_str[1])
                 expr_pos_end = [self.current_token.line, self.current_token.column + 2]
                 self.current_token = self.get_next_token() # eat format 
@@ -1705,7 +1764,7 @@ class Semantic:
             func_pos_start = [self.current_token.line, self.current_token.column]
             self.current_token = self.get_next_token() # eat load
             if self.current_token.token != '(':
-                raise SemanticError("LoadError: Missing parentheses.")
+                raise SemanticError("ParserError: Missing parentheses.", self.current_token.line)
             self.current_token = self.get_next_token() # eat (
             self.skip_spaces()
             if self.current_token.token == 'comms_ltr':
@@ -1714,7 +1773,7 @@ class Semantic:
                 self.current_token = self.get_next_token() # eat comms
                 self.skip_spaces()
             if self.current_token.token != ')':
-                raise SemanticError("LoadError: Missing parentheses.")
+                raise SemanticError("ParserError: Missing parentheses.", self.current_token.line)
             func_pos_end = [self.current_token.line, self.current_token.column]
             self.current_token = self.get_next_token() # eat )
             self.skip_spaces()
@@ -1731,7 +1790,7 @@ class Semantic:
             value = self.parse_primary_expr(scope, 'rounds', arg_pos)
             if value.kind not in ['Identifier', 'ArrayElement', 'StructInstField', 'FuncCallStmt',
                                   'CommsLiteral', 'ToCommsStmt']: 
-                raise SemanticError("ArgumentError: Invalid rounds argument.")
+                raise SemanticError("ArgumentError: Invalid rounds argument.", self.current_token.line)
             self.skip_spaces()
             self.expect(')', "Expected ')' after rounds arguments.")
             func_pos_end = [self.current_token.line, self.current_token.column-1]
@@ -1747,7 +1806,7 @@ class Semantic:
             valid_kinds = ['Identifier', 'ArrayElement', 'StructInstField', 'FuncCallStmt',
                            'ToCommsStmt']  
             if value.kind not in valid_kinds:
-                raise SemanticError(f"ArgumentError: Invalid '{tk}' argument.")
+                raise SemanticError(f"ArgumentError: Invalid '{tk}' argument.", self.current_token.line)
             self.skip_spaces()
             self.expect(')', f"Expected ')' after '{tk}' arguments.")
             func_pos_end = [self.current_token.line, self.current_token.column - 1]
@@ -1762,7 +1821,7 @@ class Semantic:
             value = self.parse_primary_expr(scope,None,arg_pos)
             valid_kinds = ['Identifier', 'ArrayElement', 'StructInstField'] 
             if value.kind not in valid_kinds:
-                raise SemanticError(f"ArgumentError: Invalid '{tk}' argument.")
+                raise SemanticError(f"ArgumentError: Invalid '{tk}' argument.", self.current_token.line)
             self.skip_spaces()
             self.expect(')', f"Expected ')' after '{tk}' arguments.")
             func_pos_end = [self.current_token.line, self.current_token.column - 1]
@@ -1777,14 +1836,14 @@ class Semantic:
             value = self.parse_primary_expr(scope, None, arg_pos)
             valid_kinds = ['Identifier', 'ArrayElement', 'StructInstField'] 
             if value.kind not in valid_kinds:
-                raise SemanticError(f"ArgumentError: Invalid '{tk}' argument.")
+                raise SemanticError(f"ArgumentError: Invalid '{tk}' argument.", self.current_token.line)
             self.skip_spaces()
             self.expect(')', f"Expected ')' after '{tk}' arguments.")
             func_pos_end = [self.current_token.line, self.current_token.column - 1]
             self.skip_spaces()
             return ToCommsStmt(value, func_pos_start, func_pos_end)
         else:
-            raise SemanticError(f"6 Unexpected token found during parsing: {tk}")
+            raise SemanticError(f"ParserError: Unexpected token found during parsing: {tk}", self.current_token.line)
         
     ########### CONDITIONALS #############
     def parse_if(self, scope) -> IfStmt:
@@ -1920,13 +1979,13 @@ class Semantic:
         self.current_token = self.get_next_token() # eat for
         self.skip_spaces()
         if not self.current_token or not re.match(r'^id\d+$', self.current_token.token):
-                raise SemanticError("ForError: Expected variable name after for keyword.")
+                raise SemanticError("ForError: Expected variable name after for keyword.", self.current_token.line)
         init_pos_start = [self.current_token.line, self.current_token.column]
         var_name_size = len(self.current_token.lexeme)
         id_pos_end = [self.current_token.line, self.current_token.column + var_name_size - 1]
         name = Identifier(self.current_token.lexeme, init_pos_start, id_pos_end)
-        if not self.lookup_id_type(name.symbol, "a variable"):
-            raise SemanticError(f"NameError: Variable '{name.symbol}' is not defined.")
+        if not self.lookup_id_type(name.symbol, "a variable", name):
+            raise SemanticError(f"NameError: Variable '{name.symbol}' is not defined.", init_pos_start, id_pos_end)
         self.current_token = self.get_next_token() # eat id
         self.skip_spaces()
         self.expect(":", "ForError: Expected ':' after identifier in loop control initialization.")
@@ -1942,13 +2001,13 @@ class Semantic:
         self.expect(",", "ForError: Expected ',' after loop condition.")
         self.skip_spaces()
         if not self.current_token or not re.match(r'^id\d+$', self.current_token.token):
-                raise SemanticError("ForError: Expected variable name after loop condition.")
+                raise SemanticError("ForError: Expected variable name after loop condition.", self.current_token.line)
         id_pos_start = [self.current_token.line, self.current_token.column]
         var_name_size = len(self.current_token.lexeme)
         id_pos_end = [self.current_token.line, self.current_token.column + var_name_size - 1]
         upd_name = Identifier(self.current_token.lexeme, id_pos_start, id_pos_end)
-        if not self.lookup_id_type(upd_name.symbol, "a variable"):
-            raise SemanticError(f"NameError: Variable '{upd_name.symbol}' is not defined.")
+        if not self.lookup_id_type(upd_name.symbol, "a variable", upd_name):
+            raise SemanticError(f"NameError: Variable '{upd_name.symbol}' is not defined.", id_pos_start, id_pos_end)
         self.current_token = self.get_next_token() # eat id
         self.skip_spaces()
         operator = self.current_token.token
@@ -2043,15 +2102,15 @@ class Semantic:
 
     def parse_join(self, scope, name, pos_start) -> JoinStmt:
         if self.lookup_identifier(name.symbol):
-            info = self.get_identifier_info(name.symbol)
+            info = self.get_identifier_info(name.symbol, name)
             if info["type"] != "an array" and info["type"] != "a parameter":
-                raise SemanticError(f"NameError: Array '{name.symbol}' is not defined.")
+                raise SemanticError(f"NameError: Array '{name.symbol}' is not defined.", name.pos_start, name.pos_end)
         else:
-            raise SemanticError(f"NameError: Array '{name.symbol}' is not defined.")
+            raise SemanticError(f"NameError: Array '{name.symbol}' is not defined.", name.pos_start, name.pos_end)
         if info["type"] == "a parameter":
             dimensions = None
         elif info["type"] == "an array":
-            dimensions = self.get_dimensions(name.symbol)
+            dimensions = self.get_dimensions(name.symbol, name)
         self.expect(".", "Expects '.' in join function call.")
         self.expect("join", "Expects 'join' keyword in join function call.")
         self.expect("(", "Expects '(' after join keyword in join function call.")
@@ -2060,7 +2119,7 @@ class Semantic:
             if dimensions is None or dimensions == 2:
                 pass
             else:
-                raise SemanticError("DimensionsError: Trying to append a new row to a one dimensional array.")
+                raise SemanticError("DimensionsError: Trying to append a new row to a one dimensional array.", self.current_token.line)
             self.current_token = self.get_next_token() # eat [
             self.skip_spaces()
             values = [self.parse_inner_arr_values(scope)]
@@ -2074,9 +2133,9 @@ class Semantic:
             if dimensions is None or dimensions == 1:
                 pass
             else:
-                raise SemanticError("DimensionsError: Trying to append new elements incorrectly to a two dimensional array, must specify row index first.")
+                raise SemanticError("DimensionsError: Trying to append new elements incorrectly to a two dimensional array, must specify row index first.", self.current_token.line)
             if self.current_token.token == ')':
-                raise SemanticError("JoinError: Elements inside parentheses must not be empty.")
+                raise SemanticError("ValueError: Elements inside parentheses must not be empty.", self.current_token.line)
             value = self.parse_expr(scope)
             self.skip_spaces()
             self.expect(")", "Expects ')' after to close join arguments.")
@@ -2088,26 +2147,26 @@ class Semantic:
         self.expect("[", "Expects '[' to specify row index of two-dimensional array.")
         self.skip_spaces()
         if self.current_token.token == ']':
-            raise SemanticError("JoinError: Index must not be blank for join function call.")
+            raise SemanticError("IndexError: Index must not be blank for join function call.", self.current_token.line)
         dim = self.parse_expr(scope)
         self.skip_spaces()
         self.expect("]", "Expected ']' to close array dimension declaration.")
         self.skip_spaces()
-        info = self.get_identifier_info(arr_name.symbol)
+        info = self.get_identifier_info(arr_name.symbol, arr_name)
         if info["type"] == "an array":
-            dimensions = self.get_dimensions(arr_name.symbol)
+            dimensions = self.get_dimensions(arr_name.symbol, arr_name)
         else:
             dimensions = None
         if dimensions is None or dimensions == 2:
             pass
         else:
-            raise SemanticError("DimensionsError: Trying to append an element in a specific row to a 1d array, must be a 2d array.")
+            raise SemanticError("DimensionsError: Trying to append an element in a specific row to a 1d array, must be a 2d array.", self.current_token.line)
         self.expect(".", "Expects '.' in join function call.")
         self.expect("join", "Expects 'join' keyword in join function call.")
         self.expect("(", "Expects '(' after join keyword in join function call.")
         self.skip_spaces()
         if self.current_token.token == ')':
-            raise SemanticError("JoinError: Elements inside parentheses must not be empty.")
+            raise SemanticError("ValueError: Elements inside parentheses must not be empty.", self.current_token.line)
         value = self.parse_expr(scope)
         self.skip_spaces()
         self.expect(")", "Expects ')' after to close join arguments.")
@@ -2117,15 +2176,15 @@ class Semantic:
 
     def parse_drop(self, scope, name, pos_start) -> DropStmt:
         if self.lookup_identifier(name.symbol):
-            info = self.get_identifier_info(name.symbol)
+            info = self.get_identifier_info(name.symbol, name)
             if info["type"] != "an array" and info["type"] != "a parameter":
-                raise SemanticError(f"NameError: Array '{name.symbol}' is not defined.")
+                raise SemanticError(f"NameError: Array '{name.symbol}' is not defined.", name.pos_start, name.pos_end)
         else:
-            raise SemanticError(f"NameError: Array '{name.symbol}' is not defined.")
+            raise SemanticError(f"NameError: Array '{name.symbol}' is not defined.", name.pos_start, name.pos_end)
         if info["type"] == "a parameter":
             dimensions = None
         elif info["type"] == "an array":
-            dimensions = self.get_dimensions(name.symbol)
+            dimensions = self.get_dimensions(name.symbol, name)
         self.expect(".", "Expects '.' in drop function call.")
         self.expect("drop", "Expects 'drop' keyword in drop function call.")
         self.expect("(", "Expects '(' after drop keyword in drop function call.")   
@@ -2144,20 +2203,20 @@ class Semantic:
         self.expect("[", "Expects '[' to specify row index of two-dimensional array.")
         self.skip_spaces()
         if self.current_token.token == ']':
-            raise SemanticError("DropError: Index must not be blank for drop function call.")
+            raise SemanticError("IndexError: Index must not be blank for drop function call.", self.current_token.line)
         dim = self.parse_expr(scope)
         self.skip_spaces()
         self.expect("]", "Expected ']' to close array dimension declaration.")
         self.skip_spaces()
-        info = self.get_identifier_info(arr_name.symbol)
+        info = self.get_identifier_info(arr_name.symbol, arr_name)
         if info["type"] == "an array":
-            dimensions = self.get_dimensions(arr_name.symbol)
+            dimensions = self.get_dimensions(arr_name.symbol, arr_name)
         else:
             dimensions = None
         if dimensions is None or dimensions == 2:
             pass
         else:
-            raise SemanticError("DimensionsError: Trying to drop specific row from a one dimensional array, must be two-dimensional.")
+            raise SemanticError("DimensionsError: Trying to drop specific row from a one dimensional array, must be two-dimensional.", self.current_token.line)
         self.expect(".", "Expects '.' in drop function call.")
         self.expect("drop", "Expects 'drop' keyword in drop function call.")
         self.expect("(", "Expects '(' after drop keyword in drop function call.")
@@ -2174,15 +2233,15 @@ class Semantic:
 
     def parse_seek(self, scope, name, pos_start) -> SeekStmt:
         if self.lookup_identifier(name.symbol):
-            info = self.get_identifier_info(name.symbol)
+            info = self.get_identifier_info(name.symbol, name)
             if info["type"] != "an array" and info["type"] != "a parameter":
-                raise SemanticError(f"NameError: Array '{name.symbol}' is not defined.")
+                raise SemanticError(f"NameError: Array '{name.symbol}' is not defined.", name.pos_start, name.pos_end)
         else:
-            raise SemanticError(f"NameError: Array '{name.symbol}' is not defined.")
+            raise SemanticError(f"NameError: Array '{name.symbol}' is not defined.", name.pos_start, name.pos_end)
         if info["type"] == "a parameter":
             dimensions = None
         elif info["type"] == "an array":
-            dimensions = self.get_dimensions(name.symbol)
+            dimensions = self.get_dimensions(name.symbol, name)
         self.expect(".", "Expects '.' in seek function call.")
         self.expect("seek", "Expects 'seek' keyword in seek function call.")
         self.expect("(", "Expects '(' after seek keyword in seek function call.")
@@ -2191,7 +2250,7 @@ class Semantic:
             if dimensions is None or dimensions == 2:
                 pass
             else:
-                raise SemanticError("DimensionsError: Trying to seek a specific row in a 1d array, must be a 2d array.")
+                raise SemanticError("DimensionsError: Trying to seek a specific row in a 1d array, must be a 2d array.", self.current_token.line)
             self.current_token = self.get_next_token() # eat [
             self.skip_spaces()
             values = [self.parse_inner_arr_values(scope)]
@@ -2205,9 +2264,9 @@ class Semantic:
             if dimensions is None or dimensions == 1:
                 pass
             else:
-                raise SemanticError("DimensionsError: Trying to seek a specific element in a 2d array, must specify row index first..")
+                raise SemanticError("DimensionsError: Trying to seek a specific element in a 2d array, must specify row index first.", self.current_token.line)
             if self.current_token.token == ')':
-                raise SemanticError("SeekError: Elements inside parentheses must not be empty.")
+                raise SemanticError("ValueError: Elements inside parentheses must not be empty.", self.current_token.line)
             value = self.parse_expr(scope)
             self.skip_spaces()
             self.expect(")", "Expects ')' after to close seek arguments.")
@@ -2219,26 +2278,26 @@ class Semantic:
         self.expect("[", "Expects '[' to specify row index of two-dimensional array.")
         self.skip_spaces()
         if self.current_token.token == ']':
-            raise SemanticError("SeekError: Index must not be blank for seek function call.")
+            raise SemanticError("IndexError: Index must not be blank for seek function call.", self.current_token.line)
         dim = self.parse_expr(scope)
         self.skip_spaces()
         self.expect("]", "Expected ']' to close array dimension declaration.")
         self.skip_spaces()
-        info = self.get_identifier_info(arr_name.symbol)
+        info = self.get_identifier_info(arr_name.symbol, arr_name)
         if info["type"] == "an array":
-            dimensions = self.get_dimensions(arr_name.symbol)
+            dimensions = self.get_dimensions(arr_name.symbol, arr_name)
         else:
             dimensions = None
         if dimensions is None or dimensions == 2:
             pass
         else:
-            raise SemanticError("DimensionsError: Trying to seek a specific row in a 1d array, must be a 2d array.")
+            raise SemanticError("DimensionsError: Trying to seek a specific row in a 1d array, must be a 2d array.", self.current_token.line)
         self.expect(".", "Expects '.' in seek function call.")
         self.expect("seek", "Expects 'seek' keyword in seek function call.")
         self.expect("(", "Expects '(' after seek keyword in seek function call.")
         self.skip_spaces()
         if self.current_token.token == ')':
-            raise SemanticError("SeekError: Elements inside parentheses must not be empty.")
+            raise SemanticError("ValueError: Elements inside parentheses must not be empty.", self.current_token.line)
         value = self.parse_expr(scope)
         self.skip_spaces()
         self.expect(")", "Expects ')' after to close seek arguments.")
