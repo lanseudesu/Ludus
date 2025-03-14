@@ -34,6 +34,32 @@ class Helper:
                 return scope[name]  
         raise SemanticError(f"NameError: Identifier '{name}' not declared.", self.start, self.end)
     
+    def is_array(self, name):
+        if self.lookup_identifier(name):
+            info = self.get_identifier_info(name)
+            if info["type"] == "an array":
+                return True
+            else:
+                return False
+        else:
+            return False
+        
+    def is_params(self, name):
+        if self.lookup_identifier(name):
+            info = self.get_identifier_info(name)
+            if info["type"] == "a parameter":
+                return True
+            else:
+                return False
+        else:
+            return False
+    
+    def get_dimensions(self, name):
+        info = self.get_identifier_info(name)
+        if info["type"] != "an array":
+            raise SemanticError(f"Identifier '{name}' is not an array", self.start, self.end)
+        return info["dimensions"]
+    
     def get_next_token(self):
         if self.current_token_index < len(self.tokens):
             token = self.tokens[self.current_token_index]
@@ -60,6 +86,22 @@ class Helper:
             la_token_index += 1  
 
         return None  
+    
+    def find_token_in_line(self, target_token):
+        la_token_index = self.current_token_index
+
+        while la_token_index < len(self.tokens):
+            la_token = self.tokens[la_token_index]
+
+            if la_token.token == target_token:
+                return la_token
+
+            if la_token.token in {':', 'newline', 'EOF'}:  
+                break
+
+            la_token_index += 1
+
+        return None
     
     def parse_expr(self, scope) -> Expr:
         self.skip_spaces()
@@ -173,6 +215,15 @@ class Helper:
             self.current_token = self.get_next_token()
             self.skip_spaces()
             if self.current_token and self.current_token.token == '.':
+                
+                join_token = self.find_token_in_line('drop')
+                if join_token:
+                    return self.parse_drop(scope, identifier, self.start)
+
+                join_token = self.find_token_in_line('seek')
+                if join_token:
+                    return self.parse_seek(scope, identifier, self.start)
+                
                 if not self.lookup_identifier(identifier.symbol):
                     raise SemanticError(f"NameError: Struct instance '{identifier.symbol}' does not exist.", self.start, self.end)
                 
@@ -194,6 +245,16 @@ class Helper:
                 self.current_token = self.get_next_token()
                 self.skip_spaces()
             elif self.current_token and self.current_token.token == '[':
+                arr_exist = self.is_array(identifier.symbol) or self.is_params(identifier.symbol)
+                if arr_exist:
+                    join_token = self.find_token_in_line('drop')
+                    if join_token:
+                        return self.parse_drop2d(scope, identifier, self.start)
+                    
+                    join_token = self.find_token_in_line('seek')
+                    if join_token:
+                        return self.parse_seek2d(scope, identifier, self.start)
+                
                 dimensions = []
                 if not self.lookup_identifier(identifier.symbol):
                     raise SemanticError(f"NameError: Array '{identifier.symbol}' does not exist.", self.start, self.end)
@@ -219,26 +280,28 @@ class Helper:
                         self.skip_spaces()
                 
                 identifier = ArrElement(identifier, dimensions, self.start, self.end)
+            
             elif self.current_token and self.current_token.token == '(':
                 if not self.lookup_id_type(identifier.symbol, "a function"):
                     raise SemanticError(f"NameError: Function '{identifier.symbol}' does not exist.", self.start, self.end)
                 self.current_token = self.get_next_token() # eat ( 
                 self.skip_spaces()
-                args = []       
-                while self.current_token and self.current_token.token != ')':
+                args = []     
+                while self.current_token.token != ')':
                     la_token = self.look_ahead()
                     if la_token.token == ',' or la_token.token == ')':
-                        arg = self.parse_primary_expr(scope, True)
+                        arg = self.parse_primary_expr(scope, 'func_call')
                     else:
                         arg = self.parse_expr(scope)
                     args.append(arg)
                     self.skip_spaces()
-                    if self.current_token and self.current_token.token == ',':
+                    if self.current_token.token == ',':
                         self.current_token = self.get_next_token() # eat ,
                         self.skip_spaces()
                 self.current_token = self.get_next_token() # eat )
                 self.skip_spaces()
-                identifier = FuncCallStmt(identifier, args, self.start, self.end)
+                identifier = FuncCallStmt(identifier, args, self.start, self.end, self.start, self.end)
+           
             elif self.current_token and self.current_token.token == 'xp_formatting':
                 if not self.lookup_id_type(identifier.symbol, "a variable"):
                     raise SemanticError(f"NameError: Variable '{identifier.symbol}' does not exist.", self.start, self.end)
@@ -266,6 +329,7 @@ class Helper:
                     raise SemanticError(f"NameError: Identifier '{identifier.symbol}' is already declared as {info['type']}", self.start, self.end)
 
             return identifier
+        
         elif tk == 'hp_ltr':
             literal = HpLiteral(self.current_token.lexeme, self.start, self.end)
             self.current_token = self.get_next_token()
@@ -331,5 +395,193 @@ class Helper:
             return DeadLiteral(None, None, self.start, self.end)
         elif tk == 'load' or tk == 'loadNum':
             raise SemanticError(f"ValueError: Cannot use load or loadNum function within string literals.", self.start, self.end)
+        elif tk == 'rounds':
+            self.current_token = self.get_next_token() # eat rounds
+            self.expect('(', "Expected '(' after 'rounds'.")
+            self.skip_spaces()
+            value = self.parse_primary_expr(scope, 'rounds')
+            if value.kind not in ['Identifier', 'ArrayElement', 'StructInstField', 'FuncCallStmt',
+                                  'CommsLiteral', 'ToCommsStmt']: 
+                raise SemanticError("ArgumentError: Invalid rounds argument.", self.start, self.end)
+            self.skip_spaces()
+            self.expect(')', "Expected ')' after rounds arguments.")
+            self.skip_spaces()
+            return RoundStmt(value, self.start, self.end)
+        elif tk in ('levelUp', 'levelDown'):
+            self.current_token = self.get_next_token()  # consume levelUp or levelDown
+            self.expect('(', f"Expected '(' after '{tk}'.")
+            self.skip_spaces()
+            value = self.parse_primary_expr(scope, None)
+            valid_kinds = ['Identifier', 'ArrayElement', 'StructInstField', 'FuncCallStmt',
+                           'ToCommsStmt']  
+            if value.kind not in valid_kinds:
+                raise SemanticError(f"ArgumentError: Invalid '{tk}' argument.", self.start, self.end)
+            self.skip_spaces()
+            self.expect(')', f"Expected ')' after '{tk}' arguments.")
+            self.skip_spaces()
+            return LevelStmt(value, tk == 'levelUp', self.start, self.end)
+        elif tk in ('toHp', 'toXp'):
+            self.current_token = self.get_next_token()  # consume toHp or toHp
+            self.expect('(', f"Expected '(' after '{tk}'.")
+            self.skip_spaces()
+            value = self.parse_primary_expr(scope,None)
+            valid_kinds = ['Identifier', 'ArrayElement', 'StructInstField'] 
+            if value.kind not in valid_kinds:
+                raise SemanticError(f"ArgumentError: Invalid '{tk}' argument.", self.start, self.end)
+            self.skip_spaces()
+            self.expect(')', f"Expected ')' after '{tk}' arguments.")
+            self.skip_spaces()
+            return ToNumStmt(value, tk == 'toHp', self.start, self.end)
+        elif tk == 'toComms':
+            self.current_token = self.get_next_token()  # consume toComms
+            self.expect('(', f"Expected '(' after '{tk}'.")
+            self.skip_spaces()
+            value = self.parse_primary_expr(scope, None)
+            valid_kinds = ['Identifier', 'ArrayElement', 'StructInstField'] 
+            if value.kind not in valid_kinds:
+                raise SemanticError(f"ArgumentError: Invalid '{tk}' argument.", self.start, self.end)
+            self.skip_spaces()
+            self.expect(')', f"Expected ')' after '{tk}' arguments.")
+            self.skip_spaces()
+            return ToCommsStmt(value, self.start, self.end)
         else:
             raise SemanticError(f"ParserError: Unexpected token found during parsing: {tk}", self.start, self.end)
+        
+    def parse_drop(self, scope, name, pos_start) -> DropStmt:
+        if self.lookup_identifier(name.symbol):
+            info = self.get_identifier_info(name.symbol)
+            if info["type"] != "an array" and info["type"] != "a parameter":
+                raise SemanticError(f"NameError: Array '{name.symbol}' is not defined.", self.start, self.end)
+        else:
+            raise SemanticError(f"NameError: Array '{name.symbol}' is not defined.", self.start, self.end)
+        if info["type"] == "a parameter":
+            dimensions = None
+        elif info["type"] == "an array":
+            dimensions = self.get_dimensions(name.symbol)
+        self.expect(".", "Expects '.' in drop function call.")
+        self.expect("drop", "Expects 'drop' keyword in drop function call.")
+        self.expect("(", "Expects '(' after drop keyword in drop function call.")   
+        self.skip_spaces()
+        index = None
+        if self.current_token.token != ')':
+            value = self.parse_expr(scope)
+            index = value
+            self.skip_spaces()
+        self.expect(")", "Expects ')' after to close drop arguments.")
+        self.skip_spaces()
+        return DropStmt(name, index, dimensions, self.start, self.end)
+    
+    def parse_drop2d(self, scope, arr_name, pos_start) -> DropStmt:
+        self.expect("[", "Expects '[' to specify row index of two-dimensional array.")
+        self.skip_spaces()
+        if self.current_token.token == ']':
+            raise SemanticError("IndexError: Index must not be blank for drop function call.", self.start, self.end)
+        dim = self.parse_expr(scope)
+        self.skip_spaces()
+        self.expect("]", "Expected ']' to close array dimension declaration.")
+        self.skip_spaces()
+        info = self.get_identifier_info(arr_name.symbol)
+        if info["type"] == "an array":
+            dimensions = self.get_dimensions(arr_name.symbol)
+        else:
+            dimensions = None
+        if dimensions is None or dimensions == 2:
+            pass
+        else:
+            raise SemanticError("DimensionsError: Trying to drop specific row from a one dimensional array, must be two-dimensional.", self.start, self.end)
+        self.expect(".", "Expects '.' in drop function call.")
+        self.expect("drop", "Expects 'drop' keyword in drop function call.")
+        self.expect("(", "Expects '(' after drop keyword in drop function call.")
+        self.skip_spaces()
+        index = None
+        if self.current_token.token != ')':
+            value = self.parse_expr(scope)
+            index = value
+            self.skip_spaces()
+        self.expect(")", "Expects ')' after to close drop arguments.")
+        self.skip_spaces()
+        return DropStmt(arr_name, index, dimensions, self.start, self.end, dim)
+
+    def parse_seek(self, scope, name, pos_start) -> SeekStmt:
+        if self.lookup_identifier(name.symbol):
+            info = self.get_identifier_info(name.symbol)
+            if info["type"] != "an array" and info["type"] != "a parameter":
+                raise SemanticError(f"NameError: Array '{name.symbol}' is not defined.", self.start, self.end)
+        else:
+            raise SemanticError(f"NameError: Array '{name.symbol}' is not defined.", self.start, self.end)
+        if info["type"] == "a parameter":
+            dimensions = None
+        elif info["type"] == "an array":
+            dimensions = self.get_dimensions(name.symbol)
+        self.expect(".", "Expects '.' in seek function call.")
+        self.expect("seek", "Expects 'seek' keyword in seek function call.")
+        self.expect("(", "Expects '(' after seek keyword in seek function call.")
+        self.skip_spaces()
+        if self.current_token.token == '[':
+            if dimensions is None or dimensions == 2:
+                pass
+            else:
+                raise SemanticError("DimensionsError: Trying to seek a specific row in a 1d array, must be a 2d array.", self.start, self.end)
+            self.current_token = self.get_next_token() # eat [
+            self.skip_spaces()
+            values = [self.parse_inner_arr_values(scope)]
+            self.expect("]", "Expects ']' to close array row values.")
+            self.skip_spaces()
+            self.expect(")", "Expects ')' after to close seek arguments.")
+            self.skip_spaces()
+            return SeekStmt(name, values, 2, self.start, self.end)
+        else:
+            if dimensions is None or dimensions == 1:
+                pass
+            else:
+                raise SemanticError("DimensionsError: Trying to seek a specific element in a 2d array, must specify row index first.", self.start, self.end)
+            if self.current_token.token == ')':
+                raise SemanticError("ValueError: Elements inside parentheses must not be empty.", self.start, self.end)
+            value = self.parse_expr(scope)
+            self.skip_spaces()
+            self.expect(")", "Expects ')' after to close seek arguments.")
+            self.skip_spaces()
+            return SeekStmt(name, value, 1, self.start, self.end)
+        
+    def parse_seek2d(self, scope, arr_name, pos_start) -> SeekStmt:
+        self.expect("[", "Expects '[' to specify row index of two-dimensional array.")
+        self.skip_spaces()
+        if self.current_token.token == ']':
+            raise SemanticError("IndexError: Index must not be blank for seek function call.", self.start, self.end)
+        dim = self.parse_expr(scope)
+        self.skip_spaces()
+        self.expect("]", "Expected ']' to close array dimension declaration.")
+        self.skip_spaces()
+        info = self.get_identifier_info(arr_name.symbol)
+        if info["type"] == "an array":
+            dimensions = self.get_dimensions(arr_name.symbol)
+        else:
+            dimensions = None
+        if dimensions is None or dimensions == 2:
+            pass
+        else:
+            raise SemanticError("DimensionsError: Trying to seek a specific row in a 1d array, must be a 2d array.", self.start, self.end)
+        self.expect(".", "Expects '.' in seek function call.")
+        self.expect("seek", "Expects 'seek' keyword in seek function call.")
+        self.expect("(", "Expects '(' after seek keyword in seek function call.")
+        self.skip_spaces()
+        if self.current_token.token == ')':
+            raise SemanticError("ValueError: Elements inside parentheses must not be empty.", self.start, self.end)
+        value = self.parse_expr(scope)
+        self.skip_spaces()
+        self.expect(")", "Expects ')' after to close seek arguments.")
+        self.skip_spaces()
+        return SeekStmt(arr_name, value, 2, self.start, self.end, dim)
+    
+    def parse_inner_arr_values(self, scope):
+        inner_values = []
+        while self.current_token and self.current_token.token != ']':
+            value = self.parse_expr(scope)
+            if value.kind not in ["HpLiteral", "XpLiteral", "CommsLiteral", "FlagLiteral"]:
+                 raise SemanticError("TypeError: Arrays can only be initialied with literal values.", self.start, self.end)
+            inner_values.append(value)
+            self.skip_spaces()
+            if self.current_token.token == ',':
+                self.current_token = self.get_next_token()  # eat ,
+                self.skip_spaces()
+        return inner_values

@@ -58,7 +58,7 @@ class Semantic:
                 if info["type"] == id_type:
                     return True
                 else:
-                    raise SemanticError(f"1 NameError: Identifier '{name}' is already declared as {info["type"]}.", node.pos_start, node.pos_end)
+                    raise SemanticError(f"NameError: Identifier '{name}' is already declared as {info["type"]}.", node.pos_start, node.pos_end)
         return False
     
     def get_identifier_info(self, name, node):

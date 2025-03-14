@@ -1,7 +1,7 @@
 from ludus.nodes import GrindWhileStmt
 from ..nodes import *
 from .symbol_table import SymbolTable
-from .interpreter import evaluate, UnresolvedNumber
+from .interpreter import evaluate, eval_func, UnresolvedNumber
 from ..error import SemanticError
 
 class ASTVisitor:
@@ -201,6 +201,7 @@ class SemanticAnalyzer(ASTVisitor):
         self.resume_flag = False
         self.in_func_flag = False
         self.recall_flag = False
+
 
     ###### VARIABLES #########
     def visit_VarDec(self, node: VarDec):
@@ -450,7 +451,12 @@ class SemanticAnalyzer(ASTVisitor):
         for i, idx in enumerate(node.left.index[:-1]):
             if idx.kind in {'LoadNum', 'Load'}:
                 raise SemanticError(f"IndexError: loadNum and load function cannot be used as index expression.", idx.pos_start, idx.pos_end)
-            idx_val = evaluate(idx, self.symbol_table)
+            
+            if idx.kind == 'FuncCallStmt':
+                idx_val = eval_func(idx.name.symbol, idx, self.symbol_table) 
+            else:    
+                idx_val = evaluate(idx, self.symbol_table)
+            
             if not isinstance(idx_val, int):
                 raise SemanticError(f"IndexError: Array index must always evaluate to a positive hp value.", idx.pos_start, idx.pos_end)
             if idx_val < 0 or idx_val >= len(target):
@@ -460,7 +466,12 @@ class SemanticAnalyzer(ASTVisitor):
         final_idx = node.left.index[-1]
         if final_idx.kind in {'LoadNum', 'Load'}:
                 raise SemanticError(f"IndexError: loadNum and load function cannot be used as index expression.", final_idx.pos_start, final_idx.pos_end)
-        final_idx_val = evaluate(final_idx, self.symbol_table)
+        
+        if final_idx.kind == 'FuncCallStmt':
+                final_idx_val = eval_func(final_idx.name.symbol, final_idx, self.symbol_table) 
+        else:    
+            final_idx_val = evaluate(final_idx, self.symbol_table)
+        
         if not isinstance(final_idx_val, int):
                 raise SemanticError(f"IndexError: Array index must always evaluate to a positive hp value.", final_idx.pos_start, final_idx.pos_end)
         if final_idx_val < 0 or final_idx_val >= len(target):
@@ -630,7 +641,11 @@ class SemanticAnalyzer(ASTVisitor):
             if node.row_index.kind in {'LoadNum', 'Load'}:
                 raise SemanticError(f"IndexError: loadNum and load function cannot be used as index expression.", node.row_index.pos_start, node.row_index.pos_end)
 
-            row_index = evaluate(node.row_index, self.symbol_table)
+            if node.row_index.kind == 'FuncCallStmt':
+                row_index = eval_func(node.row_index.name.symbol, node.row_index, self.symbol_table) 
+            else:    
+                row_index = evaluate(node.row_index, self.symbol_table)
+
             if not isinstance(row_index, int):
                 raise SemanticError(f"IndexError: Array index must always evaluate to a positive hp value.", node.row_index.pos_start, node.row_index.pos_end)
 
@@ -717,7 +732,11 @@ class SemanticAnalyzer(ASTVisitor):
             if node.row_index.kind in {'LoadNum', 'Load'}:
                 raise SemanticError(f"IndexError: loadNum and load function cannot be used as index expression.", node.row_index.pos_start, node.row_index.pos_end)
             
-            row_index = evaluate(node.row_index, self.symbol_table)
+            if node.row_index.kind == 'FuncCallStmt':
+                row_index = eval_func(node.row_index.name.symbol, node.row_index, self.symbol_table) 
+            else:    
+                row_index = evaluate(node.row_index, self.symbol_table)
+
             if not isinstance(row_index, int):
                 raise SemanticError(f"IndexError: Array index must always evaluate to a positive hp value.", node.row_index.pos_start, node.row_index.pos_end)
         
@@ -726,7 +745,11 @@ class SemanticAnalyzer(ASTVisitor):
             if node.elem_index.kind in {'LoadNum', 'Load'}:
                 raise SemanticError(f"IndexError: loadNum and load function cannot be used as index expression.", node.elem_index.pos_start, node.elem_index.pos_end)
             
-            elem_index = evaluate(node.elem_index, self.symbol_table)
+            if node.elem_index.kind == 'FuncCallStmt':
+                elem_index = eval_func(node.elem_index.name.symbol, node.elem_index, self.symbol_table) 
+            else:    
+                elem_index = evaluate(node.elem_index, self.symbol_table)
+
             if not isinstance(elem_index, int):
                 raise SemanticError(f"IndexError: Array index must always evaluate to a positive hp value.", node.elem_index.pos_start, node.elem_index.pos_end)
 
@@ -840,7 +863,11 @@ class SemanticAnalyzer(ASTVisitor):
                     return -1
                 
     def visit_RoundStmt(self, node: RoundStmt):
-        info = evaluate(node.value, self.symbol_table)
+        if node.value.kind == 'FuncCallStmt':
+            info = eval_func(node.value.name.symbol, node.value, self.symbol_table) 
+        else:    
+            info = evaluate(node.value, self.symbol_table)
+
         print(f"rounds info -> {info}")
         if isinstance(info, dict):
             if "dimensions" not in info:
@@ -990,13 +1017,27 @@ class SemanticAnalyzer(ASTVisitor):
     ###### COND #########
     def visit_IfStmt(self, node: IfStmt):
         conditions = []
-        if_condition = evaluate(node.condition, self.symbol_table)
+
+        if node.condition.kind == 'FuncCallStmt':
+            if_condition = eval_func(node.condition.name.symbol, node.condition, self.symbol_table) 
+        elif node.condition.kind in {'Load', 'LoadNum'}:
+            raise SemanticError(f"TypeError: Cannot use load and loadNum function as condition.", node.condition.pos_start, node.condition.pos_end)
+        else:    
+            if_condition = evaluate(node.condition, self.symbol_table)
+
         if not isinstance(if_condition, bool):
             raise SemanticError("TypeError: The condition used does not evaluate to a flag value.", node.condition.pos_start, node.condition.pos_end)
         conditions.append([if_condition, node.then_branch])
         if node.elif_branches is not None:
             for cond in node.elif_branches:
-                elif_condition = evaluate(cond.condition, self.symbol_table)
+
+                if cond.condition.kind == 'FuncCallStmt':
+                    elif_condition = eval_func(cond.condition.name.symbol, cond.condition, self.symbol_table) 
+                elif cond.condition.kind in {'Load', 'LoadNum'}:
+                    raise SemanticError(f"TypeError: Cannot use load and loadNum function as condition.", cond.condition.pos_start, cond.condition.pos_end)
+                else:    
+                    elif_condition = evaluate(cond.condition, self.symbol_table)
+
                 if not isinstance(elif_condition, bool):
                     raise SemanticError("TypeError: The condition used does not evaluate to a flag value.", cond.condition.pos_start, cond.condition.pos_end)
                 conditions.append([elif_condition, cond.body])
@@ -1018,7 +1059,6 @@ class SemanticAnalyzer(ASTVisitor):
                         return
                 self.symbol_table.exit_scope()
                 return
-            
         
         if node.else_branch is not None:
             self.symbol_table.restore_scope(len(self.symbol_table.scope_stack))
@@ -1037,7 +1077,13 @@ class SemanticAnalyzer(ASTVisitor):
             self.symbol_table.exit_scope()
 
     def visit_FlankStmt(self, node: FlankStmt):
-        expression = evaluate(node.expression, self.symbol_table)
+        if node.expression.kind == 'FuncCallStmt':
+            expression = eval_func(node.expression.name.symbol, node.expression, self.symbol_table) 
+        elif node.expression.kind in {'Load', 'LoadNum'}:
+            raise SemanticError(f"TypeError: Cannot use load and loadNum as flank expression.", node.expression.pos_start, node.expression.pos_end)
+        else:    
+            expression = evaluate(node.expression, self.symbol_table)
+
         for choice in node.choices:
             for choice_value in choice.values:
                 value = evaluate(choice_value, self.symbol_table)
@@ -1080,12 +1126,25 @@ class SemanticAnalyzer(ASTVisitor):
         value_type = value["type"]
         if value["immo"]==True:
             raise SemanticError(f"TypeError: '{val_name}' is declared as an immutable variable.", node.initialization.pos_start, node.initialization.pos_end) 
-        new_val = evaluate(node.initialization.right, self.symbol_table)
+        
+        if node.initialization.right.kind == 'FuncCallStmt':
+            new_val = eval_func(node.initialization.right.name.symbol, node.initialization.right, self.symbol_table) 
+        elif node.initialization.right.kind in {'Load', 'LoadNum'}:
+            raise SemanticError(f"LoopControlError: Cannot use load and loadNum in loop control initialization.", node.initialization.right.pos_start, node.initialization.right.pos_end)
+        else:    
+            new_val = evaluate(node.initialization.right, self.symbol_table)
+        
         if value_type != "hp" or not isinstance(new_val, int):
             raise SemanticError(f"LoopControlError: Only hp variables can be used for loop control.", node.initialization.pos_start, node.initialization.pos_end)
         self.symbol_table.define_var(val_name, new_val, value_type, value["immo"])
         
-        condition = evaluate(node.condition, self.symbol_table)
+        if node.condition.kind == 'FuncCallStmt':
+            condition = eval_func(node.condition.name.symbol, node.condition, self.symbol_table) 
+        elif node.condition.kind in {'Load', 'LoadNum'}:
+            raise SemanticError(f"TypeError: Cannot use load and loadNum function as condition.", node.condition.pos_start, node.condition.pos_end)
+        else:    
+            condition = evaluate(node.condition, self.symbol_table)
+
         if not isinstance(condition, bool):
             raise SemanticError(f"LoopConditionError: Loop condition does not evaluate to a flag value.", node.condition.pos_start, node.condition.pos_end)
         
@@ -1094,7 +1153,14 @@ class SemanticAnalyzer(ASTVisitor):
                 self.symbol_table.restore_scope(len(self.symbol_table.saved_scopes) - 1)
             else:
                 self.symbol_table.restore_scope(len(self.symbol_table.scope_stack))
-            while evaluate(node.condition, self.symbol_table):
+            
+            def eval_cond(cond):
+                if cond.kind == 'FuncCallStmt':
+                    return eval_func(cond.name.symbol, cond, self.symbol_table) 
+                else:    
+                    return evaluate(cond, self.symbol_table)
+            
+            while eval_cond(node.condition):
                 for stmt in node.body:
                     self.visit(stmt)
                     if self.recall_flag and self.in_func_flag:
@@ -1114,7 +1180,13 @@ class SemanticAnalyzer(ASTVisitor):
         self.symbol_table.define_var(val_name, value["value"], value_type, value["immo"])
     
     def visit_GrindWhileStmt(self, node: GrindWhileStmt):
-        condition = evaluate(node.condition, self.symbol_table)
+        if node.condition.kind == 'FuncCallStmt':
+            condition = eval_func(node.condition.name.symbol, node.condition, self.symbol_table) 
+        elif node.condition.kind in {'Load', 'LoadNum'}:
+            raise SemanticError(f"TypeError: Cannot use load and loadNum function as condition.", node.condition.pos_start, node.condition.pos_end)
+        else:    
+            condition = evaluate(node.condition, self.symbol_table)
+
         if not isinstance(condition, bool):
             raise SemanticError(f"LoopConditionError: Loop condition does not evaluate to a flag value.", node.condition.pos_start, node.condition.pos_end)
         
@@ -1134,7 +1206,13 @@ class SemanticAnalyzer(ASTVisitor):
         elif not node.is_grind and condition:
             self.symbol_table.restore_scope(len(self.symbol_table.scope_stack))
             
-        while evaluate(node.condition, self.symbol_table):
+        def eval_cond(cond):
+            if cond.kind == 'FuncCallStmt':
+                return eval_func(cond.name.symbol, cond, self.symbol_table) 
+            else:    
+                return evaluate(cond, self.symbol_table)
+
+        while eval_cond(node.condition):
             for stmt in node.body:
                 self.visit(stmt)
                 if self.checkpoint_flag:
@@ -1172,7 +1250,12 @@ class SemanticAnalyzer(ASTVisitor):
             for arg in node.args:
                 if arg.kind in ['Load', 'LoadNum']:
                     raise SemanticError("UnsupportedArgumentError: Cannot use load and loadNum function as a function argument.", arg.pos_start, arg.pos_end)
-                args.append(evaluate(arg, self.symbol_table))
+                if arg.kind == 'FuncCallStmt':
+                    value = eval_func(arg.name.symbol, arg, self.ymbol_table) 
+                else:    
+                    value = evaluate(arg, self.symbol_table)
+                
+                args.append(value)
         
         self.symbol_table.restore_scope_func(node.name.symbol)
        
@@ -1242,20 +1325,32 @@ class SemanticAnalyzer(ASTVisitor):
         else:
             for expr in node.expressions:
                 print(expr)
-                if expr.kind in {'Load', 'LoadNum'}:
-                    raise SemanticError(f"ValueError: Using load and loadNum in recall is not allowed.", node.pos_start, node.pos_end)
                 if expr == []:
                     self.recall_values.append([])
                     self.recall_flag = True
                     break
-                self.recall_values.append(evaluate(expr, self.symbol_table))
+                if expr.kind in {'Load', 'LoadNum'}:
+                    raise SemanticError(f"ValueError: Using load and loadNum in recall is not allowed.", node.pos_start, node.pos_end)
+                
+                if expr.kind == 'FuncCallStmt':
+                    value = eval_func(expr.name.symbol, expr, self.ymbol_table) 
+                else:    
+                    value = evaluate(expr, self.symbol_table)
+                
+                
+                self.recall_values.append(value)
         self.recall_flag = True
 
     ###### BUILT-IN #########
     def visit_ShootStmt(self, node: ShootStmt):
         if node.element.kind in ['Load', 'LoadNum']:
             raise SemanticError("UnsupportedArgumentError: load and loadNum function are an invalid argument for shoot and shootNxt function.", node.element.pos_start, node.element.pos_end)
-        element = evaluate(node.element, self.symbol_table)
+        
+        if node.element.kind == 'FuncCallStmt':
+            element = eval_func(node.element.name.symbol, node.element, self.symbol_table) 
+        else:    
+            element = evaluate(node.element, self.symbol_table)
+        
         if not isinstance(element, dict):
             element=element
         elif element is None:
@@ -1268,7 +1363,10 @@ class SemanticAnalyzer(ASTVisitor):
         print(f"shoot element -> {element}")
 
     def visit_LevelStmt(self, node: LevelStmt):
-        info = evaluate(node.value, self.symbol_table)
+        if node.value.kind == 'FuncCallStmt':
+            info = eval_func(node.value.name.symbol, node.value, self.symbol_table) 
+        else:    
+            info = evaluate(node.value, self.symbol_table)
 
         if not isinstance(info, str):
             function_name = "levelUp" if node.up_or_down else "levelDown"
@@ -1278,6 +1376,7 @@ class SemanticAnalyzer(ASTVisitor):
     
     def visit_ToNumStmt(self, node: ToNumStmt):
         info = evaluate(node.value, self.symbol_table)
+
         print(f"info -> {info}")
         
         if isinstance(info, UnresolvedNumber):

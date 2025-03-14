@@ -10,6 +10,18 @@ class UnresolvedNumber:
     def __repr__(self):
         return "0 or 0.0"
 
+def eval_func(name, node, symbol_table):
+    return_values = evaluate(node, symbol_table)
+    if len(return_values) > 1:
+        raise SemanticError(f"ValueError: Function '{name}' recalls more than one value, but only one was expected.", node.pos_start, node.pos_end)
+    value = return_values[0]
+    if value == []:
+        raise SemanticError(f"ValueError: Function '{name}' is recalling an array.", node.pos_start, node.pos_end)
+    if isinstance(value, list):
+        value = value[0]
+
+    return value
+
 def evaluate(ast_node, symbol_table):
     from .traverser import SemanticAnalyzer 
     traverser = SemanticAnalyzer(symbol_table)
@@ -19,7 +31,8 @@ def evaluate(ast_node, symbol_table):
         float: "xp",
         str: "comms",
         bool: "flag",
-        dict: "array"
+        dict: "array",
+        type(None): "dead"
     }
 
     if ast_node.kind == "HpLiteral":
@@ -73,8 +86,12 @@ def evaluate(ast_node, symbol_table):
         for i, idx in enumerate(ast_node.index[:-1]):
             if idx.kind in {'LoadNum', 'Load'}:
                 raise SemanticError(f"IndexError: loadNum and load function cannot be used as index expression.", idx.pos_start, idx.pos_end)
-            idx_val = evaluate(idx, symbol_table)
             
+            if idx.kind == 'FuncCallStmt':
+                idx_val = eval_func(idx.name.symbol, idx, symbol_table) 
+            else:    
+                idx_val = evaluate(idx, symbol_table)
+                        
             if not isinstance(idx_val, int):
                 raise SemanticError(f"IndexError: Array index must always evaluate to a positive hp value.", idx.pos_start, idx.pos_end)
             
@@ -83,9 +100,15 @@ def evaluate(ast_node, symbol_table):
             target = target[idx_val]
         
         final_idx = ast_node.index[-1]
+        
         if final_idx.kind in {'LoadNum', 'Load'}:
             raise SemanticError(f"IndexError: loadNum and load function cannot be used as index expression.", final_idx.pos_start, final_idx.pos_end)
-        final_idx_val = evaluate(final_idx, symbol_table)
+        
+        if final_idx.kind == 'FuncCallStmt':
+            final_idx_val = eval_func(final_idx.name.symbol, final_idx, symbol_table) 
+        else:    
+            final_idx_val = evaluate(final_idx, symbol_table)
+        
         if not isinstance(final_idx_val, int):
             raise SemanticError(f"IndexError: Array index must always evaluate to a positive hp value.", final_idx.pos_start, final_idx.pos_end)
         if final_idx_val < 0 or final_idx_val >= len(target):
@@ -100,7 +123,12 @@ def evaluate(ast_node, symbol_table):
         if ast_node.operand.kind in {'LoadNum', 'Load'}:
             raise SemanticError(f"InvalidOperand: loadNum and load function cannot be used as unary operand.", ast_node.operand.pos_start, ast_node.operand.pos_end)
         
-        operand = evaluate(ast_node.operand, symbol_table)
+        if ast_node.operand.kind == 'FuncCallStmt':
+            value = eval_func(ast_node.operand.name.symbol, ast_node.operand, symbol_table) 
+        else:    
+            value = evaluate(ast_node.operand, symbol_table)
+        
+        operand = value
         op_type = TYPE_MAP.get(type(operand), str(type(operand)))
         if ast_node.operator == '-':
             if not isinstance(operand, (int, float, bool)):
@@ -124,25 +152,35 @@ def evaluate(ast_node, symbol_table):
         result = traverser.visit_FuncCallStmt(ast_node, True)
         # print(f"yoyo {result}")
         return result
+    
     elif ast_node.kind == "Load":
         return ""
     elif ast_node.kind == "LoadNum":
         return UnresolvedNumber()
+    
     elif ast_node.kind == "XpFormatting":
         if ast_node.lhs.kind in {'Load', 'LoadNum'}:
             raise SemanticError(f"FormatError: 'load' and 'loadNum' function are not allowed in xp formatting.", ast_node.pos_start, ast_node.pos_end)
         
-        value = evaluate(ast_node.lhs, symbol_table)
+        if ast_node.lhs.kind == 'FuncCallStmt':
+            value = eval_func(ast_node.lhs.name.symbol, ast_node.lhs, symbol_table) 
+        else:    
+            value = evaluate(ast_node.lhs, symbol_table)
+        
         print (f"xp format val = {value}")
+        
         if not isinstance(value, dict):
             if value is None:
                 raise SemanticError("FormatError: Cannot use xp formatting on a dead value.", ast_node.pos_start, ast_node.pos_end)
             elif not isinstance(value, float):
                 raise SemanticError("FormatError: Using xp formatting on a non-xp value.", ast_node.pos_start, ast_node.pos_end)
+            
             formatted_digits = f".{ast_node.digits}f"
             formatted = f"{value:{formatted_digits}}"  
             print(f"formatted {formatted}")
+            
             return formatted
+        
         else:
             if "elements" in value or "fields" in value:
                 raise SemanticError("FormatError: Using xp formatting on a non-xp value.", ast_node.pos_start, ast_node.pos_end)
@@ -150,44 +188,56 @@ def evaluate(ast_node, symbol_table):
                 raise SemanticError("FormatError: Using xp formatting on a non-xp value.", ast_node.pos_start, ast_node.pos_end)
             elif value["value"] is None:
                 raise SemanticError("FormatError: Cannot use xp formatting on a dead value.", ast_node.pos_start, ast_node.pos_end)
+            
             formatted_digits = f".{ast_node.digits}f"
             formatted = f"{value:{formatted_digits}}"  
             print(f"formatted {formatted}")
+            
             return formatted
+    
     elif ast_node.kind == "FormCommsLiteral":
         evaluated_values = []
+
         for expr in ast_node.expressions:
             if expr.kind in {'Load', 'LoadNum'}:
                 raise SemanticError(f"FormatError: 'load' and 'loadNum' function are not allowed as placeholders.", expr.pos_start, expr.pos_end)
-            result = evaluate(expr, symbol_table)  
+            
+            if expr.kind == 'FuncCallStmt':
+                result = eval_func(expr.name.symbol, expr, symbol_table) 
+            else:    
+                result = evaluate(expr, symbol_table)
             print(f"res {result}")
+            
             if not isinstance(result, dict):
                 if result is None:
                     result = 'dead'
-                elif isinstance(result, int) or isinstance(result, float):
+                elif isinstance(result, int) or isinstance(result, float) or isinstance(result, str):
                     result=result
                 elif result == False:
                     result = 'false'
-                else:
+                elif result == True:
                     result='true'  
+                else:
+                    raise SemanticError("Cannot unpack placeholder.", expr.pos_start, expr.pos_end)
             elif "value" in result:
-                result = result["value"]
                 if result is None:
                     result = 'dead'
-                elif isinstance(result, int) or isinstance(result, float):
+                elif isinstance(result, int) or isinstance(result, float) or isinstance(result, str):
                     result=result
                 elif result == False:
                     result = 'false'
-                else:
+                elif result == True:
                     result='true'  
+                else:
+                    raise SemanticError("Cannot unpack placeholder.", expr.pos_start, expr.pos_end)
             elif "elements" in result or "fields" in result:
                 raise SemanticError("TypeError: Cannot format a list object within a comms literal.", expr.pos_start, expr.pos_end)
+            
             evaluated_values.append(str(result))  
 
         formatted = ast_node.value
         for placeholder, result in zip(ast_node.placeholders, evaluated_values):
             formatted = formatted.replace(f"{{{placeholder}}}", result, 1)
-
         return formatted
     elif ast_node.kind == 'DropStmt':
         result = traverser.visit_DropStmt(ast_node, True)
@@ -213,6 +263,7 @@ def evaluate(ast_node, symbol_table):
 def eval_binary_expr(binop, symbol_table):
     if binop.left.kind in {'Load', 'LoadNum'} or binop.right.kind in {'Load', 'LoadNum'}:
         raise SemanticError("OperandError: Cannot use load or loadNum function in a binary expression.", binop.pos_start, binop.pos_end)
+    
     lhs = evaluate(binop.left, symbol_table)
     rhs = evaluate(binop.right, symbol_table)
     
