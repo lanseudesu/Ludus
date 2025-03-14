@@ -34,6 +34,9 @@ current_file = None
 def create_new_file():
     global current_file
     current_file = None
+    eel.clearError()
+    eel.clearTerminal()
+    eel.clearLexemeToken()
     return "" 
 
 #Option 1 Open File - Tkinter
@@ -42,8 +45,12 @@ def open_file():
     global current_file
     root = tk.Tk()
     root.withdraw()  
+    root.attributes('-topmost', True)
     file_path = filedialog.askopenfilename(filetypes=[("Ludus Files", "*.lds")])
     if file_path:
+        eel.clearError()
+        eel.clearTerminal()
+        eel.clearLexemeToken()
         with open(file_path, "r", encoding="utf-8") as file:
             content = file.read()
         current_file = file_path
@@ -77,7 +84,7 @@ def save_file_as(content):
 
 @eel.expose
 def lexical_analyzer(input_text):
-    tokens, error = lexer.run("yo", input_text)
+    tokens, error = lexer.run(current_file, input_text)
 
     if error:
         eel.updateError("\n\n".join(error))
@@ -87,24 +94,24 @@ def lexical_analyzer(input_text):
     if tokens:
         tokens.pop()
     
-        linenumbers = [token.line for token in tokens]
-        colnumbers = [token.column for token in tokens]
-        lexemes = [token.lexeme for token in tokens]  
-        tokens = [token.token for token in tokens]
-        formatted_lexemes = "\n".join(f'{line}.{col}: {lex}' for line, col, lex in zip(linenumbers, colnumbers, lexemes))
-        formatted_tokens = "\n".join(f'{line}.{col}: {tok}' for line, col, tok in zip(linenumbers, colnumbers, tokens))
+    linenumbers = [token.line for token in tokens]
+    colnumbers = [token.column for token in tokens]
+    lexemes = [token.lexeme for token in tokens]  
+    tokens = [token.token for token in tokens]
+    formatted_lexemes = "\n".join(f'{line}.{col}: {lex}' for line, col, lex in zip(linenumbers, colnumbers, lexemes))
+    formatted_tokens = "\n".join(f'{line}.{col}: {tok}' for line, col, tok in zip(linenumbers, colnumbers, tokens))
 
     eel.updateLexemeToken((formatted_lexemes), (formatted_tokens))
 
 @eel.expose
 def syntax_analyzer(input_text):
-    result = parser.parse("yo", input_text)
+    result = parser.parse(current_file, input_text)
 
     eel.updateTerminal(result)
 
 @eel.expose
 def semantic_analyzer(input_text):
-    result, table = ast.check("yo", input_text)
+    result, table = ast.check(current_file, input_text)
     output = str(result) + "\n" + str(table) 
 
     eel.updateTerminal(output)

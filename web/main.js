@@ -14,7 +14,6 @@ document.addEventListener("DOMContentLoaded", () => {
         isModified = true;
     });
 
-    // Restore saved text if available
     if (savedText) {
         editor.setValue(savedText);
     }
@@ -37,7 +36,6 @@ document.addEventListener("DOMContentLoaded", () => {
         lineNumbersElement.scrollTop = scrollInfo.top;
     }
 
-    // Save editor content automatically when the user types
     editor.on("change", () => {
         localStorage.setItem("editorText", editor.getValue());
         updateLineNumbers();
@@ -47,10 +45,15 @@ document.addEventListener("DOMContentLoaded", () => {
 
     updateLineNumbers();
 
+    if (!sessionStorage.getItem("hasLoaded")) {
+        sessionStorage.setItem("hasLoaded", "true");
+        console.log('Skipping analyzers on initial load');
+        return;
+    }
+
     if (window.location.href.includes("index.html")) {
         console.log("Running analyzers after navigation...");
         lexicalAnalyzer();
-        syntaxAnalyzer();
         semanticAnalyzer();
     }
 
@@ -87,13 +90,11 @@ function showCustomConfirm(message, callback = null) {
         document.getElementById('confirmMessage').textContent = message;
         document.getElementById('customConfirm').classList.remove('hidden');
 
-        // Cleanup any old event listeners first
         const yesButton = document.getElementById('confirmYes');
         const noButton = document.getElementById('confirmNo');
         yesButton.replaceWith(yesButton.cloneNode(true));
         noButton.replaceWith(noButton.cloneNode(true));
 
-        // Re-fetch buttons after cloning
         const newYesButton = document.getElementById('confirmYes');
         const newNoButton = document.getElementById('confirmNo');
 
@@ -132,7 +133,7 @@ async function newFileAction() {
 }
 
 async function openFile() {
-    if (isModified) {
+    if (isModified && (!sessionStorage.getItem("hasLoaded"))) {
         const confirmResult = await showCustomConfirm("You have unsaved changes. Do you want to proceed and discard them?");
         if (!confirmResult) {
             return;
@@ -155,7 +156,6 @@ function showCustomAlert(message) {
     document.getElementById('alertMessage').textContent = message;
     document.getElementById('customAlert').classList.remove('hidden');
 
-    // Close on any click or key press
     document.addEventListener('click', closeCustomAlert);
     document.addEventListener('keydown', closeCustomAlert);
 }
@@ -164,7 +164,6 @@ function closeCustomAlert() {
     const alertBox = document.getElementById('customAlert');
     alertBox.classList.add('hidden');
 
-    // Clean up event listeners after closing
     document.removeEventListener('click', closeCustomAlert);
     document.removeEventListener('keydown', closeCustomAlert);
 }
@@ -311,4 +310,19 @@ eel.expose(clearError);
 function clearError() {
     const errorArea = document.getElementById("error");
     if (errorArea) errorArea.value = ""; 
+}
+
+eel.expose(clearTerminal);
+function clearTerminal() {
+    const errorArea = document.getElementById("error2");
+    if (errorArea) errorArea.value = ""; 
+}
+
+eel.expose(clearLexemeToken);
+function clearLexemeToken() {
+    const lexemeArea = document.getElementById("lexeme");
+    const tokenArea = document.getElementById("token");
+
+    if (lexemeArea) lexemeArea.innerHTML = "";  
+    if (tokenArea) tokenArea.innerHTML = "";  
 }
