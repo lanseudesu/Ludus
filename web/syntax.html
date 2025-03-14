@@ -4,6 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Ludus</title>
+  <link rel="icon" type="image/png" href="ludus.png">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.5/codemirror.min.js"></script>
   <link rel="stylesheet" href="codemirror.css">
   <link rel="stylesheet" href="styles.css">
@@ -15,31 +16,53 @@
 <body>
   <nav class="navbar">
     <div class="nav-left">
-        <div class="nav-logo">Ludus</div>
+        <div class="nav-logo">
+            <span class="brackets">[</span>L<span class="brackets">]</span>udus</div>
         <ul class="nav-files">
-            <li><a href="#files">Files</a></li>
-            <button class="run-button" onclick="syntaxAnalyzer()">
-                <span class="run-icon">▷</span> 
-                <span class="run-text">Run</span>
+            <div class="file-dropdown">
+                <button class="file-button" onclick="toggleFileButton()">Files
+                    <span class="file-icon">▽</span>
+                </button>
+                <div id="dropdown-content" class="file-options">
+                    <a href="#" onclick="newFile()">New File</a>
+                    <a href="#" onclick="openFile()">Open File</a>
+                    <a href="#" onclick="saveFile()">Save</a>
+                    <a href="#" onclick="saveAs()">Save As</a>
+                    <hr class="dashed">
+                    <a href="#" onclick="exitApp()">Exit</a>
+                </div>
+            </div>
+            <button class="run-button">
+                <li><a href="index.html" onclick = "preserveText()">▷ Run</a></li>
             </button>
         </ul>
     </div>
-    
+   
     <ul class="nav-links">
-        <li><a href="index.html" onclick = "preserveText()">Code-Gen</a></li>
-        <li><a href="lexerpage.html" onclick = "preserveText()">Lexer</a></li>
+        <li><a href="lexerpage.html" onclick = "preserveText()">Lexical</a></li>
         <li><a href="syntax.html" onclick = "preserveText()">Syntax</a></li>
         <li><a href="semantic_page.html" onclick = "preserveText()">Semantic</a></li>
     </ul>
   </nav>
-    <div class="master_box2">
-        <div class="code-editor-wrapper2">
-            <div class="line-numbers" id="lineNumbers"></div>
-            <textarea id="editor" class="code-editor"></textarea>
-        </div>
-        <div class="error_box2">
-            <textarea id="error2" readonly></textarea>
-        </div>
+  <div class="master_box">
+    <div class="code-editor-wrapper">
+        <div class="line-numbers" id="lineNumbers"></div>
+        <textarea id="editor" class="code-editor"></textarea>
     </div>
+    <div class="lexeme_token">
+      <div class="lexeme_token_inner">
+        <div class="lexeme_master">
+              <h2>Lexemes</h2>
+              <div id="lexeme" class="lexeme" onscroll="lexemeTokenScroll('lexeme')" contenteditable="false"></div>
+        </div>
+        <div class="token_master">
+              <h2>Tokens</h2>
+              <div id="token" class="token" onscroll="lexemeTokenScroll('token')" contenteditable="false"></div>
+          </div>
+      </div>
+      <div class="error_box">
+          <h2>Errors</h2>
+          <textarea id="error2" readonly></textarea>
+      </div>
 </body>
 </html>
