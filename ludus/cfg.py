@@ -366,20 +366,22 @@ def compute_predict_set(cfg, first_set, follow_set):
 first_set = compute_first_set(cfg)
 # print("First Sets:")
 # for non_terminal, first in first_set.items():
-#     print(f"{non_terminal} -> {first}")
+#     print(f"{first}")
 
-# terminal_list = list()
-# for non_terminal, first in first_set.items():
-#     terminal_list.extend(first) 
+# terminals = set()
+# for productions in cfg.values():
+#     for production in productions:
+#         for symbol in production:
+#             if not symbol.startswith("<"):  
+#                 terminals.add(symbol)
 
-# unique_terminals = list(dict.fromkeys(terminal_list))
-
+# unique_terminals = sorted(terminals)
 # print(unique_terminals)
 
 follow_set = compute_follow_set(cfg, "<program>", first_set)
 # print("\nFollow Sets:")
 # for non_terminal, follow in follow_set.items():
-#     print(f"{non_terminal} -> {follow}")
+#     print(f"{follow}")
 
 predict_set = compute_predict_set(cfg, first_set, follow_set)
 
@@ -439,4 +441,4 @@ def check_ambiguity(cfg, predict_set):
     else:
         print("\nNo ambiguities found in the CFG.")
 
-check_ambiguity(cfg, predict_set)
+# check_ambiguity(cfg, predict_set)
