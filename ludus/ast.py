@@ -5,7 +5,6 @@ import re
 from typing import Union
 from .runtime.traverser import ASTVisitor, SemanticAnalyzer
 from .error import SemanticError
-from ludus import lexer
 from .helper_parser import Helper
 
 class Semantic:
@@ -489,7 +488,7 @@ class Semantic:
         else:
             if self.lookup_identifier(name):
                 info = self.get_identifier_info(name, name_node)
-                raise SemanticError(f"5 NameError: Identifier {name}' was "
+                raise SemanticError(f"NameError: Identifier {name}' was "
                                     f"already declared as {info["type"]}.", name_start, name_end)
             return self.parse_var_dec(datatype, scope, pos_start)
     
@@ -1762,17 +1761,19 @@ class Semantic:
         elif tk == 'load' or tk == 'loadNum':
             prompt_msg = None
             func_pos_start = [self.current_token.line, self.current_token.column]
+            print(self.current_token.token)
             self.current_token = self.get_next_token() # eat load
+            print(self.current_token.token)
             if self.current_token.token != '(':
                 raise SemanticError("ParserError: Missing parentheses.", self.current_token.line)
             self.current_token = self.get_next_token() # eat (
+            print(self.current_token.token)
             self.skip_spaces()
             if self.current_token.token == 'comms_ltr':
-                value = re.sub(r'^"(.*)"$', r'\1', self.current_token.lexeme)
-                prompt_msg = CommsLiteral(value)
-                self.current_token = self.get_next_token() # eat comms
+                prompt_msg = self.parse_primary_expr(scope)
                 self.skip_spaces()
             if self.current_token.token != ')':
+                print(self.current_token.token)
                 raise SemanticError("ParserError: Missing parentheses.", self.current_token.line)
             func_pos_end = [self.current_token.line, self.current_token.column]
             self.current_token = self.get_next_token() # eat )
@@ -2309,18 +2310,18 @@ class Semantic:
 def check(fn, text):
     lexer = Lexer(fn, text)
     if text == "":
-        return "No code in the module.", {}
+        return "No code in the module."  #, {}
 
     tokens, error = lexer.make_tokens()
 
     if error:
-        return 'Lexical errors found, cannot continue with syntax analyzing. Please check lexer tab.\n\nLexical Errors:\n' + "\n\n".join(error), {}
+        return 'Lexical errors found, cannot continue with syntax analyzing. Please check lexer tab.\n\nLexical Errors:\n' + "\n\n".join(error)  #, {}
 
     result = parse(fn, text)
 
     if result != 'No lexical errors found!\nValid syntax.':
         result = result.split("\n", 1)[-1]
-        return f'Syntax errors found, cannot continue with semantic analyzing. Please check syntax tab.\n{result}', {}
+        return f'Syntax errors found, cannot continue with semantic analyzing. Please check syntax tab.\n\n{result}'  #, {}
 
     semantic = Semantic(tokens)
     result = semantic.produce_ast()
@@ -2328,7 +2329,7 @@ def check(fn, text):
 
     if isinstance(result, SemanticError):
         result.source_code = text.splitlines()
-        return str(result), {}
+        return str(result) 
     
     try:
         visitor = ASTVisitor()
@@ -2336,12 +2337,29 @@ def check(fn, text):
 
         analyzer = SemanticAnalyzer(visitor.symbol_table)
         analyzer.visit(result)
-        table = analyzer.symbol_table
     except SemanticError as e:
         e.source_code = text.splitlines()
-        return str(e), {}
+        return str(e)
 
-    return result, table
+    return "Semantic analyzing successful, no lexical, syntax, and semantic errors found!"
 
-    return result, {}
+
+    # if isinstance(result, SemanticError):
+    #     result.source_code = text.splitlines()
+    #     return str(result), {}
+    
+    # try:
+    #     visitor = ASTVisitor()
+    #     visitor.visit(result)
+
+    #     analyzer = SemanticAnalyzer(visitor.symbol_table)
+    #     analyzer.visit(result)
+    #     table = analyzer.symbol_table
+    # except SemanticError as e:
+    #     e.source_code = text.splitlines()
+    #     return str(e), {}
+
+    # return result, table
+
+    # return result, {}
         

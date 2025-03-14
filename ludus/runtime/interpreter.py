@@ -69,7 +69,7 @@ def evaluate(ast_node, symbol_table):
             if fld["name"] == ast_node.field.symbol:
                 return fld["value"]
         raise SemanticError(f"NameError: Field '{ast_node.field.symbol}' is not defined in struct instance '{ast_node.instance.symbol}'.", 
-                            ast_node.instance.pos_start, ast_node.instance.pos_end)
+                            ast_node.field.pos_start, ast_node.field.pos_end)
     
     elif ast_node.kind == 'ArrayElement':
         arr_name = ast_node.left.symbol
@@ -92,6 +92,9 @@ def evaluate(ast_node, symbol_table):
             else:    
                 idx_val = evaluate(idx, symbol_table)
                         
+            if isinstance(idx_val, UnresolvedNumber):
+                idx_val = 0
+            
             if not isinstance(idx_val, int):
                 raise SemanticError(f"IndexError: Array index must always evaluate to a positive hp value.", idx.pos_start, idx.pos_end)
             
@@ -108,6 +111,9 @@ def evaluate(ast_node, symbol_table):
             final_idx_val = eval_func(final_idx.name.symbol, final_idx, symbol_table) 
         else:    
             final_idx_val = evaluate(final_idx, symbol_table)
+        
+        if isinstance(final_idx_val, UnresolvedNumber):
+                final_idx_val = 0
         
         if not isinstance(final_idx_val, int):
             raise SemanticError(f"IndexError: Array index must always evaluate to a positive hp value.", final_idx.pos_start, final_idx.pos_end)
@@ -131,6 +137,8 @@ def evaluate(ast_node, symbol_table):
         operand = value
         op_type = TYPE_MAP.get(type(operand), str(type(operand)))
         if ast_node.operator == '-':
+            if isinstance(operand, UnresolvedNumber):
+                return 0
             if not isinstance(operand, (int, float, bool)):
                 raise SemanticError(f"TypeError: Cannot apply '-' to non-numeric type: {op_type}", ast_node.operand.pos_start, ast_node.operand.pos_end) 
             return -operand
@@ -167,6 +175,9 @@ def evaluate(ast_node, symbol_table):
         else:    
             value = evaluate(ast_node.lhs, symbol_table)
         
+        if isinstance(value, UnresolvedNumber):
+            value = 0.0
+
         print (f"xp format val = {value}")
         
         if not isinstance(value, dict):
@@ -211,6 +222,8 @@ def evaluate(ast_node, symbol_table):
             if not isinstance(result, dict):
                 if result is None:
                     result = 'dead'
+                elif isinstance(result, UnresolvedNumber):
+                    result = '0 or 0.0'
                 elif isinstance(result, int) or isinstance(result, float) or isinstance(result, str):
                     result=result
                 elif result == False:
@@ -222,6 +235,8 @@ def evaluate(ast_node, symbol_table):
             elif "value" in result:
                 if result is None:
                     result = 'dead'
+                elif isinstance(result, UnresolvedNumber):
+                    result = '0 or 0.0'
                 elif isinstance(result, int) or isinstance(result, float) or isinstance(result, str):
                     result=result
                 elif result == False:
@@ -287,7 +302,7 @@ def eval_binary_expr(binop, symbol_table):
         elif binop.operator in ['<', '>', '<=', '>=', '==', '!=']:
             return eval_relational_expr(0, 0, binop.operator)  
         else:
-            raise SemanticError(f"TypeError: Operation '{binop.operator}' not supported for unresolved numbers.", binop.pos_start, binop.pos_end)
+            raise SemanticError(f"TypeError: Operation '{binop.operator}' not supported for numerical numbers.", binop.pos_start, binop.pos_end)
 
     if isinstance(rhs, list):
         if len(rhs) > 1:

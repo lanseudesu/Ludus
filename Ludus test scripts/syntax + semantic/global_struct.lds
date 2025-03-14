@@ -6,7 +6,7 @@ hp userAge
 # Global declarations include constants, variables, and arrays.
 # These can be declared in any order.
 
-generate displayUserInfo()  # Function declaration
+generate displayUserInfo(user)  # Function declaration
 build UserInfo              # Global struct declaration
 
 play() {  # Main function begins here

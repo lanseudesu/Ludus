@@ -11,7 +11,7 @@ NUM_TO_6        = '0123456'
 
 arith_op   = '+-*/%^'
 relat_op   = '<>=!'
-whitespace = '# \n'
+whitespace = '# \n\t'
 
 ### DELIMITERS ###
 

@@ -111,8 +111,11 @@ def syntax_analyzer(input_text):
 
 @eel.expose
 def semantic_analyzer(input_text):
-    result, table = ast.check(current_file, input_text)
-    output = str(result) + "\n" + str(table) 
+    #result, table = ast.check(current_file, input_text)
+    # output = str(result) + "\n" + str(table) 
+
+    result = ast.check(current_file, input_text)
+    output = str(result)  
 
     eel.updateTerminal(output)
 

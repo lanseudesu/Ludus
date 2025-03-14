@@ -168,6 +168,9 @@ class ASTVisitor:
             self.visit(stmt)
         self.symbol_table.exit_scope()
 
+    def visit_GlobalFuncDec(self, node: GlobalFuncDec):
+        self.symbol_table.define(node.name.symbol, node.params)
+    
     def visit_GlobalFuncBody(self, node: GlobalFuncBody):
         body=[]
         self.symbol_table.enter_scope_func()
@@ -456,7 +459,10 @@ class SemanticAnalyzer(ASTVisitor):
                 idx_val = eval_func(idx.name.symbol, idx, self.symbol_table) 
             else:    
                 idx_val = evaluate(idx, self.symbol_table)
-            
+
+            if isinstance(idx_val, UnresolvedNumber):
+                idx_val = 0
+
             if not isinstance(idx_val, int):
                 raise SemanticError(f"IndexError: Array index must always evaluate to a positive hp value.", idx.pos_start, idx.pos_end)
             if idx_val < 0 or idx_val >= len(target):
@@ -472,6 +478,9 @@ class SemanticAnalyzer(ASTVisitor):
         else:    
             final_idx_val = evaluate(final_idx, self.symbol_table)
         
+        if isinstance(final_idx_val, UnresolvedNumber):
+            final_idx_val = 0
+
         if not isinstance(final_idx_val, int):
                 raise SemanticError(f"IndexError: Array index must always evaluate to a positive hp value.", final_idx.pos_start, final_idx.pos_end)
         if final_idx_val < 0 or final_idx_val >= len(target):
@@ -497,11 +506,9 @@ class SemanticAnalyzer(ASTVisitor):
             elif lhs_type == "xp":
                 value = 0.0    
             else:
-                raise SemanticError("TypeError: Using loadNum function to assign a non-numeric array element.", node.right.pos_start, node.right.pos_end)
+                raise SemanticError("TypeError: Trying to assign a numeric value into a non-numeric array.", node.right.pos_start, node.right.pos_end)
 
         if node.operator in ['+=', '-=', '*=', '/=', '%=']:
-            i
-            
             if (isinstance(value, str) and isinstance(target[final_idx_val], bool)) or (isinstance(value, bool) and isinstance(target[final_idx_val], str)):
                 raise SemanticError("TypeError: Cannot mix comms and flags in an expression.", node.pos_start, node.pos_end)
 
@@ -646,6 +653,9 @@ class SemanticAnalyzer(ASTVisitor):
             else:    
                 row_index = evaluate(node.row_index, self.symbol_table)
 
+            if isinstance(row_index, UnresolvedNumber):
+                row_index = 0
+
             if not isinstance(row_index, int):
                 raise SemanticError(f"IndexError: Array index must always evaluate to a positive hp value.", node.row_index.pos_start, node.row_index.pos_end)
 
@@ -695,6 +705,16 @@ class SemanticAnalyzer(ASTVisitor):
         else:
             elem = evaluate(value, self.symbol_table)
 
+        if isinstance(elem, UnresolvedNumber):
+            if arr_type == 'hp':
+                elem = 0
+            elif arr_type == 'xp':
+                elem = 0
+            else:
+                if is_seek:
+                    raise SemanticError(f"TypeError: Seeking a non-numeric element from a numeric array", value.pos_start, value.pos_end)
+                raise SemanticError(f"TypeError: Appending a non-numeric element into a numeric array", value.pos_start, value.pos_end)
+
         if isinstance(elem, dict):
             if is_seek:
                 raise SemanticError(f"ValueError: Trying to seek a list object, must be an element or a row only.", value.pos_start, value.pos_end)
@@ -737,6 +757,9 @@ class SemanticAnalyzer(ASTVisitor):
             else:    
                 row_index = evaluate(node.row_index, self.symbol_table)
 
+            if isinstance(row_index, UnresolvedNumber):
+                row_index = 0
+
             if not isinstance(row_index, int):
                 raise SemanticError(f"IndexError: Array index must always evaluate to a positive hp value.", node.row_index.pos_start, node.row_index.pos_end)
         
@@ -749,6 +772,9 @@ class SemanticAnalyzer(ASTVisitor):
                 elem_index = eval_func(node.elem_index.name.symbol, node.elem_index, self.symbol_table) 
             else:    
                 elem_index = evaluate(node.elem_index, self.symbol_table)
+
+            if isinstance(row_index, UnresolvedNumber):
+                row_index = 0
 
             if not isinstance(elem_index, int):
                 raise SemanticError(f"IndexError: Array index must always evaluate to a positive hp value.", node.elem_index.pos_start, node.elem_index.pos_end)
@@ -819,7 +845,14 @@ class SemanticAnalyzer(ASTVisitor):
             if node.row_index.kind in {'LoadNum', 'Load'}:
                 raise SemanticError(f"IndexError: loadNum and load function cannot be used as index expression.", node.row_index.pos_start, node.row_index.pos_end)
 
-            row_index = evaluate(node.row_index, self.symbol_table)
+            if node.row_index.kind == 'FuncCallStmt':
+                row_index = eval_func(node.row_index.name.symbol, node.row_index, self.symbol_table) 
+            else:    
+                row_index = evaluate(node.row_index, self.symbol_table)
+
+            if isinstance(row_index, UnresolvedNumber):
+                row_index = 0
+
             if not isinstance(row_index, int):
                 raise SemanticError(f"IndexError: Array index must always evaluate to a positive hp value.", node.row_index.pos_start, node.row_index.pos_end)
 
@@ -867,6 +900,9 @@ class SemanticAnalyzer(ASTVisitor):
             info = eval_func(node.value.name.symbol, node.value, self.symbol_table) 
         else:    
             info = evaluate(node.value, self.symbol_table)
+
+        if isinstance(info, UnresolvedNumber):
+            raise SemanticError(f"TypeError: Can only use rounds function on comms and arrays.", node.pos_start, node.pos_end)
 
         print(f"rounds info -> {info}")
         if isinstance(info, dict):
@@ -966,6 +1002,7 @@ class SemanticAnalyzer(ASTVisitor):
                     else:
                         raise SemanticError("TypeError: Using loadNum function to assign a non-numeric instance field.", node.right.pos_start, node.right.pos_end)
                 if node.operator in ['+=', '-=', '*=', '/=', '%=']:
+
                     if (isinstance(new_val, str) and isinstance(field["value"], bool)) or (isinstance(new_val, bool) and isinstance(field["value"], str)):
                         raise SemanticError("TypeError: Cannot mix comms and flags in an expression.", node.pos_start, node.pos_end)
 
@@ -1044,7 +1081,18 @@ class SemanticAnalyzer(ASTVisitor):
         
         for cond in conditions:
             if cond[0] == True:
-                self.symbol_table.restore_scope(len(self.symbol_table.scope_stack))
+                prev_stack = [scope.copy() for scope in self.symbol_table.scope_stack]
+                if self.in_func_flag:
+                    self.symbol_table.restore_scope(len(self.symbol_table.saved_scopes) - 1)
+                else:
+                    self.symbol_table.restore_scope(len(self.symbol_table.scope_stack))
+                
+                new_scope = self.symbol_table.scope_stack    
+                for scope in prev_stack:
+                    for name, value in scope.items():
+                        if name in new_scope[-1]:
+                            new_scope[-1][name] = value  
+                
                 for stmt in cond[1]:
                     self.visit(stmt)
                     if self.recall_flag and self.in_func_flag:
@@ -1057,11 +1105,23 @@ class SemanticAnalyzer(ASTVisitor):
                     if self.resume_flag:
                         self.symbol_table.exit_scope()
                         return
+                
                 self.symbol_table.exit_scope()
                 return
         
         if node.else_branch is not None:
-            self.symbol_table.restore_scope(len(self.symbol_table.scope_stack))
+            prev_stack = [scope.copy() for scope in self.symbol_table.scope_stack]
+            if self.in_func_flag:
+                self.symbol_table.restore_scope(len(self.symbol_table.saved_scopes) - 1)
+            else:
+                self.symbol_table.restore_scope(len(self.symbol_table.scope_stack))
+                
+            new_scope = self.symbol_table.scope_stack    
+            for scope in prev_stack:
+                 for name, value in scope.items():
+                    if name in new_scope[-1]:
+                        new_scope[-1][name] = value  
+
             for stmt in node.else_branch:
                 self.visit(stmt)
                 if self.recall_flag and self.in_func_flag:
@@ -1074,6 +1134,7 @@ class SemanticAnalyzer(ASTVisitor):
                 if self.resume_flag:
                     self.symbol_table.exit_scope()
                     return
+
             self.symbol_table.exit_scope()
 
     def visit_FlankStmt(self, node: FlankStmt):
@@ -1087,8 +1148,19 @@ class SemanticAnalyzer(ASTVisitor):
         for choice in node.choices:
             for choice_value in choice.values:
                 value = evaluate(choice_value, self.symbol_table)
-                if value == expression:
-                    self.symbol_table.restore_scope(len(self.symbol_table.scope_stack))
+                if value == expression or ((value == 0 or value == 0.0) and isinstance(expression, UnresolvedNumber)):
+                    prev_stack = [scope.copy() for scope in self.symbol_table.scope_stack]
+                    if self.in_func_flag:
+                        self.symbol_table.restore_scope(len(self.symbol_table.saved_scopes) - 1)
+                    else:
+                        self.symbol_table.restore_scope(len(self.symbol_table.scope_stack))
+                    
+                    new_scope = self.symbol_table.scope_stack    
+                    for scope in prev_stack:
+                        for scope_name, scope_val in scope.items():
+                            if scope_name in new_scope[-1]:
+                                new_scope[-1][scope_name] = scope_val  
+
                     for stmt in choice.body:
                         self.visit(stmt)
                         if self.recall_flag and self.in_func_flag:
@@ -1101,7 +1173,18 @@ class SemanticAnalyzer(ASTVisitor):
                     self.symbol_table.exit_scope()
                     return
 
-        self.symbol_table.restore_scope(len(self.symbol_table.scope_stack))
+        prev_stack = [scope.copy() for scope in self.symbol_table.scope_stack]
+        if self.in_func_flag:
+            self.symbol_table.restore_scope(len(self.symbol_table.saved_scopes) - 1)
+        else:
+            self.symbol_table.restore_scope(len(self.symbol_table.scope_stack))
+                    
+        new_scope = self.symbol_table.scope_stack    
+        for scope in prev_stack:
+            for scope_name, scope_val in scope.items():
+                if scope_name in new_scope[-1]:
+                    new_scope[-1][scope_name] = scope_val  
+
         for stmt in node.backup_body:
             self.visit(stmt)
             if self.recall_flag and self.in_func_flag:
@@ -1149,6 +1232,7 @@ class SemanticAnalyzer(ASTVisitor):
             raise SemanticError(f"LoopConditionError: Loop condition does not evaluate to a flag value.", node.condition.pos_start, node.condition.pos_end)
         
         if condition:
+            prev_stack = [scope.copy() for scope in self.symbol_table.scope_stack]
             if self.in_func_flag:
                 self.symbol_table.restore_scope(len(self.symbol_table.saved_scopes) - 1)
             else:
@@ -1159,6 +1243,12 @@ class SemanticAnalyzer(ASTVisitor):
                     return eval_func(cond.name.symbol, cond, self.symbol_table) 
                 else:    
                     return evaluate(cond, self.symbol_table)
+                
+            new_scope = self.symbol_table.scope_stack    
+            for scope in prev_stack:
+                 for scope_name, scope_val in scope.items():
+                    if scope_name in new_scope[-1]:
+                        new_scope[-1][scope_name] = scope_val
             
             while eval_cond(node.condition):
                 for stmt in node.body:
@@ -1191,7 +1281,18 @@ class SemanticAnalyzer(ASTVisitor):
             raise SemanticError(f"LoopConditionError: Loop condition does not evaluate to a flag value.", node.condition.pos_start, node.condition.pos_end)
         
         if node.is_grind:
-            self.symbol_table.restore_scope(len(self.symbol_table.scope_stack))
+            prev_stack = [scope.copy() for scope in self.symbol_table.scope_stack]
+            if self.in_func_flag:
+                self.symbol_table.restore_scope(len(self.symbol_table.saved_scopes) - 1)
+            else:
+                self.symbol_table.restore_scope(len(self.symbol_table.scope_stack))
+            
+            new_scope = self.symbol_table.scope_stack    
+            for scope in prev_stack:
+                 for name, value in scope.items():
+                    if name in new_scope[-1]:
+                        new_scope[-1][name] = value  
+
             for stmt in node.body:
                 self.visit(stmt)
                 if self.recall_flag and self.in_func_flag:
@@ -1204,7 +1305,18 @@ class SemanticAnalyzer(ASTVisitor):
                 if self.resume_flag:
                     self.resume_flag = False
         elif not node.is_grind and condition:
-            self.symbol_table.restore_scope(len(self.symbol_table.scope_stack))
+            prev_stack = [scope.copy() for scope in self.symbol_table.scope_stack]
+            if self.in_func_flag:
+                self.symbol_table.restore_scope(len(self.symbol_table.saved_scopes) - 1)
+            else:
+                self.symbol_table.restore_scope(len(self.symbol_table.scope_stack))
+            
+            new_scope = self.symbol_table.scope_stack    
+            for scope in prev_stack:
+                 for name, value in scope.items():
+                    if name in new_scope[-1]:
+                        new_scope[-1][name] = value  
+
             
         def eval_cond(cond):
             if cond.kind == 'FuncCallStmt':
@@ -1238,6 +1350,9 @@ class SemanticAnalyzer(ASTVisitor):
     def visit_CheckpointStmt(self, node: CheckpointStmt):
         self.checkpoint_flag = True   
 
+    def visit_GlobalFuncDec(self, node: GlobalFuncDec):
+        pass
+
     def visit_GlobalFuncBody(self, node: GlobalFuncBody):
         pass
 
@@ -1251,7 +1366,7 @@ class SemanticAnalyzer(ASTVisitor):
                 if arg.kind in ['Load', 'LoadNum']:
                     raise SemanticError("UnsupportedArgumentError: Cannot use load and loadNum function as a function argument.", arg.pos_start, arg.pos_end)
                 if arg.kind == 'FuncCallStmt':
-                    value = eval_func(arg.name.symbol, arg, self.ymbol_table) 
+                    value = eval_func(arg.name.symbol, arg, self.symbol_table) 
                 else:    
                     value = evaluate(arg, self.symbol_table)
                 
@@ -1333,10 +1448,9 @@ class SemanticAnalyzer(ASTVisitor):
                     raise SemanticError(f"ValueError: Using load and loadNum in recall is not allowed.", node.pos_start, node.pos_end)
                 
                 if expr.kind == 'FuncCallStmt':
-                    value = eval_func(expr.name.symbol, expr, self.ymbol_table) 
+                    value = eval_func(expr.name.symbol, expr, self.symbol_table) 
                 else:    
                     value = evaluate(expr, self.symbol_table)
-                
                 
                 self.recall_values.append(value)
         self.recall_flag = True
@@ -1350,8 +1464,9 @@ class SemanticAnalyzer(ASTVisitor):
             element = eval_func(node.element.name.symbol, node.element, self.symbol_table) 
         else:    
             element = evaluate(node.element, self.symbol_table)
-        
-        if not isinstance(element, dict):
+        if isinstance(element, UnresolvedNumber):
+            element = '0 or 0.0'
+        elif not isinstance(element, dict):
             element=element
         elif element is None:
             element = 'dead'

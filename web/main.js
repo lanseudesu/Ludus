@@ -3,6 +3,7 @@ let isModified = false
 
 document.addEventListener("DOMContentLoaded", () => {
     const savedText = localStorage.getItem("editorText");  // Retrieve saved text
+    const savedHistory = sessionStorage.getItem("editorHistory");
 
     editor = CodeMirror.fromTextArea(document.getElementById("editor"), {
         lineNumbers: false, 
@@ -15,7 +16,12 @@ document.addEventListener("DOMContentLoaded", () => {
     });
 
     if (savedText) {
-        editor.setValue(savedText);
+        editor.setValue(savedText, -1);
+    }
+
+    if (savedHistory) {
+        const history = JSON.parse(savedHistory);
+        editor.setHistory(history);
     }
 
     function updateLineNumbers() {
@@ -124,7 +130,7 @@ async function newFile() {
 async function newFileAction() {
     try {
         const content = await eel.create_new_file()();
-        editor.setValue(content);
+        editor.setValue(content, -1);
         isModified = false;
     } catch (error) {
         console.error("Error creating new file:", error);
@@ -143,7 +149,7 @@ async function openFile() {
     try {
         const content = await eel.open_file()();
         if (content !== null) {
-            editor.setValue(content);
+            editor.setValue(content, -1);
             isModified = false;
         }
     } catch (error) {
@@ -229,6 +235,9 @@ document.addEventListener("keydown", (event) => {
 function preserveText() {
     if (editor) {
         localStorage.setItem("editorText", editor.getValue());
+
+        const history = editor.getHistory();
+        sessionStorage.setItem("editorHistory", JSON.stringify(history));
     }
 }
 
