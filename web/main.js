@@ -72,14 +72,55 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 });
 
+window.onload = () => {
+    const modal = document.getElementById('customConfirm');
+    if (modal) {
+        modal.classList.add('hidden');
+        console.log('Modal hidden status on load:', modal.classList.contains('hidden'));
+    } else {
+        console.log('Modal not found on load');
+    }
+};
+
+function showCustomConfirm(message, callback = null) {
+    return new Promise((resolve) => {
+        document.getElementById('confirmMessage').textContent = message;
+        document.getElementById('customConfirm').classList.remove('hidden');
+
+        // Cleanup any old event listeners first
+        const yesButton = document.getElementById('confirmYes');
+        const noButton = document.getElementById('confirmNo');
+        yesButton.replaceWith(yesButton.cloneNode(true));
+        noButton.replaceWith(noButton.cloneNode(true));
+
+        // Re-fetch buttons after cloning
+        const newYesButton = document.getElementById('confirmYes');
+        const newNoButton = document.getElementById('confirmNo');
+
+        const handleResponse = (result) => {
+            document.getElementById('customConfirm').classList.add('hidden');
+            if (callback) callback(result);
+            resolve(result);
+        };
+
+        newYesButton.addEventListener('click', () => handleResponse(true));
+        newNoButton.addEventListener('click', () => handleResponse(false));
+    });
+}
+
 async function newFile() {
     if (isModified) {
-        const result = confirm("You have unsaved changes. Do you want to continue?");
-        if (!result) {
-            return;
-        }
+        showCustomConfirm("You have unsaved changes. Do you want to continue?", async (result) => {
+            if (result) {
+                await newFileAction();
+            }
+        });
+        return;
     }
+    await newFileAction();
+}
 
+async function newFileAction() {
     try {
         const content = await eel.create_new_file()();
         editor.setValue(content);
@@ -92,7 +133,7 @@ async function newFile() {
 
 async function openFile() {
     if (isModified) {
-        const confirmResult = confirm("You have unsaved changes. Do you want to proceed and discard them?");
+        const confirmResult = await showCustomConfirm("You have unsaved changes. Do you want to proceed and discard them?");
         if (!confirmResult) {
             return;
         }
@@ -103,12 +144,29 @@ async function openFile() {
         if (content !== null) {
             editor.setValue(content);
             isModified = false;
-            alert("File opened successfully!");
         }
-    }   catch (error) {
+    } catch (error) {
         console.error("Error opening file:", error);
         alert("An error occurred while opening the file.");
     }
+}
+
+function showCustomAlert(message) {
+    document.getElementById('alertMessage').textContent = message;
+    document.getElementById('customAlert').classList.remove('hidden');
+
+    // Close on any click or key press
+    document.addEventListener('click', closeCustomAlert);
+    document.addEventListener('keydown', closeCustomAlert);
+}
+
+function closeCustomAlert() {
+    const alertBox = document.getElementById('customAlert');
+    alertBox.classList.add('hidden');
+
+    // Clean up event listeners after closing
+    document.removeEventListener('click', closeCustomAlert);
+    document.removeEventListener('keydown', closeCustomAlert);
 }
 
 async function saveFile() {
@@ -117,15 +175,14 @@ async function saveFile() {
         const success = await eel.save_file(content)();
         if (success) {
             isModified = false;
-            alert("File saved successfully!");
+            showCustomAlert("File saved successfully!");
         } else {
             saveAs();
         }
-    }   catch (error) {
+    } catch (error) {
         console.error("Error saving file:", error);
-        alert("An error occurred while saving the file.");
-    } 
-    
+        showCustomAlert("An error occurred while saving the file.");
+    }
 }
 
 async function saveAs() {
@@ -134,22 +191,15 @@ async function saveAs() {
         const success = await eel.save_file_as(content)();
         if (success) {
             isModified = false;
-            alert("File saved successfully!");
+            showCustomAlert("File saved successfully!");
         }
-    }
-    catch (error) { 
+    } catch (error) {
         console.error("Error saving file as:", error);
-        alert("An error occurred while saving the file.");
+        showCustomAlert("An error occurred while saving the file.");
     }
 }
 
 function exitApp() {
-        if (isModified) {
-            const result = confirm("You have unsaved changes. Do you want to exit anyway?");
-            if (!result) {
-                return;
-            }
-        }
         window.close();
         eel.exit_app();
 }
@@ -254,12 +304,7 @@ function updateError(errors) {
 eel.expose(updateTerminal);
 function updateTerminal(result) {
     const errorArea = document.getElementById("error2");
-    if (!errorArea) return;
-    if (typeof result !== "string" || result.includes("{") || result.includes("SymbolTable")) {
-        console.warn("Ignoring non-error message:", result);
-        return;
-    }
-    errorArea.value = result; 
+    if (errorArea) errorArea.value = result; 
 }
 
 eel.expose(clearError);

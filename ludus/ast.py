@@ -1727,7 +1727,7 @@ class Semantic:
             if self.current_token.token == 'xp_formatting':
                 format_str = re.sub(r'^"(.*)"$', r'\1', self.current_token.lexeme)
                 if not re.match(r'^\.\d+f$', format_str):
-                    raise SemanticError(f"FormatError: Invalid format specifier '{format_str}'."
+                    raise SemanticError(f"FormatError: Invalid format specifier '{format_str}'.",
                                         [self.current_token.line, self.current_token.column],
                                         [self.current_token.line, self.current_token.column]+2)
                 digit = int(format_str[1])
@@ -2090,9 +2090,10 @@ class Semantic:
         self.expect("(", "Expected opening parentheses after shoot keyword.")
         self.skip_spaces()
         if self.current_token.token == ')':
+            pos_end = [self.current_token.line, self.current_token.column]
             self.expect(")", "Expected closing parentheses in function call.")
             self.skip_whitespace()
-            return ShootStmt("", is_Next)
+            return ShootStmt(CommsLiteral("", pos_start, pos_end), is_Next, pos_start, pos_end)
         value = self.parse_expr(scope)
         self.skip_spaces()
         self.expect(")", "Expected closing parentheses in function call.")
