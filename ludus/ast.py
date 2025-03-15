@@ -15,8 +15,8 @@ class Semantic:
         self.globalstruct = {}
         self.global_func = {}
         self.scope_stack = [{}]
-        self.loop_flag = False
-        self.flank_flag = False
+        self.loop_flag_stack = []
+        self.flank_flag_stack = []
         self.func_flag = False
         self.func_call_flag = False
         self.recall_stmts = []
@@ -363,16 +363,24 @@ class Semantic:
         ###### loop control ######
         elif self.current_token and self.current_token.token == 'resume':
             line = [self.current_token.line, self.current_token.column]
-            if self.flank_flag or self.loop_flag:
+
+            in_flank = self.flank_flag_stack and self.flank_flag_stack[-1]
+            in_loop = self.loop_flag_stack and self.loop_flag_stack[-1]
+
+            if in_flank or in_loop:
                 self.current_token = self.get_next_token()
                 self.skip_whitespace()
                 return ResumeStmt()
             else:
                 raise SemanticError(f"ResumeError: Cannot use resume statement if not within a flank choice body or loop body.",
                                     line, [self.current_token.line, self.current_token.column + 5])
+        
         elif self.current_token and self.current_token.token == 'checkpoint':
             line = [self.current_token.line, self.current_token.column]
-            if self.loop_flag:
+            in_loop = self.loop_flag_stack and self.loop_flag_stack[-1]
+            print(f"loop flag = {in_loop}")
+
+            if in_loop:
                 self.current_token = self.get_next_token()
                 self.skip_whitespace()
                 return CheckpointStmt()
@@ -1761,19 +1769,22 @@ class Semantic:
         elif tk == 'load' or tk == 'loadNum':
             prompt_msg = None
             func_pos_start = [self.current_token.line, self.current_token.column]
-            print(self.current_token.token)
+            #print(self.current_token.token)
             self.current_token = self.get_next_token() # eat load
-            print(self.current_token.token)
+            #print(self.current_token.token)
             if self.current_token.token != '(':
+                #print("here?")
                 raise SemanticError("ParserError: Missing parentheses.", self.current_token.line)
+            #print(f"3 {self.current_token.token}")
             self.current_token = self.get_next_token() # eat (
-            print(self.current_token.token)
+            #print(f"4 {self.current_token.token}")
             self.skip_spaces()
-            if self.current_token.token == 'comms_ltr':
+            if re.match(r'^comms_ltr', self.current_token.token):
                 prompt_msg = self.parse_primary_expr(scope)
+                #print(f"5 {self.current_token.token}")
+                #print(f"6 {self.current_token.token}")
                 self.skip_spaces()
             if self.current_token.token != ')':
-                print(self.current_token.token)
                 raise SemanticError("ParserError: Missing parentheses.", self.current_token.line)
             func_pos_end = [self.current_token.line, self.current_token.column]
             self.current_token = self.get_next_token() # eat )
@@ -1924,7 +1935,13 @@ class Semantic:
         if self.current_token.token != 'choice':
             raise SemanticError("FlankError: There must be at least one choice statement in a flank statement.")
         
-        self.flank_flag = True
+        
+        if not hasattr(self, 'flank_flag_stack'):
+            self.flank_flag_stack = []
+
+        self.flank_flag_stack.append(True)  
+        print(f"flank flag out of flank = {self.flank_flag_stack[-1]}.")
+
         while self.current_token and self.current_token.token == "choice":
             self.current_token = self.get_next_token()  # eat choice
             self.skip_spaces()
@@ -1951,7 +1968,7 @@ class Semantic:
             choices.append(ChoiceStmts(values, choice_body))
         
         if not self.current_token or self.current_token.token != 'backup':
-            self.flank_flag = False
+            self.flank_flag_stack.pop()
             raise SemanticError("FlankError: A flank statement must include a backup statement.")
 
         self.current_token = self.get_next_token()  # eat backup
@@ -1971,7 +1988,7 @@ class Semantic:
 
         self.expect("}", "Expected '}' to close a flank statement's body.")
         self.skip_whitespace()
-        self.flank_flag = False
+        self.flank_flag_stack.pop()
         return FlankStmt(expression, choices, backup_body)
 
     ########## LOOPS #############
@@ -2021,18 +2038,27 @@ class Semantic:
         self.skip_whitespace()
         body = []
         self.push_scope()
-        self.loop_flag = True
+        
+        if not hasattr(self, 'loop_flag_stack'):
+            self.loop_flag_stack = []
+
+        self.loop_flag_stack.append(True)  
+        print(f"loop flag out of loop = {self.loop_flag_stack[-1]}.")
+
         while self.current_token and self.current_token.token != "}":
+            print(f"loop flag in loop = {self.loop_flag_stack[-1]}.")
             stmt = self.parse_stmt(scope)
             body.append(stmt)
             self.skip_whitespace()
             if isinstance(stmt, RecallStmt):
                 self.recall_stmts.append(stmt)
+
+
         self.expect("}", "Expected '}' to close a for loop statement's body.")
         pos_end = [self.current_token.line, self.current_token.column-1]
         self.skip_whitespace()
         self.pop_scope()
-        self.loop_flag = False
+        self.loop_flag_stack.pop()
         return ForStmt(initialization, condition, update, body, pos_start, pos_end)
     
     def parse_while(self,scope) -> GrindWhileStmt:
@@ -2044,8 +2070,15 @@ class Semantic:
         self.skip_whitespace()
         body = []
         self.push_scope()
-        self.loop_flag = True
+
+        if not hasattr(self, 'loop_flag_stack'):
+            self.loop_flag_stack = []
+
+        self.loop_flag_stack.append(True)  
+        print(f"loop flag out of loop = {self.loop_flag_stack[-1]}.")
+
         while self.current_token and self.current_token.token != "}":
+            print(f"loop flag in loop = {self.loop_flag_stack[-1]}.")
             stmt = self.parse_stmt(scope)
             body.append(stmt)
             self.skip_whitespace()
@@ -2054,7 +2087,8 @@ class Semantic:
         self.expect("}", "Expected '}' to close a while loop statement's body.")
         self.skip_whitespace()
         self.pop_scope()
-        self.loop_flag = False
+
+        self.loop_flag_stack.pop()
         return GrindWhileStmt(condition, body)
     
     def parse_grind_while(self,scope) -> GrindWhileStmt:
@@ -2064,8 +2098,15 @@ class Semantic:
         self.skip_whitespace()
         body = []
         self.push_scope()
-        self.loop_flag = True
+
+        if not hasattr(self, 'loop_flag_stack'):
+            self.loop_flag_stack = []
+
+        self.loop_flag_stack.append(True)  
+        print(f"loop flag out of loop = {self.loop_flag_stack[-1]}.")
+
         while self.current_token and self.current_token.token != "}":
+            print(f"loop flag in loop = {self.loop_flag_stack[-1]}.")
             stmt = self.parse_stmt(scope)
             body.append(stmt)
             self.skip_whitespace()
@@ -2074,7 +2115,8 @@ class Semantic:
         self.expect("}", "Expected '}' to close a grind while loop statement's body.")
         self.skip_whitespace()
         self.pop_scope()
-        self.loop_flag = False
+
+        self.loop_flag_stack.pop()
         self.expect("while", "Missing a while loop condition after a grind-while loop statement's body.")
         self.skip_spaces()
         condition = self.parse_expr(scope)
