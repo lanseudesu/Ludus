@@ -60,7 +60,7 @@ document.addEventListener("DOMContentLoaded", () => {
     if (window.location.href.includes("index.html")) {
         console.log("Running analyzers after navigation...");
         lexicalAnalyzer();
-        semanticAnalyzer();
+        runtime();
     }
 
     if (window.location.href.includes("lexerpage.html")) {
@@ -284,6 +284,11 @@ function syntaxAnalyzer() {
 function semanticAnalyzer() {
     const inputText = editor.getValue(); 
     eel.semantic_analyzer(inputText); 
+}
+
+function runtime() {
+    const inputText = editor.getValue(); 
+    eel.runtime(inputText); 
 }
 
 eel.expose(updateLexemeToken);

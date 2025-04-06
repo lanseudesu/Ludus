@@ -8,6 +8,7 @@ class SymbolTable:
         self.function_scopes = {}
         self.play_scope = []
         self.func_flag = False
+        self.shoot_elements = []
     
     def enter_scope(self):
         new_scope = {}
@@ -130,9 +131,8 @@ class SymbolTable:
 
         raise SemanticError(f"NameError: Identifier '{name}' is not defined.", start, end)
     
+    def save_shoot_elems(self, element):
+        self.shoot_elements.append(element)
+
     def __repr__(self):
-        return "SymbolTable:\n" + "\n".join(
-            f"{name}: {info}"
-            for scope in self.play_scope
-            for name, info in scope.items()
-        ) 
+        return "".join(str(element) for element in self.shoot_elements)

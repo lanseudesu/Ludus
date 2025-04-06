@@ -339,6 +339,7 @@ def eval_binary_expr(binop, symbol_table):
     if isinstance(lhs, str) and isinstance(rhs, str):
         if binop.operator != '+':
             raise SemanticError("TypeError: Only valid operator between comms is '+'.", binop.pos_start, binop.pos_end)
+        print(f"lhs -> {lhs}, rhs -> {rhs}")
         return lhs + rhs
 
     return eval_numeric_binary_expr(lhs, rhs, binop.operator, binop)

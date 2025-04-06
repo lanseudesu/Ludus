@@ -1676,7 +1676,8 @@ class Semantic:
             ltr_pos_start = [self.current_token.line, self.current_token.column]
             ltr_size = len(self.current_token.lexeme) - 1
             ltr_pos_end = [self.current_token.line, self.current_token.column + ltr_size]
-            value = re.sub(r'^"(.*)"$', r'\1', self.current_token.lexeme)
+            print(f"value before {self.current_token.lexeme}")
+            value = re.sub(r'^"(.*)"$', r'\1', self.current_token.lexeme, flags=re.DOTALL)
             print(value)
             open_braces = 0
             placeholders = []
@@ -2400,7 +2401,7 @@ class Semantic:
         self.skip_spaces()
         return SeekStmt(arr_name, value, 2, pos_start, pos_end, dim)
 
-def check(fn, text):
+def check(fn, text, isRuntime=False):
     lexer = Lexer(fn, text)
     if text == "":
         return "No code in the module."  #, {}
@@ -2430,11 +2431,15 @@ def check(fn, text):
 
         analyzer = SemanticAnalyzer(visitor.symbol_table)
         analyzer.visit(result)
+        table = analyzer.symbol_table
     except SemanticError as e:
         e.source_code = text.splitlines()
         return str(e)
 
-    return "Semantic analyzing successful, no lexical, syntax, and semantic errors found!"
+    if isRuntime:
+        return str(table)
+    else:
+        return "Semantic analyzing successful, no lexical, syntax, and semantic errors found!"
 
 
     # if isinstance(result, SemanticError):

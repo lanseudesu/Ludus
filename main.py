@@ -119,6 +119,16 @@ def semantic_analyzer(input_text):
 
     eel.updateTerminal(output)
 
+@eel.expose
+def runtime(input_text):
+    #result, table = ast.check(current_file, input_text)
+    # output = str(result) + "\n" + str(table) 
+
+    result = ast.check(current_file, input_text, True)
+    output = str(result)  
+
+    eel.updateTerminal(output)
+
 # Option 1
 @eel.expose
 def exit_app(): 

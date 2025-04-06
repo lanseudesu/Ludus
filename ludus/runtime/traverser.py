@@ -1464,18 +1464,23 @@ class SemanticAnalyzer(ASTVisitor):
             element = eval_func(node.element.name.symbol, node.element, self.symbol_table) 
         else:    
             element = evaluate(node.element, self.symbol_table)
+        
         if isinstance(element, UnresolvedNumber):
             element = '0 or 0.0'
         elif not isinstance(element, dict):
+            print("1")
             element=element
         elif element is None:
             element = 'dead'
         elif "value" in element:
+            print("2")
             element = element["value"]
         elif "elements" in element or "fields" in element:
             raise SemanticError("UnsupportedArgumentError: Cannot use a list object as a shoot argument.", node.pos_start, node.pos_end)
-        
+            
         print(f"shoot element -> {element}")
+        self.symbol_table.save_shoot_elems(element)
+        
 
     def visit_LevelStmt(self, node: LevelStmt):
         if node.value.kind == 'FuncCallStmt':
@@ -1543,3 +1548,8 @@ class SemanticAnalyzer(ASTVisitor):
         if isinstance(info, int) or isinstance(info, float):
             return str(info)
         raise SemanticError(f"TypeError: Cannot convert '{info}' to comms.", node.pos_start, node.pos_end)
+
+########################################
+####### RUNTIME OF TRAVERSER ###########
+########################################
+
