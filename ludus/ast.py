@@ -339,7 +339,10 @@ class Semantic:
                 return self.parse_inst_ass(scope)
             elif la_token is not None and la_token.token == '(':
                 if self.current_token.lexeme in self.global_func:
-                    return self.parse_func_call(scope)
+                    value = self.parse_func_call(scope)
+                    self.skip_spaces()
+                    self.expect("newline", "Expected 'newline' after every statements.")
+                    return value
                 else:
                     raise SemanticError(f"NameError: Function {self.current_token.lexeme} does not exist.", line_start, 
                                         [self.current_token.line, self.current_token.column + len(self.current_token.lexeme) - 1])
@@ -369,7 +372,8 @@ class Semantic:
 
             if in_flank or in_loop:
                 self.current_token = self.get_next_token()
-                self.skip_whitespace()
+                self.skip_spaces()
+                self.expect("newline", "Expected 'newline' after every statements.")
                 return ResumeStmt()
             else:
                 raise SemanticError(f"ResumeError: Cannot use resume statement if not within a flank choice body or loop body.",
@@ -382,7 +386,8 @@ class Semantic:
 
             if in_loop:
                 self.current_token = self.get_next_token()
-                self.skip_whitespace()
+                self.skip_spaces()
+                self.expect("newline", "Expected 'newline' after every statements.")
                 return CheckpointStmt()
             else:
                 raise SemanticError(f"CheckpointError: Cannot use checkpoint statement if not within a loop body.",
@@ -412,7 +417,8 @@ class Semantic:
             self.expect("(", "Expects a parentheses after wipe keyword.")
             self.skip_spaces()
             self.expect(")", "Expects a closing parentheses.")
-            self.skip_whitespace()
+            self.skip_spaces()
+            self.expect("newline", "Expected 'newline' after every statements.")
             return WipeStmt()
         else:
             raise SemanticError(f"ParserError: Unexpected token found during parsing: {self.current_token.token}", self.current_token.line)
@@ -441,6 +447,7 @@ class Semantic:
                 self.current_token = self.get_next_token() # eat ,
                 self.skip_spaces()
 
+        self.expect("newline", "Expected 'newline' after every statements.")
         return RecallStmt(stmt)
 
     def parse_func_call(self, scope) -> FuncCallStmt:
@@ -469,7 +476,6 @@ class Semantic:
                 self.skip_spaces()
         pos_end = [self.current_token.line, self.current_token.column]
         self.current_token = self.get_next_token() # eat )
-        self.skip_whitespace()
         return FuncCallStmt(func_name, args, pos_start, pos_end, arg_pos_start, pos_end)
     
     ######### ARRAYS AND VARIABLES #########    
@@ -551,6 +557,7 @@ class Semantic:
                         self.declare_id(var.symbol, "a variable")
 
                 self.skip_spaces()
+                self.expect("newline", "Expected 'newline' after every statements.")
                 return BatchVarDec(declarations, True, pos_start, pos_end)
 
         self.current_token = self.get_next_token() # eat :
@@ -580,6 +587,7 @@ class Semantic:
                         else:
                             values = inner_values
                             break
+                    self.expect("newline", "Expected 'newline' after every statements.")
                     return ArrayRedec(var_names[0], None, values, False, scope, pos_start, pos_end)
                 
         value = self.parse_expr(scope)
@@ -606,13 +614,14 @@ class Semantic:
                 raise SemanticError("ParserError: Expected ':' in variable initialization.", self.current_token.line)
             
             self.current_token = self.get_next_token() # eat :
-            self.skip_whitespace()
+            self.skip_spaces()
 
             value = self.parse_expr(scope)
             values_table[variable_name] = {"values": value}
 
         pos_end = value.pos_end
         self.skip_spaces()
+        self.expect("newline", "Expected 'newline' after every statements.")
         if len(var_names) > 1:
             declarations = []
             for var in var_names:
@@ -684,7 +693,9 @@ class Semantic:
             self.skip_spaces()
             self.expect("dead", "Expected 'dead' keyword.")
             value = None  
-        self.skip_whitespace()
+        
+        self.skip_spaces()
+        self.expect("newline", "Expected 'newline' after every statements.")
 
         if len(var_names) > 1:
             for var in var_names:
@@ -753,8 +764,9 @@ class Semantic:
                 else:
                     values = [default_value] * dimensions[0]
 
-            self.skip_whitespace()
             self.declare_id(name, "an array", len(dimensions))
+            self.skip_spaces()
+            self.expect("newline", "Expected 'newline' after every statements.")
             return ArrayDec(arr_name, dimensions, values, False, scope, datatype, pos_start, pos_end)
         elif self.current_token and self.current_token.token == ':':
             self.current_token = self.get_next_token() #eat :
@@ -773,6 +785,8 @@ class Semantic:
                     raise SemanticError("NullSizeError: Null arrays cannot be initialized with specific size.", pos_start, pos_end)
                 
             self.declare_id(name, "an array", len(dimensions))
+            self.skip_spaces()
+            self.expect("newline", "Expected 'newline' after every statements.")
             return ArrayDec(arr_name, dimensions, values, False, scope, datatype, pos_start, pos_end)      
     
     def parse_array(self, scope) -> Union[ArrayDec, ArrAssignment]:
@@ -791,7 +805,10 @@ class Semantic:
             
             join_token = self.find_token_in_line('drop')
             if join_token:
-                return self.parse_drop2d(scope, arr_name, pos_start)
+                node = self.parse_drop2d(scope, arr_name, pos_start)
+                self.skip_spaces()
+                self.expect("newline", "Expected 'newline' after every statements.") 
+                return node
 
         dimensions = []
         while self.current_token and self.current_token.token == '[':
@@ -828,6 +845,8 @@ class Semantic:
                 else:
                     values, pos_end = self.parse_array_values(dimensions, scope, pos_start)
                     self.declare_id(name, "an array", len(dimensions))
+                    self.skip_spaces()
+                    self.expect("newline", "Expected 'newline' after every statements.")
                     return ArrayDec(arr_name, dimensions, values, False, scope, None, pos_start, pos_end)
             else:
                 if arr_exist:
@@ -835,6 +854,8 @@ class Semantic:
                         value = self.parse_expr(scope)
                         lhs = ArrElement(arr_name, dimensions, pos_start, pos_end)
                         pos_end = value.pos_end
+                        self.skip_spaces()
+                        self.expect("newline", "Expected 'newline' after every statements.")
                         return ArrAssignment(lhs, ':', value, pos_start, pos_end)
                     else:
                         raise SemanticError(f"IndexError: Index must not be blank for array index assignment for array name '{arr_name.symbol}'.", pos_start, pos_end)
@@ -849,6 +870,8 @@ class Semantic:
                     value = self.parse_expr(scope)
                     lhs = ArrElement(arr_name, dimensions, pos_start, pos_end)
                     pos_end = value.pos_end
+                    self.skip_spaces()
+                    self.expect("newline", "Expected 'newline' after every statements.")
                     return ArrAssignment(lhs, operator, value, pos_start, pos_end)
                 else:
                     raise SemanticError(f"IndexError: Index must not be blank for array index assignment for array name '{arr_name.symbol}'.", pos_start, pos_end)
@@ -924,6 +947,8 @@ class Semantic:
             dimensions = [None, None]
         if self.current_token and self.current_token.token == '[':
             values, pos_end = self.parse_array_values(dimensions, scope, pos_start)
+            self.skip_spaces()
+            self.expect("newline", "Expected 'newline' after every statements.")
             return ArrayRedec(name, dimensions, values, False, scope, pos_start, pos_end) 
         elif re.match(r'^id\d+$', self.current_token.token):
             id_pos_start = [self.current_token.line, self.current_token.column]
@@ -937,9 +962,12 @@ class Semantic:
                     raise SemanticError(f"NameError: Function '{rhs_name}' does not exist.", id_pos_start, id_pos_end)
                 values = self.parse_func_call(scope)
                 pos_end = values.pos_end
+                self.skip_spaces()
+                self.expect("newline", "Expected 'newline' after every statements.") 
                 return ArrayRedec(name, dimensions, values, False, scope, pos_start, pos_end)
             self.current_token = self.get_next_token() # eat id
-            self.skip_whitespace()
+            self.skip_spaces()
+            self.expect("newline", "Expected 'newline' after every statements.") 
             info = self.lookup_identifier(rhs_name)
             if info:
                 info = self.get_identifier_info(rhs_name, rhs_name_node)
@@ -1117,7 +1145,10 @@ class Semantic:
         
         join_token = self.find_token_in_line('drop') 
         if join_token:
-            return self.parse_drop(scope, struct_inst_name, pos_start)
+            node = self.parse_drop(scope, struct_inst_name, pos_start)
+            self.skip_spaces()
+            self.expect("newline", "Expected 'newline' after every statements.") 
+            return node
 
         if self.lookup_identifier(struct_inst_name.symbol):
             info = self.get_identifier_info(struct_inst_name.symbol, struct_inst_name)
@@ -1143,6 +1174,8 @@ class Semantic:
         self.skip_spaces()
         value = self.parse_expr(scope)
         pos_end = value.pos_end
+        self.skip_spaces()
+        self.expect("newline", "Expected 'newline' after every statements.") 
         return InstAssignment(left, operator, value, pos_start, pos_end)
 
     ########## IMMO ############
@@ -1200,6 +1233,7 @@ class Semantic:
                         raise SemanticError(f"NameError: Identifier '{var.symbol}' is already declared as {info["type"]}.", var.pos_start, var.pos_end)  
                     self.declare_id(var.symbol, "a variable")
                 self.skip_spaces()
+                self.expect("newline", "Expected 'newline' after every statements.") 
                 return BatchVarDec([VarDec(var, value, True, scope) for var in var_names], False, pos_start, pos_end)
             
         self.current_token = self.get_next_token() # eat :
@@ -1234,6 +1268,7 @@ class Semantic:
             values_table[variable_name] = {"values": value}
         
         self.skip_spaces()
+        self.expect("newline", "Expected 'newline' after every statements.") 
         if len(var_names) > 1:
             for var in var_names:
                 if self.lookup_identifier(var.symbol):
@@ -1282,6 +1317,8 @@ class Semantic:
         self.skip_spaces()
         values, pos_end = self.parse_array_values(dimensions, scope, pos_start)
         self.declare_id(name, "an array", len(dimensions))
+        self.skip_spaces()
+        self.expect("newline", "Expected 'newline' after every statements.") 
         return ArrayDec(arr_name, dimensions, values, True, scope, None, pos_start, pos_end)
     
     def parse_immo_inst(self, scope) -> ImmoInstDec:
@@ -1345,6 +1382,8 @@ class Semantic:
         self.skip_spaces()
         value = self.parse_expr(scope)
         pos_end = value.pos_end
+        self.skip_spaces()
+        self.expect("newline", "Expected 'newline' after every statements.") 
         return VarAssignment(var_name, operator, value, pos_start, pos_end)
 
     ########## EXPR ############
@@ -1484,7 +1523,9 @@ class Semantic:
                 
                 join_token = self.find_token_in_line('drop')
                 if join_token:
-                    return self.parse_drop(scope, identifier, new_pos_start)
+                    node = self.parse_drop(scope, identifier, new_pos_start)
+                    self.skip_spaces()
+                    return node
 
                 join_token = self.find_token_in_line('seek')
                 if join_token:
@@ -1518,7 +1559,9 @@ class Semantic:
                 if arr_exist:
                     join_token = self.find_token_in_line('drop')
                     if join_token:
-                        return self.parse_drop2d(scope, identifier, new_pos_start)
+                        node = self.parse_drop2d(scope, identifier, new_pos_start)
+                        self.skip_spaces()
+                        return node
                     
                     join_token = self.find_token_in_line('seek')
                     if join_token:
@@ -2135,13 +2178,15 @@ class Semantic:
         if self.current_token.token == ')':
             pos_end = [self.current_token.line, self.current_token.column]
             self.expect(")", "Expected closing parentheses in function call.")
-            self.skip_whitespace()
+            self.skip_spaces()
+            self.expect("newline", "Expected 'newline' after every statements.") 
             return ShootStmt(CommsLiteral("", pos_start, pos_end), is_Next, pos_start, pos_end)
         value = self.parse_expr(scope)
         self.skip_spaces()
         self.expect(")", "Expected closing parentheses in function call.")
         pos_end = [self.current_token.line, self.current_token.column-1]
-        self.skip_whitespace()
+        self.skip_spaces()
+        self.expect("newline", "Expected 'newline' after every statements.") 
         return ShootStmt(value, is_Next, pos_start, pos_end)
 
     def parse_join(self, scope, name, pos_start) -> JoinStmt:
@@ -2171,6 +2216,8 @@ class Semantic:
             self.skip_spaces()
             self.expect(")", "Expects ')' after to close join arguments.")
             pos_end = [self.current_token.line, self.current_token.column-1]
+            self.skip_spaces()
+            self.expect("newline", "Expected 'newline' after every statements.") 
             self.skip_whitespace()
             return JoinStmt(name, values, 2, pos_start, pos_end)
         else:
@@ -2184,6 +2231,8 @@ class Semantic:
             self.skip_spaces()
             self.expect(")", "Expects ')' after to close join arguments.")
             pos_end = [self.current_token.line, self.current_token.column-1]
+            self.skip_spaces()
+            self.expect("newline", "Expected 'newline' after every statements.") 
             self.skip_whitespace()
             return JoinStmt(name, value, 1, pos_start, pos_end)
 
@@ -2215,6 +2264,8 @@ class Semantic:
         self.skip_spaces()
         self.expect(")", "Expects ')' after to close join arguments.")
         pos_end = [self.current_token.line, self.current_token.column-1]
+        self.skip_spaces()
+        self.expect("newline", "Expected 'newline' after every statements.") 
         self.skip_whitespace()
         return JoinStmt(arr_name, value, 2, pos_start, pos_end, dim)
 
@@ -2240,7 +2291,7 @@ class Semantic:
             self.skip_spaces()
         self.expect(")", "Expects ')' after to close drop arguments.")
         pos_end = [self.current_token.line, self.current_token.column-1]
-        self.skip_whitespace()
+        self.skip_spaces()
         return DropStmt(name, index, dimensions, pos_start, pos_end)
     
     def parse_drop2d(self, scope, arr_name, pos_start) -> DropStmt:
@@ -2272,7 +2323,7 @@ class Semantic:
             self.skip_spaces()
         self.expect(")", "Expects ')' after to close drop arguments.")
         pos_end = [self.current_token.line, self.current_token.column-1]
-        self.skip_whitespace()
+        self.skip_spaces()
         return DropStmt(arr_name, index, dimensions, pos_start, pos_end, dim)
 
     def parse_seek(self, scope, name, pos_start) -> SeekStmt:
@@ -2302,7 +2353,7 @@ class Semantic:
             self.skip_spaces()
             self.expect(")", "Expects ')' after to close seek arguments.")
             pos_end = [self.current_token.line, self.current_token.column-1]
-            self.skip_whitespace()
+            self.skip_spaces()
             return SeekStmt(name, values, 2, pos_start, pos_end)
         else:
             if dimensions is None or dimensions == 1:
@@ -2315,7 +2366,7 @@ class Semantic:
             self.skip_spaces()
             self.expect(")", "Expects ')' after to close seek arguments.")
             pos_end = [self.current_token.line, self.current_token.column-1]
-            self.skip_whitespace()
+            self.skip_spaces()
             return SeekStmt(name, value, 1, pos_start, pos_end)
         
     def parse_seek2d(self, scope, arr_name, pos_start) -> SeekStmt:
@@ -2346,7 +2397,7 @@ class Semantic:
         self.skip_spaces()
         self.expect(")", "Expects ')' after to close seek arguments.")
         pos_end = [self.current_token.line, self.current_token.column-1]
-        self.skip_whitespace()
+        self.skip_spaces()
         return SeekStmt(arr_name, value, 2, pos_start, pos_end, dim)
 
 def check(fn, text):
