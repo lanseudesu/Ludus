@@ -1,13 +1,13 @@
 generate check_perfect(n)
 
 play() {
-    num: 28
+    num: loadNum("Enter a number: ")
     is_perfect: check_perfect(num)
 
     if is_perfect {
-        shootNxt("{num} is a Perfect number.")
+        shootNxt("\n{num} is a Perfect number.")
     } else {
-        shootNxt("{num} is not a Perfect number.")
+        shootNxt("\n{num} is not a Perfect number.")
     }
 }
 

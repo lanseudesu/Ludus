@@ -1,8 +1,9 @@
 generate factorial(n)
 
 play() {
-    result: factorial(5)
-    shootNxt("The factorial of 5 is: {result}")
+	num: loadNum("Enter number: ")
+    result: factorial(num)
+    shoot("\nThe factorial of {num} is: {result}")
 }
 
 generate factorial(n) {

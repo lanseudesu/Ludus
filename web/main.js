@@ -1,7 +1,10 @@
 let editor;
 let isModified = false
+let keyListener = null;
 
 document.addEventListener("DOMContentLoaded", () => {
+    console.log("App started, sessionStorage cleared:", sessionStorage.getItem("preservedTextFirstRun"));
+
     const savedText = localStorage.getItem("editorText");  // Retrieve saved text
     const savedHistory = sessionStorage.getItem("editorHistory");
 
@@ -233,6 +236,9 @@ document.addEventListener("keydown", (event) => {
 });
 
 function preserveText() {
+    sessionStorage.setItem("preservedTextFirstRun", "true");
+    console.log("First run of preserveText after app start.");
+        
     if (editor) {
         localStorage.setItem("editorText", editor.getValue());
 
@@ -287,8 +293,28 @@ function semanticAnalyzer() {
 }
 
 function runtime() {
-    const inputText = editor.getValue(); 
-    eel.runtime(inputText); 
+    console.log("tatat", keyListener)
+    if (keyListener) {
+        //eel.pass_input("stop")
+        document.removeEventListener("keydown", keyListener);
+        keyListener = null;
+        console.log("Key listener removed.");
+    }
+    console.log("after", keyListener)
+    document.querySelector("button").disabled = true;
+
+    eel.reset_interpreter()().then(() => {
+        setTimeout(() => {
+            const inputBox = document.getElementById("error2");
+            inputBox.value = "";
+            lexicalAnalyzer();
+            const inputText = editor.getValue(); 
+            eel.runtime_backend(inputText); 
+            document.querySelector("button").disabled = false;
+        }, 30);
+    });
+    
+    
 }
 
 eel.expose(updateLexemeToken);
@@ -316,8 +342,23 @@ function updateError(errors) {
 
 eel.expose(updateTerminal);
 function updateTerminal(result) {
+    
     const errorArea = document.getElementById("error2");
-    if (errorArea) errorArea.value = result; 
+    if (errorArea) {
+        if (errorArea.value === "") {
+            errorArea.value = result;
+        } else {
+            errorArea.value += "\n\n" + result;
+            console.log("tatat", keyListener)
+            if (keyListener) {
+                document.removeEventListener("keydown", keyListener);
+                keyListener = null;
+                console.log("Key listener removed.");
+            }
+            console.log("after", keyListener)
+        }
+        
+    } 
 }
 
 eel.expose(clearError);
@@ -339,4 +380,47 @@ function clearLexemeToken() {
 
     if (lexemeArea) lexemeArea.innerHTML = "";  
     if (tokenArea) tokenArea.innerHTML = "";  
+}
+
+
+
+eel.expose(requestInput);
+function requestInput(promptText) {
+    console.log(`Requesting input from frontend: ${promptText}`);
+    
+    const inputBox = document.getElementById("error2");
+    inputBox.value += promptText;
+    const initialContent = inputBox.value;
+    inputBox.removeAttribute('readonly');
+    inputBox.focus();  
+
+    if (keyListener) {
+        document.removeEventListener("keydown", keyListener);
+    }
+
+    keyListener = function(event) {
+        if (event.key === "Enter") {
+            event.preventDefault();  
+
+            const userInput = inputBox.value.trim();  
+            const newInput = userInput.substring(initialContent.length).trim();
+            console.log("Old input:", userInput);
+            console.log("New input:", newInput);
+
+            if (newInput !== "") {
+                eel.pass_input(newInput)  
+                console.log("Input sent to Python.");       
+            }
+            inputBox.setAttribute('readonly', true);
+        }
+    };
+    document.addEventListener("keydown", keyListener);
+}
+
+eel.expose(printShoot);
+function printShoot(shootElement) {
+    console.log(`Received shoot element: ${shootElement}`);
+    
+    const inputBox = document.getElementById("error2");
+    inputBox.value += shootElement;  
 }

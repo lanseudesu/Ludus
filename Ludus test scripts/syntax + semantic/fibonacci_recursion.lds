@@ -1,9 +1,9 @@
 generate fibonacci(n)
 
 play() {
-    n: 7
+    n: loadNum("Enter a number: ")
     result: fibonacci(n)
-    shootNxt("The {n}th Fibonacci number is {result}")
+    shootNxt("\nThe {n}th Fibonacci number is {result}")
 }
 
 generate fibonacci(n) {

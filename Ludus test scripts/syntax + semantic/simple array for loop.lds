@@ -9,11 +9,11 @@ generate checkTemp(list){
 	hp i
     for i: 0, i < rounds(list), i += 1{
     	if list[i] < 38 && list[i] > 35 {
-        	shoot("Normal temp")
+        	shootNxt("{(list[i]).2f} is = Normal temp")
         } elif list[i] < 35 {
-        	shoot("Hypothermia")
+        	shootNxt("{(list[i]).2f} is = Hypothermia")
         } elif list[i] > 38 {
-        	shoot("Fever")
+        	shootNxt("{(list[i]).2f} is = Fever")
         }
     }
 }

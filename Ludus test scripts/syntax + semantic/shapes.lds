@@ -1,41 +1,41 @@
-generate choose_shape()
 generate create_square(l)
 generate create_rectangle(l,w)
+generate create_left_triangle(h)
+generate create_right_triangle(h)
 generate create_triangle(h)
-generate print_shape(result)
 
 play() {
-	shape: choose_shape()
+	shape: load("Enter shape [S]quare [R]ectangle [T]riangle: ")
+    if shape == "T" || shape == "t" {
+    	shape: load("Enter type of triangle [CT] Center triangle [LT] Left Triangle [RT] Right Triangle: ")
+    }
+    shape: levelUp(shape)
     comms result
-    shape: "S"
     flank shape {
+    	choice "LT":
+        	height: loadNum("\nEnter height: ")
+        	result: create_left_triangle(height)
+        choice "RT":
+        	height: loadNum("\nEnter height: ")
+        	result: create_right_triangle(height) 
+        choice "CT":
+        	height: loadNum("\nEnter height: ")
+        	result: create_triangle(height)    
     	choice "S":
         	length: loadNum("\nEnter length: ")
-            result: create_square(5)
-        	#result: create_square(length)
+        	result: create_square(length)
         choice "R":
-        	length: loadNum("\n Enter length: ")
-            shootNxt()
-            width: loadNum("\n Enter width: ")
-            result: create_rectangle(5, 7)
-        	#result: create_rectangle(length, width)
-        choice "T":
-        	height: loadNum("\n Enter height: ")
-            result: create_triangle(6)
-        	#result: create_triangle(height)
+        	length: loadNum("\nEnter length: ")
+            width: loadNum("\nEnter width: ")
+        	result: create_rectangle(length, width)
         backup:
-        	shoot("Invalid shape.")
+        	shoot("\nInvalid shape: {shape}")
     }
     
     if result != "" {
     	shootNxt()
-    	print_shape(result)
+    	shoot(result)
     }
-}
-
-generate choose_shape(){
-	input: load("Enter shape [S]quare [R]ectangle [T]riangle: ")
-    recall input
 }
 
 generate create_square(l){
@@ -63,17 +63,17 @@ generate create_rectangle(l, w){
 	for i: 0, i < l, i += 1{
     	hp j
     	for j: 0, j < w, j += 1{
-        	result += "*"
+        	result += "* "
         }
         result += "\n"
     }
     recall result
 }
 
-generate create_triangle(h){
+generate create_left_triangle(h){
 	comms result
 	if h < 1 {
-    	shoot("Invalid inputs for rectangle.")
+    	shoot("Invalid inputs for triangle.")
     }
 	hp i
 	for i: 0, i < h, i += 1{
@@ -86,8 +86,44 @@ generate create_triangle(h){
     recall result
 }
 
-generate print_shape(result){
-	shoot(result)
+generate create_right_triangle(h){
+	comms result
+	if h < 1 {
+    	shoot("Invalid inputs for triangle.")
+    }
+	hp i
+	for i: 0, i < h, i += 1{
+    	x: ((h * 2) - (i * 2)) - 2
+    	hp j
+        for j: 0, j < x, j += 1{
+        	result += " "
+        }
+    	for j: 0, j < (2 * i + 1), j += 1{
+        	result += "*"
+        }
+        result += "\n"
+    }
+    recall result
+}
+
+generate create_triangle(h){
+	comms result
+	if h < 1 {
+    	shoot("Invalid inputs for triangle.")
+    }
+	hp i
+	for i: 0, i < h, i += 1{
+    	x: h - i - 1
+    	hp j
+        for j: 0, j < x, j += 1{
+        	result += " "
+        }
+    	for j: 0, j < (2 * i + 1), j += 1{
+        	result += "*"
+        }
+        result += "\n"
+    }
+    recall result
 }
 
 gameOver

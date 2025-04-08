@@ -1,7 +1,13 @@
 from .symbol_table import SymbolTable
 from ..error import SemanticError
-        
+import eel
+import time
+
 symbol_table = SymbolTable()
+input_value = None
+stopper = False
+current_run_id = 0
+test_flag = False
 
 class UnresolvedNumber:
     def __init__(self, possible_types=("int", "float")):
@@ -9,6 +15,24 @@ class UnresolvedNumber:
     
     def __repr__(self):
         return "0 or 0.0"
+
+@eel.expose
+def pass_input(value): # receives input from js
+    global input_value
+    print(f"Received input from frontend: {value}")
+    input_value = value  
+
+@eel.expose
+def get_input_from_frontend(prompt="Enter value"): # pass input to js
+    print(f"Prompting user: {prompt}")
+    eel.requestInput(prompt)  
+
+@eel.expose
+def reset_interpreter():
+    global input_value, stopper, current_run_id
+    input_value = None
+    stopper = False
+    current_run_id += 1
 
 def eval_func(name, node, symbol_table):
     return_values = evaluate(node, symbol_table)
@@ -22,10 +46,13 @@ def eval_func(name, node, symbol_table):
 
     return value
 
-def evaluate(ast_node, symbol_table):
+def evaluate(ast_node, symbol_table, isRuntime=False):
     from .traverser import SemanticAnalyzer 
-    traverser = SemanticAnalyzer(symbol_table)
-
+    traverser = SemanticAnalyzer(symbol_table, isRuntime)
+    global input_value
+    global stopper
+    global test_flag
+    
     TYPE_MAP = {
         int: "hp",
         float: "xp",
@@ -150,6 +177,7 @@ def evaluate(ast_node, symbol_table):
             raise SemanticError(f"Unknown unary operator: {ast_node.operator}")
     
     elif ast_node.kind == "FuncCallStmt":
+        print(f"funccallstmt in interpreter runtime is {isRuntime}")
         value = symbol_table.lookup(ast_node.name.symbol, ast_node.name.pos_start, ast_node.name.pos_end)
         recall = value["recall"]
         if recall == []:
@@ -157,14 +185,73 @@ def evaluate(ast_node, symbol_table):
         if all(rec.expressions == ["void"] for rec in recall):
             raise SemanticError(f"RecallError: Function '{ast_node.name.symbol}' does not return a value.", ast_node.pos_start, ast_node.pos_end)
         
-        result = traverser.visit_FuncCallStmt(ast_node, True)
-        # print(f"yoyo {result}")
+        result = traverser.visit_FuncCallStmt(ast_node, True, isRuntime)
+        #print(f"yoyo {result}")
         return result
     
     elif ast_node.kind == "Load":
-        return ""
+        print(f"loadnode = {ast_node} in loadNUm")
+        if isRuntime:
+            if ast_node.prompt_msg is not None:
+                prompt = evaluate(ast_node.prompt_msg, symbol_table)
+            else:
+                prompt = ""
+            
+            run_id_snapshot = current_run_id  # snapshot of the current run ID before waiting for input
+            get_input_from_frontend(prompt)
+
+            print(f"before sleep {input_value} and {stopper}")
+
+            while input_value is None and stopper is False:
+                if current_run_id != run_id_snapshot:  # this checks if runtime was clicked
+                    print("Cancelled waiting for input due to new run.")
+                    raise SemanticError("test")
+                eel.sleep(0)
+
+            print(f"Received input: {input_value}")
+
+            val = input_value
+            input_value = None  
+            
+            return val
+        else:
+            return ""
+    
     elif ast_node.kind == "LoadNum":
-        return UnresolvedNumber()
+        
+        print(f"loadnode = {ast_node} in loadNUm")
+        if isRuntime:
+            if ast_node.prompt_msg is not None:
+                prompt = evaluate(ast_node.prompt_msg, symbol_table)
+            else:
+                prompt = ""
+            
+            run_id_snapshot = current_run_id  
+            get_input_from_frontend(prompt)
+
+            print(f"before sleep {input_value} and {stopper}")
+
+            while input_value is None and stopper is False:
+                if current_run_id != run_id_snapshot:  # this checks if runtime was clicked
+                    print("Cancelled waiting for input due to new run.")
+                    raise SemanticError("test")
+                eel.sleep(0)
+            
+            print(f"Received input: {input_value}")
+            
+            val = input_value
+            input_value = None
+            
+
+            try:
+                if '.' in val:
+                    return float(val)
+                else:
+                    return int(val)
+            except:
+                raise SemanticError(f"TypeError: Invalid numeric input: '{val}'", ast_node.pos_start, ast_node.pos_end)
+        else:
+            return UnresolvedNumber()
     
     elif ast_node.kind == "XpFormatting":
         if ast_node.lhs.kind in {'Load', 'LoadNum'}:
@@ -361,7 +448,7 @@ def eval_numeric_binary_expr(lhs, rhs, operator, binop):
             if isinstance(lhs, int) and isinstance(rhs, int):
                 if rhs == 0:
                     raise SemanticError("ZeroDivisionError: Division by zero is not allowed", binop.pos_start, binop.pos_end)
-                result = int(lhs / rhs)
+                result = lhs / rhs
             else:
                 if rhs == 0 or rhs == 0.0:
                     raise SemanticError("ZeroDivisionError: Division by zero is not allowed", binop.pos_start, binop.pos_end)

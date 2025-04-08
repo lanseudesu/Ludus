@@ -3,30 +3,9 @@ import os, sys
 import tkinter as tk
 from tkinter import filedialog
 from ludus import ast, lexer, parser
+import time
 
 eel.init('web')
-
-#Option 2: Open new window, previous window remains opened
-# @eel.expose
-# def new_file():
-#     eel.start("index.html", mode="chrome", size=(1920,1080), block=False)
-
-#Option 2 Open File - Pure Python
-# @eel.expose
-# def open_file():
-#     global current_file
-#     file_path = filedialog.askopenfilename(filetypes=[("Ludus Files", "*.lds")])
-#     if file_path:
-#         with open(file_path, "r", encoding="utf-8") as file:
-#             content = file.read()
-#         current_file = file_path
-#         return content
-#     return None
-
-# Option 2
-# @eel.expose
-# def exit_app():
-#     sys.exit(0)
 
 current_file = None
 #Option 1: Clear same window and update editor
@@ -120,18 +99,20 @@ def semantic_analyzer(input_text):
     eel.updateTerminal(output)
 
 @eel.expose
-def runtime(input_text):
-    #result, table = ast.check(current_file, input_text)
-    # output = str(result) + "\n" + str(table) 
+def runtime_backend(input_text):
+    # from ludus.runtime.interpreter import reset_interpreter  # <- we'll define this
+    # reset_interpreter()
 
+    print("running runtime again")
+    #time.sleep(0.2)
     result = ast.check(current_file, input_text, True)
-    output = str(result)  
-
-    eel.updateTerminal(output)
+    
+    eel.updateTerminal(result)
 
 # Option 1
 @eel.expose
 def exit_app(): 
     os._exit(0)
 
-eel.start('lexerpage.html', size=(1920,1080)) 
+eel.init("web")
+eel.start('index.html', size=(1920,1080)) 

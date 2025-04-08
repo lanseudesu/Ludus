@@ -5,7 +5,7 @@ play() {
     celsius: loadNum("Enter temperature in Celsius: ")
 
     fahrenheit: to_fahrenheit(celsius)
-    shootNxt("{celsius.2f}°C is equal to {fahrenheit.2f}°F")
+    shootNxt("\n{celsius.2f}°C is equal to {fahrenheit.2f}°F")
 }
 
 generate to_fahrenheit(c) {

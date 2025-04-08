@@ -167,12 +167,11 @@ class Semantic:
                     else:
                         start = [la_token.line, la_token.column]
                         end = [la_token.line, la_token.column]
-                        raise SemanticError(f"ParserError: Unexpected token found during parsing: {la_token.token}", start, end)
+                        raise SemanticError(f"ParserError: 1 Unexpected token found during parsing: {la_token.token}", start, end)
                 elif self.current_token and self.current_token.token in ['hp','xp','comms','flag']:
                     program.body.append(self.var_or_arr("global"))
                 elif self.current_token and self.current_token.token == 'immo':
                     program.body.append(self.parse_immo("global"))
-                    self.current_token = self.get_next_token()
                 elif self.current_token and self.current_token.token == 'build':
                     program.body.append(self.parse_globalstruct())
                 elif self.current_token and self.current_token.token == 'play':
@@ -184,7 +183,7 @@ class Semantic:
                 else:
                     start = [self.current_toke.line, self.current_toke.column]
                     end = [self.current_toke.line, self.current_toke.column]
-                    raise SemanticError(f"ParserError: Unexpected token found during parsing: {self.current_token.token}", self.current_token.line)
+                    raise SemanticError(f"ParserError: 2 Unexpected token found during parsing: {self.current_token.token}", self.current_token.line)
             if self.global_func:
                 first_func = next(iter(self.global_func))
                 start = self.global_func[first_func]["start"]  
@@ -347,7 +346,7 @@ class Semantic:
                     raise SemanticError(f"NameError: Function {self.current_token.lexeme} does not exist.", line_start, 
                                         [self.current_token.line, self.current_token.column + len(self.current_token.lexeme) - 1])
             else:
-                raise SemanticError(f"ParserError: Unexpected token found during parsing: {la_token.token}", self.current_token.line)
+                raise SemanticError(f"ParserError: 3 Unexpected token found during parsing: {la_token.token}", self.current_token.line)
         elif self.current_token and self.current_token.token in ['hp','xp','comms','flag']:
             return self.var_or_arr(scope)
         elif self.current_token and self.current_token.token == 'build':
@@ -421,7 +420,7 @@ class Semantic:
             self.expect("newline", "Expected 'newline' after every statements.")
             return WipeStmt()
         else:
-            raise SemanticError(f"ParserError: Unexpected token found during parsing: {self.current_token.token}", self.current_token.line)
+            raise SemanticError(f"ParserError: 4 Unexpected token found during parsing: {self.current_token.token}", self.current_token.line)
 
     def parse_recall(self, scope) -> RecallStmt:
         self.current_token = self.get_next_token() # eat recall
@@ -1196,7 +1195,7 @@ class Semantic:
                 immo_arr = self.parse_immo_arr(scope)
                 return immo_arr
             else:
-                raise SemanticError(f"ParserError: Unexpected token found during parsing: {la_token}", self.current_token.line)  
+                raise SemanticError(f"ParserError: 5 Unexpected token found during parsing: {la_token}", self.current_token.line)  
             
     def parse_immo_var(self, scope) -> Union[VarDec, BatchVarDec]:
         pos_start = [self.current_token.line, self.current_token.column]
@@ -1899,7 +1898,7 @@ class Semantic:
             self.skip_spaces()
             return ToCommsStmt(value, func_pos_start, func_pos_end)
         else:
-            raise SemanticError(f"ParserError: Unexpected token found during parsing: {tk}", self.current_token.line)
+            raise SemanticError(f"ParserError: 6 Unexpected token found during parsing: {tk}", self.current_token.line)
         
     ########### CONDITIONALS #############
     def parse_if(self, scope) -> IfStmt:
@@ -2431,13 +2430,23 @@ def check(fn, text, isRuntime=False):
 
         analyzer = SemanticAnalyzer(visitor.symbol_table)
         analyzer.visit(result)
-        table = analyzer.symbol_table
+        #table = analyzer.symbol_table
     except SemanticError as e:
         e.source_code = text.splitlines()
         return str(e)
 
     if isRuntime:
-        return str(table)
+        try:
+            runtime_visitor = ASTVisitor()
+            runtime_visitor.visit(result)
+
+            runtime_analyzer = SemanticAnalyzer(runtime_visitor.symbol_table, isRuntime)
+            runtime_analyzer.visit(result)
+        except SemanticError as e:
+            e.source_code = text.splitlines()
+            return str(e)
+        
+        return "Code Gen successful!"
     else:
         return "Semantic analyzing successful, no lexical, syntax, and semantic errors found!"
 

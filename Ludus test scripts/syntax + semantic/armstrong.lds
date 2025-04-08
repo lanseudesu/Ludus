@@ -2,13 +2,13 @@ generate check_armstrong(n)
 generate count_digits(n) 
 
 play() {
-    num: 153
+    num: loadNum("Enter a number: ")
     is_armstrong: check_armstrong(num)
 
     if is_armstrong {
-        shootNxt("{num} is an Armstrong number.")
+        shootNxt("\n{num} is an Armstrong number.")
     } else {
-        shootNxt("{num} is not an Armstrong number.")
+        shootNxt("\n{num} is not an Armstrong number.")
     }
 }
 

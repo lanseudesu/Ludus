@@ -9,6 +9,7 @@ class SymbolTable:
         self.play_scope = []
         self.func_flag = False
         self.shoot_elements = []
+        self.loads = [{}]
     
     def enter_scope(self):
         new_scope = {}
@@ -19,7 +20,7 @@ class SymbolTable:
         self.scope_stack.append(new_scope)
         self.saved_scopes_func = [{}]
     
-    def exit_scope(self):
+    def exit_scope(self, actual_exit=False):
         # print("Exit Scope:")
         # for scope in reversed(self.scope_stack):
         #     print(scope)
@@ -32,8 +33,10 @@ class SymbolTable:
         if self.func_flag:  
             self.saved_scopes_func.insert(1, current_scope.copy())
         else:  
+            if actual_exit:
+                return
             self.saved_scopes.insert(1, current_scope.copy())
-            #print(f"exit scope -> {self.saved_scopes}")
+            print(f"exit scope -> {self.saved_scopes}")
         
     def exit_scope_func(self, func_name):
         self.function_scopes[func_name] = {

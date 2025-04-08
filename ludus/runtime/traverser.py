@@ -3,6 +3,11 @@ from ..nodes import *
 from .symbol_table import SymbolTable
 from .interpreter import evaluate, eval_func, UnresolvedNumber
 from ..error import SemanticError
+import eel
+
+@eel.expose
+def print_shoot(element):
+    eel.printShoot(element)
 
 class ASTVisitor:
     TYPE_MAP = {
@@ -196,7 +201,7 @@ class SemanticAnalyzer(ASTVisitor):
         dict: "array"
     }
 
-    def __init__(self, symbol_table):
+    def __init__(self, symbol_table, isRuntime=False):
         super().__init__()
         self.symbol_table = symbol_table 
         self.i = 1 
@@ -204,13 +209,22 @@ class SemanticAnalyzer(ASTVisitor):
         self.resume_flag = False
         self.in_func_flag = False
         self.recall_flag = False
+        self.isRuntime = isRuntime
 
+    def visit(self, node: Stmt, is_runtime=False):
+        print(f"runtime is {is_runtime} and self.isruntime is {self.isRuntime}")
+        if is_runtime:
+            self.isRuntime = True
+        print(f"runtime is currently {self.isRuntime}")
+        method_name = f"visit_{node.kind}"
+        visitor = getattr(self, method_name, self.generic_visit)
+        return visitor(node)
 
     ###### VARIABLES #########
     def visit_VarDec(self, node: VarDec):
         if node.value.kind == 'FuncCallStmt':
             rhs_name = node.value.name.symbol
-            return_values = evaluate(node.value, self.symbol_table)
+            return_values = evaluate(node.value, self.symbol_table, self.isRuntime)
             if len(return_values) > 1:
                 raise SemanticError(f"ValueError: Function '{rhs_name}' recalls more than one value, but only one was expected.", node.value.pos_start, node.value.pos_end)
             value = return_values[0]
@@ -219,7 +233,8 @@ class SemanticAnalyzer(ASTVisitor):
             if isinstance(value, list):
                 value = value[0]
         else:    
-            value = evaluate(node.value, self.symbol_table)
+            value = evaluate(node.value, self.symbol_table, self.isRuntime)
+            print(f"value is {value}")
             
         if isinstance(value, UnresolvedNumber):
             val_type = "hp or xp" 
@@ -241,7 +256,7 @@ class SemanticAnalyzer(ASTVisitor):
     def visit_VarAssignmentStmt(self, node: VarAssignment):
         if node.right.kind == 'FuncCallStmt':
             rhs_name = node.right.name.symbol
-            return_values = evaluate(node.right, self.symbol_table)
+            return_values = evaluate(node.right, self.symbol_table, self.isRuntime)
             if len(return_values) > 1:
                 raise SemanticError(f"ValueError: Function '{rhs_name}' recalls more than one value, but only one was expected.", node.right.pos_start, node.right.pos_end)
             new_val = return_values[0]
@@ -250,14 +265,15 @@ class SemanticAnalyzer(ASTVisitor):
         elif node.right.kind in {'LoadNum', 'Load'} and node.operator != ':':
             raise SemanticError(f"ValueError: loadNum and load function cannot be used in compound assignment statements.", node.right.pos_start, node.right.pos_end)
         else:
-            new_val = evaluate(node.right, self.symbol_table)
- 
+            new_val = evaluate(node.right, self.symbol_table, self.isRuntime)
+
         if isinstance(new_val, dict):
             if "dimensions" in new_val:
                 raise SemanticError(f"ValueError: Trying to assign an array to a variable: '{node.left.symbol}'.", node.right.pos_start, node.right.pos_end)
             if "parent" in new_val:
                 raise SemanticError(f"ValueError: Trying to assign a struct instance to a variable: '{node.left.symbol}'.", node.right.pos_start, node.right.pos_end)
 
+        #print(f"new_val is {new_val}")
         value = self.symbol_table.lookup(node.left.symbol, node.left.pos_start, node.left.pos_end)
         
         if not isinstance(value, dict):
@@ -384,7 +400,7 @@ class SemanticAnalyzer(ASTVisitor):
                         else:
                             raise SemanticError(f"ValueError: Function '{kind.name.symbol}' recalls more than one value.", var_dec.value.pos_start, var_dec.value.pos_end)
 
-            self.visit(var_dec)
+            self.visit(var_dec, is_runtime=self.isRuntime)
             value = self.symbol_table.lookup(name, name_node.pos_start, name_node.pos_end)
             if variable_type and variable_type != value["type"]:
                 value_node = var_dec.right if var_dec.kind == 'VarAssignmentStmt' else var_dec.value
@@ -495,7 +511,7 @@ class SemanticAnalyzer(ASTVisitor):
             if value == []:
                 raise SemanticError(f"ValueError: Mismatched values — Trying to assign a list object to an array element.", node.right.pos_start, node.right.pos_end)
         else:
-            value = evaluate(node.right, self.symbol_table)
+            value = evaluate(node.right, self.symbol_table, self.isRuntime)
         
         if isinstance(value, dict):
             raise SemanticError(f"ValueError: Mismatched values — Trying to assign a list object to an array element.", node.right.pos_start, node.right.pos_end)
@@ -986,7 +1002,7 @@ class SemanticAnalyzer(ASTVisitor):
             if value == []:
                 raise SemanticError(f"ValueError: Mismatched values — Trying to assign a list object to a struct instance field.", node.right.pos_start, node.right.pos_end)
         else:
-            value = evaluate(node.right, self.symbol_table)
+            value = evaluate(node.right, self.symbol_table, self.isRuntime)
 
         if isinstance(value, dict):
             raise SemanticError(f"ValueError: Mismatched values — Trying to assign a list object to a struct instance field.", node.right.pos_start, node.right.pos_end)
@@ -1094,19 +1110,19 @@ class SemanticAnalyzer(ASTVisitor):
                             new_scope[-1][name] = value  
                 
                 for stmt in cond[1]:
-                    self.visit(stmt)
+                    self.visit(stmt, is_runtime=self.isRuntime)
                     if self.recall_flag and self.in_func_flag:
-                        self.symbol_table.exit_scope()
+                        self.symbol_table.exit_scope(True)
                         return
                     if self.checkpoint_flag:
-                        self.symbol_table.exit_scope()
+                        self.symbol_table.exit_scope(True)
                         return
 
                     if self.resume_flag:
-                        self.symbol_table.exit_scope()
+                        self.symbol_table.exit_scope(True)
                         return
                 
-                self.symbol_table.exit_scope()
+                self.symbol_table.exit_scope(True)
                 return
         
         if node.else_branch is not None:
@@ -1123,19 +1139,19 @@ class SemanticAnalyzer(ASTVisitor):
                         new_scope[-1][name] = value  
 
             for stmt in node.else_branch:
-                self.visit(stmt)
+                self.visit(stmt, is_runtime=self.isRuntime)
                 if self.recall_flag and self.in_func_flag:
-                    self.symbol_table.exit_scope()
+                    self.symbol_table.exit_scope(True)
                     return
                 if self.checkpoint_flag:
-                    self.symbol_table.exit_scope()
+                    self.symbol_table.exit_scope(True)
                     return
 
                 if self.resume_flag:
-                    self.symbol_table.exit_scope()
+                    self.symbol_table.exit_scope(True)
                     return
 
-            self.symbol_table.exit_scope()
+            self.symbol_table.exit_scope(True)
 
     def visit_FlankStmt(self, node: FlankStmt):
         if node.expression.kind == 'FuncCallStmt':
@@ -1162,15 +1178,16 @@ class SemanticAnalyzer(ASTVisitor):
                                 new_scope[-1][scope_name] = scope_val  
 
                     for stmt in choice.body:
-                        self.visit(stmt)
+                        #print(f"runtime before flank: {self.isRuntime}")
+                        self.visit(stmt, is_runtime=self.isRuntime)
                         if self.recall_flag and self.in_func_flag:
-                            self.symbol_table.exit_scope()
+                            self.symbol_table.exit_scope(True)
                             return
                     if self.resume_flag:  
                         self.resume_flag = False
-                        self.symbol_table.exit_scope()
+                        self.symbol_table.exit_scope(True)
                         break
-                    self.symbol_table.exit_scope()
+                    self.symbol_table.exit_scope(True)
                     return
 
         prev_stack = [scope.copy() for scope in self.symbol_table.scope_stack]
@@ -1186,11 +1203,11 @@ class SemanticAnalyzer(ASTVisitor):
                     new_scope[-1][scope_name] = scope_val  
 
         for stmt in node.backup_body:
-            self.visit(stmt)
+            self.visit(stmt, is_runtime=self.isRuntime)
             if self.recall_flag and self.in_func_flag:
-                self.symbol_table.exit_scope()
+                self.symbol_table.exit_scope(True)
                 return
-        self.symbol_table.exit_scope()
+        self.symbol_table.exit_scope(True)
 
     ###### LOOP #########
     def visit_ForStmt(self, node: ForStmt):
@@ -1252,20 +1269,20 @@ class SemanticAnalyzer(ASTVisitor):
             
             while eval_cond(node.condition):
                 for stmt in node.body:
-                    self.visit(stmt)
+                    self.visit(stmt, is_runtime=self.isRuntime)
                     if self.recall_flag and self.in_func_flag:
-                        self.symbol_table.exit_scope()
+                        self.symbol_table.exit_scope(True)
                         return
                     if self.checkpoint_flag:
                         self.checkpoint_flag = False
-                        self.symbol_table.exit_scope()
+                        self.symbol_table.exit_scope(True)
                         self.symbol_table.define_var(val_name, value["value"], value_type, value["immo"])
                         return
                     if self.resume_flag:
                         self.resume_flag = False
                         continue 
                 self.visit_VarAssignmentStmt(node.update)
-            self.symbol_table.exit_scope()
+            self.symbol_table.exit_scope(True)
             
         self.symbol_table.define_var(val_name, value["value"], value_type, value["immo"])
     
@@ -1294,13 +1311,13 @@ class SemanticAnalyzer(ASTVisitor):
                         new_scope[-1][name] = value  
 
             for stmt in node.body:
-                self.visit(stmt)
+                self.visit(stmt, is_runtime=self.isRuntime)
                 if self.recall_flag and self.in_func_flag:
-                    self.symbol_table.exit_scope()
+                    self.symbol_table.exit_scope(True)
                     return
                 if self.checkpoint_flag:
                     self.checkpoint_flag = False
-                    self.symbol_table.exit_scope()
+                    self.symbol_table.exit_scope(True)
                     return
                 if self.resume_flag:
                     self.resume_flag = False
@@ -1326,23 +1343,27 @@ class SemanticAnalyzer(ASTVisitor):
 
         while eval_cond(node.condition):
             for stmt in node.body:
-                self.visit(stmt)
+                self.visit(stmt, is_runtime=self.isRuntime)
                 if self.checkpoint_flag:
                     self.checkpoint_flag = False
-                    self.symbol_table.exit_scope()
+                    self.symbol_table.exit_scope(True)
                     return
                 if self.resume_flag:
                     self.resume_flag = False
                     continue 
-        self.symbol_table.exit_scope()
+            if node.condition.kind == 'FlagLiteral':
+                if not self.isRuntime:
+                    if node.condition.value == True:
+                        break
+        self.symbol_table.exit_scope(True)
     
     ###### FUNCS #########
     def visit_BlockStmt(self, node: BlockStmt):
         self.symbol_table.restore_scope(len(self.symbol_table.scope_stack))
         for stmt in node.statements:
-            self.visit(stmt)
+            self.visit(stmt, is_runtime=self.isRuntime)
         self.symbol_table.play_scope = self.symbol_table.scope_stack.copy()
-        self.symbol_table.exit_scope()  
+        self.symbol_table.exit_scope(True)  
 
     def visit_ResumeStmt(self, node: ResumeStmt):
         self.resume_flag = True 
@@ -1356,7 +1377,11 @@ class SemanticAnalyzer(ASTVisitor):
     def visit_GlobalFuncBody(self, node: GlobalFuncBody):
         pass
 
-    def visit_FuncCallStmt(self, node: FuncCallStmt, being_assigned = False):
+    def visit_FuncCallStmt(self, node: FuncCallStmt, being_assigned = False, func_is_runtime=False):
+        print(f"in func call and runtime is {self.isRuntime}")
+        if func_is_runtime:
+            self.isRuntime = func_is_runtime
+        print(f"in func call and runtime is now {self.isRuntime}")
         self.recall_values = []
         prev_stack = [scope.copy() for scope in self.symbol_table.scope_stack]
         prev_saved_stack = [scope.copy() for scope in self.symbol_table.saved_scopes]
@@ -1391,7 +1416,7 @@ class SemanticAnalyzer(ASTVisitor):
             for i, param in enumerate(params):
                 if i < len(args):  
                     arg_value = args[i]
-                    print(f"arg value raw -> {arg_value}") 
+                    print(f"arg value -> {arg_value}") 
                 elif param.param_val is not None:
                     arg_value = evaluate(param.param_val, self.symbol_table)
                 else:
@@ -1412,7 +1437,7 @@ class SemanticAnalyzer(ASTVisitor):
         self.in_func_flag = True
         
         for stmt in info["body"]:
-            self.visit(stmt)
+            self.visit(stmt, is_runtime=self.isRuntime)
             if self.recall_flag:
                 break
 
@@ -1439,7 +1464,7 @@ class SemanticAnalyzer(ASTVisitor):
             self.recall_values = None
         else:
             for expr in node.expressions:
-                print(expr)
+                #print(expr)
                 if expr == []:
                     self.recall_values.append([])
                     self.recall_flag = True
@@ -1451,7 +1476,7 @@ class SemanticAnalyzer(ASTVisitor):
                     value = eval_func(expr.name.symbol, expr, self.symbol_table) 
                 else:    
                     value = evaluate(expr, self.symbol_table)
-                
+
                 self.recall_values.append(value)
         self.recall_flag = True
 
@@ -1465,22 +1490,24 @@ class SemanticAnalyzer(ASTVisitor):
         else:    
             element = evaluate(node.element, self.symbol_table)
         
+        #print(f"shoot element is {element} before and node element is {node.element}")
         if isinstance(element, UnresolvedNumber):
             element = '0 or 0.0'
         elif not isinstance(element, dict):
-            print("1")
             element=element
         elif element is None:
             element = 'dead'
         elif "value" in element:
-            print("2")
             element = element["value"]
         elif "elements" in element or "fields" in element:
             raise SemanticError("UnsupportedArgumentError: Cannot use a list object as a shoot argument.", node.pos_start, node.pos_end)
             
-        print(f"shoot element -> {element}")
-        self.symbol_table.save_shoot_elems(element)
-        
+        print(f"shoot element -> {element}.")
+        if self.isRuntime:
+            if node.is_Next:
+                print_shoot(element + "\n")
+            else:
+                print_shoot(element)
 
     def visit_LevelStmt(self, node: LevelStmt):
         if node.value.kind == 'FuncCallStmt':
