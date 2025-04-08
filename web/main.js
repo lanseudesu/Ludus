@@ -390,7 +390,7 @@ function requestInput(promptText) {
     
     const inputBox = document.getElementById("error2");
     inputBox.value += promptText;
-    const initialContent = inputBox.value;
+    const promptLength = inputBox.value.length;
     inputBox.removeAttribute('readonly');
     inputBox.focus();  
 
@@ -402,10 +402,9 @@ function requestInput(promptText) {
         if (event.key === "Enter") {
             event.preventDefault();  
 
-            const userInput = inputBox.value.trim();  
-            const newInput = userInput.substring(initialContent.length).trim();
-            console.log("Old input:", userInput);
-            console.log("New input:", newInput);
+            const userInput = inputBox.value;  
+            const newInput = userInput.slice(promptLength).trim();
+            console.log("Typed input:", newInput);
 
             if (newInput !== "") {
                 eel.pass_input(newInput)  
