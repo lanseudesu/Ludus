@@ -381,7 +381,7 @@ class SemanticAnalyzer(ASTVisitor):
             kind = var_dec.right if var_dec.kind == 'VarAssignmentStmt' else var_dec.value
 
             if kind.kind == 'FuncCallStmt':
-                return_values = evaluate(kind, self.symbol_table)
+                return_values = evaluate(kind, self.symbol_table, self.isRuntime)
 
                 if len(return_values) > 1:
                     if node.batch_ver1:
