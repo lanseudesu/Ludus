@@ -2423,17 +2423,6 @@ def check(fn, text, isRuntime=False):
     if isinstance(result, SemanticError):
         result.source_code = text.splitlines()
         return str(result) 
-    
-    try:
-        visitor = ASTVisitor()
-        visitor.visit(result)
-
-        analyzer = SemanticAnalyzer(visitor.symbol_table)
-        analyzer.visit(result)
-        #table = analyzer.symbol_table
-    except SemanticError as e:
-        e.source_code = text.splitlines()
-        return str(e)
 
     if isRuntime:
         try:
@@ -2448,6 +2437,17 @@ def check(fn, text, isRuntime=False):
         
         return "Code Gen successful!"
     else:
+        try:
+            visitor = ASTVisitor()
+            visitor.visit(result)
+
+            analyzer = SemanticAnalyzer(visitor.symbol_table)
+            analyzer.visit(result)
+            #table = analyzer.symbol_table
+        except SemanticError as e:
+            e.source_code = text.splitlines()
+            return str(e)
+        
         return "Semantic analyzing successful, no lexical, syntax, and semantic errors found!"
 
 
