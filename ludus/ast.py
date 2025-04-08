@@ -1873,8 +1873,8 @@ class Semantic:
             self.expect('(', f"Expected '(' after '{tk}'.")
             self.skip_spaces()
             arg_pos = [self.current_token.line, self.current_token.column]
-            value = self.parse_primary_expr(scope,None,arg_pos)
-            valid_kinds = ['Identifier', 'ArrayElement', 'StructInstField'] 
+            value = self.parse_expr(scope)
+            valid_kinds = ['Identifier', 'ArrayElement', 'StructInstField', 'BinaryExpr'] 
             if value.kind not in valid_kinds:
                 raise SemanticError(f"ArgumentError: Invalid '{tk}' argument.", self.current_token.line)
             self.skip_spaces()
@@ -1888,8 +1888,8 @@ class Semantic:
             self.expect('(', f"Expected '(' after '{tk}'.")
             self.skip_spaces()
             arg_pos = [self.current_token.line, self.current_token.column]
-            value = self.parse_primary_expr(scope, None, arg_pos)
-            valid_kinds = ['Identifier', 'ArrayElement', 'StructInstField'] 
+            value = self.parse_expr(scope)
+            valid_kinds = ['Identifier', 'ArrayElement', 'StructInstField', 'BinaryExpr'] 
             if value.kind not in valid_kinds:
                 raise SemanticError(f"ArgumentError: Invalid '{tk}' argument.", self.current_token.line)
             self.skip_spaces()
