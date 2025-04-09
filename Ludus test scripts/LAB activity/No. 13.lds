@@ -10,9 +10,9 @@ play() {
 generate pyramid(total_rows) {
 	hp current_row, space, stars
     
-    if total_rows < 1 {
+    if total_rows <= 1 {
     	shoot("Invalid input for pyramid.")
-    }
+    } else {
     
       for current_row: 1, current_row <= total_rows, current_row += 1 {
           stars:0
@@ -26,7 +26,7 @@ generate pyramid(total_rows) {
           }
         shoot("\n")
       }
-    
+   }
 }
 
 gameOver

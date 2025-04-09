@@ -18,13 +18,14 @@ generate rectangle(rows, cols){
         shoot("Invalid number of rows.")
     } elif cols <= 1 {
         shoot("Invalid number of columns.")
-    }
-    
-	for i: 0, i < rows, i+=1 {
+    } else {
+    	for i: 0, i < rows, i+=1 {
             for j: 0, j < cols, j+=1 {
                 shoot("*")
             }
             shootNxt()
-  }
- }
+  		}
+ 	}
+}    
+	
 gameOver

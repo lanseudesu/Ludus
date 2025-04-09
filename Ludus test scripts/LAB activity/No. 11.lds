@@ -8,13 +8,17 @@ play(){
 }
 
 generate rightTriangle(size){
-	hp i
-	for i: 1, i <= size, i +=1  {  
-    	hp j
-        for j: 1, j <= i, j+=1 {  
-            shoot("* ") 
-        }
-     	shootNxt()
+	if size <= 1 {
+    	shoot("Invalid triangle height, must be more than 1.")
+    } else {
+      hp i
+      for i: 1, i <= size, i +=1  {  
+          hp j
+          for j: 1, j <= i, j+=1 {  
+              shoot("* ") 
+          }
+          shootNxt()
+       }
     }
 }
 gameOver

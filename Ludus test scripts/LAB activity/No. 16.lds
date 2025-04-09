@@ -43,8 +43,8 @@ play() {
 
 generate square(size){
 	comms result
-	if size < 1 {
-    	shoot("Invalid input for square.")
+	if size <= 1 {
+    	recall "Invalid input for square."
     }
 	hp i
 	for i: 0, i < size, i += 1{
@@ -59,8 +59,8 @@ generate square(size){
 
 generate rectangle(length, width){
 	comms result
-	if length < 1 OR width < 1 {
-    	shoot("Invalid inputs for rectangle.")
+	if length <= 1 OR width <= 1 {
+    	recall "Invalid inputs for rectangle."
     }
 	hp i
 	for i: 0, i < length, i += 1{
@@ -75,8 +75,8 @@ generate rectangle(length, width){
 
 generate triangle(height){
 	comms result
-	if height < 1 {
-    	shoot("Invalid inputs for triangle.")
+	if height <= 1 {
+    	recall "Invalid input for triangle."
     }
 	hp i
 	for i: 0, i < height, i += 1{
@@ -95,8 +95,8 @@ generate triangle(height){
 
 generate right_triangle(height){
 	comms result
-	if height < 1 {
-    	shoot("Invalid inputs for triangle.")
+	if height <= 1 {
+    	recall "Invalid input for triangle."
     }
 	hp i
 	for i: 0, i < height, i += 1{
@@ -111,8 +111,8 @@ generate right_triangle(height){
 
 generate inverted_right_triangle(height){
 	comms result
-	if height < 1 {
-    	shoot("Invalid inputs for triangle.")
+	if height <= 1 {
+    	recall "Invalid input for triangle."
     }
 	hp i
 	for i: 0, i < height, i += 1{
