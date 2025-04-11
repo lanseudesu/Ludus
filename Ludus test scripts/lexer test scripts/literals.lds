@@ -13,5 +13,6 @@ string: "hello, ludus"
 name: 0934
 
 greeting: "Merry Christmas"(
-print: "autoeye"[
+print: "Autoeye"[
+
 
