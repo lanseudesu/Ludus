@@ -15,8 +15,8 @@ play(){
         area: square_area(side)
         shoot("\nThe area of the square is {area.2f}.")
     choice 2:
-    	length: loadNum("\nEnter the length of the square: ")
-        width: loadNum("\nEnter the width of the square: ")
+    	length: loadNum("\nEnter the length of the rectangle: ")
+        width: loadNum("\nEnter the width of the rectangle: ")
         area: rectangle_area(length, width)
         shoot("\nThe area of the rectangle is {area.2f}.")
     choice 3:

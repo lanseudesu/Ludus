@@ -4,6 +4,7 @@ from .symbol_table import SymbolTable
 from .interpreter import evaluate, eval_func, UnresolvedNumber
 from ..error import SemanticError
 import eel
+import math
 
 @eel.expose
 def print_shoot(element):
@@ -1504,6 +1505,18 @@ class SemanticAnalyzer(ASTVisitor):
             
         print(f"shoot element -> {element}.")
         if self.isRuntime:
+            if isinstance(element, float):
+                whole_part = str(int(abs(element)))
+                if len(whole_part) > 10:
+                    raise SemanticError("TypeError: Whole number part of xp exceeds 10 digits.", node.pos_start, node.pos_end)
+                
+                element = round(element, 7)
+                element = f"{element:.7f}".rstrip('0').rstrip('.') if '.' in f"{element:.7f}" else f"{element:.7f}"
+
+            elif isinstance(element, int):
+                if len(str(abs(element))) > 10:
+                    raise SemanticError("TypeError: Hp value exceeds 10 digits.", node.pos_start, node.pos_end)
+
             if node.is_Next:
                 print_shoot(element + "\n")
             else:

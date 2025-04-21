@@ -244,11 +244,27 @@ def evaluate(ast_node, symbol_table, isRuntime=False):
             
 
             try:
-                if '.' in val:
-                    return float(val)
+                stripped_val = val.strip()
+    
+                if '.' in stripped_val:
+                    whole, decimal = stripped_val.split('.', 1)
+                    whole = whole.lstrip('0') or '0'
+                    decimal = decimal.rstrip('0')
+
+                    if len(whole.lstrip('-')) > 10:
+                        raise SemanticError(f"TypeError: Whole number part of xp exceeds 10 digits: '{whole}'", ast_node.pos_start, ast_node.pos_end)
+                    if len(decimal) > 7:
+                        raise SemanticError(f"TypeError: Decimal part of xp exceeds 7 digits: '{decimal}'", ast_node.pos_start, ast_node.pos_end)
+
+                    return float(stripped_val)
+
                 else:
-                    return int(val)
-            except:
+                    num_part = stripped_val.lstrip('-').lstrip('0') or '0'
+                    if len(num_part) > 10:
+                        raise SemanticError(f"TypeError: Hp value exceeds 10 digits: '{num_part}'", ast_node.pos_start, ast_node.pos_end)
+
+                    return int(stripped_val)
+            except ValueError:
                 raise SemanticError(f"TypeError: Invalid numeric input: '{val}'", ast_node.pos_start, ast_node.pos_end)
         else:
             return UnresolvedNumber()
@@ -311,7 +327,18 @@ def evaluate(ast_node, symbol_table, isRuntime=False):
                     result = 'dead'
                 elif isinstance(result, UnresolvedNumber):
                     result = '0 or 0.0'
-                elif isinstance(result, int) or isinstance(result, float) or isinstance(result, str):
+                elif isinstance(result, float):
+                    whole_part = str(int(abs(result)))
+                    if len(whole_part) > 10:
+                        raise SemanticError("TypeError: Whole number part of xp exceeds 10 digits.", expr.pos_start, expr.pos_end)
+                    
+                    result = round(result, 7)
+                    result = f"{result:.7f}".rstrip('0').rstrip('.') if '.' in f"{result:.7f}" else f"{result:.7f}"
+                elif isinstance(result, int):
+                    if len(str(abs(result))) > 10:
+                        raise SemanticError("TypeError: Hp exceeds 10 digits.", expr.pos_start, expr.pos_end)
+                    result = str(result)
+                elif isinstance(result, str):
                     result=result
                 elif result == False:
                     result = 'false'
@@ -324,7 +351,17 @@ def evaluate(ast_node, symbol_table, isRuntime=False):
                     result = 'dead'
                 elif isinstance(result, UnresolvedNumber):
                     result = '0 or 0.0'
-                elif isinstance(result, int) or isinstance(result, float) or isinstance(result, str):
+                elif isinstance(result, float):
+                    whole_part = str(int(abs(result)))
+                    if len(whole_part) > 10:
+                        raise SemanticError("TypeError: Whole number part of xp exceeds 10 digits.", expr.pos_start, expr.pos_end)
+                    result = round(result, 7)
+                    result = f"{result:.7f}".rstrip('0').rstrip('.') if '.' in f"{result:.7f}" else f"{result:.7f}"
+                elif isinstance(result, int):
+                    if len(str(abs(result))) > 10:
+                        raise SemanticError("TypeError: Hp exceeds 10 digits.", expr.pos_start, expr.pos_end)
+                    result = str(result)
+                elif isinstance(result, str):
                     result=result
                 elif result == False:
                     result = 'false'

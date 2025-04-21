@@ -15,8 +15,8 @@ play(){
         perimeter: square_perimeter(side)
         shoot("\nThe perimeter of the square is {perimeter.2f}.")
     choice 2:
-    	length: loadNum("\nEnter the length of the square: ")
-        width: loadNum("\nEnter the width of the square: ")
+    	length: loadNum("\nEnter the length of the rectangle: ")
+        width: loadNum("\nEnter the width of the rectangle: ")
         perimeter: rectangle_perimeter(length, width)
         shoot("\nThe perimeter of the rectangle is {perimeter.2f}.")
     choice 3:

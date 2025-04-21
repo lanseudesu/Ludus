@@ -21,7 +21,7 @@ generate rectangle(rows, cols){
     } else {
     	for i: 0, i < rows, i+=1 {
             for j: 0, j < cols, j+=1 {
-                shoot("*")
+                shoot("* ")
             }
             shootNxt()
   		}
