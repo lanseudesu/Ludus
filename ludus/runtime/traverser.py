@@ -1521,9 +1521,9 @@ class SemanticAnalyzer(ASTVisitor):
                     raise SemanticError("TypeError: Hp value exceeds 10 digits.", node.pos_start, node.pos_end)
 
             if node.is_Next:
-                print_shoot(element + "\n")
+                print_shoot(str(element) + "\n")
             else:
-                print_shoot(element)
+                print_shoot(str(element))
 
     def visit_LevelStmt(self, node: LevelStmt):
         if node.value.kind == 'FuncCallStmt':
