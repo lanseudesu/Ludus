@@ -59,6 +59,7 @@ class NodeType:
     LEVEL_STMT          = "LevelStmt"
     TO_NUM_STMT         = "ToNumStmt"
     TO_COMMS_STMT       = "ToCommsStmt"
+    STRING_INDEX_ARR    = "StringIndexArr"
 
 class Stmt:
     def __init__(self, kind: str):
@@ -535,5 +536,13 @@ class ToCommsStmt(Stmt):
     def __init__(self, value, pos_start=None, pos_end=None):
         super().__init__(NodeType.TO_COMMS_STMT)
         self.value = value
+        self.pos_start = pos_start
+        self.pos_end = pos_end
+
+class StringIndexArr(Expr):
+    def __init__(self, left: Identifier, index: Expr, pos_start=None, pos_end=None):
+        super().__init__(NodeType.STRING_INDEX_ARR)
+        self.left = left
+        self.index = index
         self.pos_start = pos_start
         self.pos_end = pos_end

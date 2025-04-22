@@ -29,6 +29,8 @@ class SymbolTable:
             return
         
         current_scope = self.scope_stack.pop()
+        # for scope in reversed(self.scope_stack):
+        #     print("scope: ", scope)
 
         if self.func_flag:  
             self.saved_scopes_func.insert(1, current_scope.copy())

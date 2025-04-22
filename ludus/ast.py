@@ -57,7 +57,7 @@ class Semantic:
                 if info["type"] == id_type:
                     return True
                 else:
-                    raise SemanticError(f"NameError: Identifier '{name}' is already declared as {info["type"]}.", node.pos_start, node.pos_end)
+                    raise SemanticError(f"1 NameError: Identifier '{name}' is already declared as {info["type"]}.", node.pos_start, node.pos_end)
         return False
     
     def get_identifier_info(self, name, node):
@@ -646,7 +646,7 @@ class Semantic:
             if info:
                 info = self.get_identifier_info(var.symbol, var)
                 if info["type"] != "a variable" and info["type"] != "a parameter":
-                    raise SemanticError(f"8 NameError: Identifier '{var.symbol}' was "
+                    raise SemanticError(f"NameError: Identifier '{var.symbol}' was "
                                         f"already declared as {info["type"]}.", var.pos_start, var.pos_end)
                 else:
                     if info["type"] == "a parameter" and isinstance(value, Identifier):
@@ -1568,10 +1568,13 @@ class Semantic:
                 
                 dimensions = []
                 if not self.lookup_identifier(identifier.symbol):
-                    raise SemanticError(f"NameError: Array '{identifier.symbol}' does not exist.", new_pos_start, id_pos_end)
-                
+                    if info["type"] == "an array":
+                        raise SemanticError(f"NameError: Array '{identifier.symbol}' does not exist.", new_pos_start, id_pos_end)
+                    else:
+                        raise SemanticError(f"NameError: Variable '{identifier.symbol}' does not exist.", new_pos_start, id_pos_end)
+
                 info = self.get_identifier_info(identifier.symbol, identifier)
-                allowed_types = {"an array"}
+                allowed_types = {"an array", "a variable"}
                 if self.func_flag:
                     allowed_types.add("a parameter")
 
@@ -1601,7 +1604,10 @@ class Semantic:
                     error.pos_end = pos_end
                     raise error
 
-                identifier = ArrElement(identifier, dimensions, new_pos_start, pos_end)
+                if info["type"] == "an array":
+                    identifier = ArrElement(identifier, dimensions, new_pos_start, pos_end)
+                else:
+                    identifier = StringIndexArr(identifier, dimensions, new_pos_start, pos_end)
             elif self.current_token.token == '(':
                 if not self.lookup_id_type(identifier.symbol, "a function", identifier):
                     raise SemanticError(f"NameError: Function '{identifier.symbol}' does not exist.", new_pos_start, id_pos_end)

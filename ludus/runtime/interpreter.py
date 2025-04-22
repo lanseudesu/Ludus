@@ -101,6 +101,7 @@ def evaluate(ast_node, symbol_table, isRuntime=False):
     elif ast_node.kind == 'ArrayElement':
         arr_name = ast_node.left.symbol
         arr = symbol_table.lookup(arr_name, ast_node.left.pos_start, ast_node.left.pos_end)
+        print(f"arr: {arr}")
 
         if not isinstance(arr, dict) or "dimensions" not in arr:
             raise SemanticError(f"TypeError: '{arr_name}' is not an array.", 
@@ -149,6 +150,57 @@ def evaluate(ast_node, symbol_table, isRuntime=False):
         
         return target[final_idx_val]
     
+    elif ast_node.kind == 'StringIndexArr':
+        name = ast_node.left.symbol
+        value = symbol_table.lookup(name, ast_node.left.pos_start, ast_node.left.pos_end)
+
+        if not isinstance(value, dict) or "type" not in value:
+            raise SemanticError(f"TypeError: '{name}' is not a variable.", 
+                                ast_node.left.pos_start, ast_node.left.pos_end)
+        if value["type"] != "comms":
+            raise SemanticError(f"TypeError: '{name}' is not a comms variable.", 
+                                ast_node.left.pos_start, ast_node.left.pos_end)
+        
+        target = list(value["value"])
+        for i, idx in enumerate(ast_node.index[:-1]):
+            if idx.kind in {'LoadNum', 'Load'}:
+                raise SemanticError(f"IndexError: loadNum and load function cannot be used as index expression.", idx.pos_start, idx.pos_end)
+            
+            if idx.kind == 'FuncCallStmt':
+                idx_val = eval_func(idx.name.symbol, idx, symbol_table) 
+            else:    
+                idx_val = evaluate(idx, symbol_table)
+                        
+            if isinstance(idx_val, UnresolvedNumber):
+                idx_val = 0
+            
+            if not isinstance(idx_val, int):
+                raise SemanticError(f"IndexError: Variable index must always evaluate to a positive hp value.", idx.pos_start, idx.pos_end)
+            
+            if idx_val < 0 or idx_val >= len(target):
+                raise SemanticError(f"IndexError: Variable {idx_val} out of bounds for size {i} of comms '{name}'.", idx.pos_start, idx.pos_end)
+            target = target[idx_val]
+        
+        final_idx = ast_node.index[-1]
+        
+        if final_idx.kind in {'LoadNum', 'Load'}:
+            raise SemanticError(f"IndexError: loadNum and load function cannot be used as index expression.", final_idx.pos_start, final_idx.pos_end)
+        
+        if final_idx.kind == 'FuncCallStmt':
+            final_idx_val = eval_func(final_idx.name.symbol, final_idx, symbol_table) 
+        else:    
+            final_idx_val = evaluate(final_idx, symbol_table)
+        
+        if isinstance(final_idx_val, UnresolvedNumber):
+                final_idx_val = 0
+        
+        if not isinstance(final_idx_val, int):
+            raise SemanticError(f"IndexError: Index must always evaluate to a positive hp value.", final_idx.pos_start, final_idx.pos_end)
+        if final_idx_val < 0 or final_idx_val >= len(target):
+            raise SemanticError(f"IndexError: Index {final_idx_val} out of bounds for final dimension of variable '{name}'.", final_idx.pos_start, final_idx.pos_end)
+        
+        return target[final_idx_val]
+
     elif ast_node.kind == "DeadLiteral":
         return None
     

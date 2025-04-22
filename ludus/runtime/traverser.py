@@ -1288,6 +1288,7 @@ class SemanticAnalyzer(ASTVisitor):
         self.symbol_table.define_var(val_name, value["value"], value_type, value["immo"])
     
     def visit_GrindWhileStmt(self, node: GrindWhileStmt):
+        it_ran = False
         if node.condition.kind == 'FuncCallStmt':
             condition = eval_func(node.condition.name.symbol, node.condition, self.symbol_table) 
         elif node.condition.kind in {'Load', 'LoadNum'}:
@@ -1299,6 +1300,7 @@ class SemanticAnalyzer(ASTVisitor):
             raise SemanticError(f"LoopConditionError: Loop condition does not evaluate to a flag value.", node.condition.pos_start, node.condition.pos_end)
         
         if node.is_grind:
+            it_ran = True
             prev_stack = [scope.copy() for scope in self.symbol_table.scope_stack]
             if self.in_func_flag:
                 self.symbol_table.restore_scope(len(self.symbol_table.saved_scopes) - 1)
@@ -1323,6 +1325,7 @@ class SemanticAnalyzer(ASTVisitor):
                 if self.resume_flag:
                     self.resume_flag = False
         elif not node.is_grind and condition:
+            it_ran = True
             prev_stack = [scope.copy() for scope in self.symbol_table.scope_stack]
             if self.in_func_flag:
                 self.symbol_table.restore_scope(len(self.symbol_table.saved_scopes) - 1)
@@ -1334,7 +1337,6 @@ class SemanticAnalyzer(ASTVisitor):
                  for name, value in scope.items():
                     if name in new_scope[-1]:
                         new_scope[-1][name] = value  
-
             
         def eval_cond(cond):
             if cond.kind == 'FuncCallStmt':
@@ -1356,7 +1358,8 @@ class SemanticAnalyzer(ASTVisitor):
                 if not self.isRuntime:
                     if node.condition.value == True:
                         break
-        self.symbol_table.exit_scope(True)
+        if it_ran:
+            self.symbol_table.exit_scope(True)
     
     ###### FUNCS #########
     def visit_BlockStmt(self, node: BlockStmt):
