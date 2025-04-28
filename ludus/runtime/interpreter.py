@@ -153,15 +153,21 @@ def evaluate(ast_node, symbol_table, isRuntime=False):
     elif ast_node.kind == 'StringIndexArr':
         name = ast_node.left.symbol
         value = symbol_table.lookup(name, ast_node.left.pos_start, ast_node.left.pos_end)
-
-        if not isinstance(value, dict) or "type" not in value:
+        if isinstance(value, dict):
+            if "type" not in value:
+                raise SemanticError(f"TypeError: '{name}' is not a variable.", 
+                                    ast_node.left.pos_start, ast_node.left.pos_end)
+            if value["type"] != "comms":
+                raise SemanticError(f"TypeError: '{name}' is not a comms variable.", 
+                                    ast_node.left.pos_start, ast_node.left.pos_end)
+            value = value["value"]
+        elif isinstance(value, str):
+            pass
+        else:
             raise SemanticError(f"TypeError: '{name}' is not a variable.", 
                                 ast_node.left.pos_start, ast_node.left.pos_end)
-        if value["type"] != "comms":
-            raise SemanticError(f"TypeError: '{name}' is not a comms variable.", 
-                                ast_node.left.pos_start, ast_node.left.pos_end)
-        
-        target = list(value["value"])
+
+        target = list(value)
         for i, idx in enumerate(ast_node.index[:-1]):
             if idx.kind in {'LoadNum', 'Load'}:
                 raise SemanticError(f"IndexError: loadNum and load function cannot be used as index expression.", idx.pos_start, idx.pos_end)

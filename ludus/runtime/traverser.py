@@ -705,11 +705,148 @@ class SemanticAnalyzer(ASTVisitor):
 
             self.symbol_table.define_arr(arr_name, node.dimensions, values, node.immo, arr_type)
     
+    def commsJoinStmt(self, node: JoinStmt):
+        arr_name = node.arr_name.symbol
+        arr_info = self.symbol_table.lookup(arr_name, node.arr_name.pos_start, node.arr_name.pos_end)
+
+        arr_immo = arr_info["immo"]
+        arr_type = arr_info["type"]
+        arr_value = arr_info["value"]
+
+        if arr_value == None:
+            raise SemanticError(f"TypeError: Comms variable '{arr_name}' is a dead variable and must be defined with a value first.", node.arr_name.pos_start, node.arr_name.pos_end)
+        if arr_immo==True:
+            raise SemanticError(f"ImmoError: Comms variable '{arr_name}' is declared as an immutable variable.", node.arr_name.pos_start, node.arr_name.pos_end)
+
+        if node.row_index:
+            raise SemanticError(f"TypeError: Trying to use comms variable '{arr_name}' like a two-dimensional array.", node.arr_name.pos_start, node.arr_name.pos_end)
+        if isinstance(node.value, list):
+            raise SemanticError(f"TypeError: Trying to join a list; only one character can be joined in a comms variable.", node.arr_name.pos_start, node.arr_name.pos_end)
+        else:
+            value = node.value 
+            if value.kind == 'FuncCallStmt':
+                return_values = evaluate(value, self.symbol_table)
+                if len(return_values) > 1:
+                    raise SemanticError(f"ValueError: Function '{value.name.symbol}' recalls more than one value.", value.pos_start, value.pos_end) 
+                elem = return_values[0]
+                if elem == []:
+                    raise SemanticError(f"ValueError: Trying to append an array to an comms variable.", value.pos_start, value.pos_end)
+            elif value.kind in {'LoadNum', 'Load'}:
+                raise SemanticError(f"ValueError: loadNum and load function cannot be used to append an element to a comms variable.", value.pos_start, value.pos_end)
+            else:
+                elem = evaluate(value, self.symbol_table)
+
+            if isinstance(elem, dict):
+                raise SemanticError(f"ValueError: Trying to append a list object to a comms variable.", node.pos_start, node.pos_end)
+            if not isinstance(elem, str):
+                raise SemanticError(f"TypeError: Comms variable '{arr_name}' can only be appended with a single character value.", node.pos_start, node.pos_end)
+            if len(elem) > 1:
+                raise SemanticError(f"ValueError: Comms variable '{arr_name}' can only be appended with a single character value.", node.pos_start, node.pos_end)
+
+        arr_value += elem
+        self.symbol_table.define_var(arr_name, arr_value, arr_type, arr_immo)  
+
+    def commsDropStmt(self, node: DropStmt, is_Return=False):
+        arr_name = node.arr_name.symbol
+        arr_info = self.symbol_table.lookup(arr_name, node.arr_name.pos_start, node.arr_name.pos_end)
+
+        arr_immo = arr_info["immo"]
+        arr_type = arr_info["type"]
+        arr_value = arr_info["value"]
+
+        if arr_value == None:
+            raise SemanticError(f"TypeError: Comms variable '{arr_name}' is a dead variable and must be defined with a value first.", node.arr_name.pos_start, node.arr_name.pos_end)
+        if arr_immo==True:
+            raise SemanticError(f"ImmoError: Comms variable '{arr_name}' is declared as an immutable variable.", node.arr_name.pos_start, node.arr_name.pos_end)
+
+        if node.row_index:
+            raise SemanticError(f"TypeError: Trying to use comms variable '{arr_name}' like a two-dimensional array.", node.arr_name.pos_start, node.arr_name.pos_end)
+        
+        elem_index = None
+        if node.elem_index:
+            if node.elem_index.kind in {'LoadNum', 'Load'}:
+                raise SemanticError(f"IndexError: loadNum and load function cannot be used as index expression.", node.elem_index.pos_start, node.elem_index.pos_end)
+            
+            if node.elem_index.kind == 'FuncCallStmt':
+                elem_index = eval_func(node.elem_index.name.symbol, node.elem_index, self.symbol_table) 
+            else:    
+                elem_index = evaluate(node.elem_index, self.symbol_table)
+
+            if isinstance(elem_index, UnresolvedNumber):
+                elem_index = 0
+
+            if not isinstance(elem_index, int):
+                raise SemanticError(f"IndexError: Array index must always evaluate to a positive hp value.", node.elem_index.pos_start, node.elem_index.pos_end)
+
+        var_str = list(arr_value)
+        if elem_index is not None:
+            if elem_index >= len(arr_value) or elem_index < 0:
+                raise SemanticError(f"IndexError: Index {elem_index} out of bounds for comms variable '{arr_name}'.", node.elem_index.pos_start, node.elem_index.pos_end)
+            ret = var_str.pop(elem_index)
+        else:
+            ret = var_str.pop()  
+
+        new_str = ''.join(var_str)
+        if is_Return:
+            self.symbol_table.define_var(arr_name, new_str, arr_type, arr_immo)
+            return ret  
+        
+        self.symbol_table.define_var(arr_name, new_str, arr_type, arr_immo)  
+    
+    def commsSeekStmt(self, node: SeekStmt):
+        arr_name = node.arr_name.symbol
+        arr_info = self.symbol_table.lookup(arr_name, node.arr_name.pos_start, node.arr_name.pos_end)
+
+        arr_value = arr_info["value"]
+
+        if arr_value == None:
+            raise SemanticError(f"TypeError: Comms variable '{arr_name}' is a dead variable and must be defined with a value first.", node.arr_name.pos_start, node.arr_name.pos_end)
+        if arr_value == "":
+            raise SemanticError(f"ImmoError: Comms variable '{arr_name}' is an empty variable, there is no character to be seeked.", node.arr_name.pos_start, node.arr_name.pos_end)
+
+        if node.row_index:
+            raise SemanticError(f"TypeError: Trying to use comms variable '{arr_name}' like a two-dimensional array.", node.arr_name.pos_start, node.arr_name.pos_end)
+        
+        if isinstance(node.value, list):
+            raise SemanticError(f"TypeError: Trying to seek a list; only one character can be seeked in a comms variable.", node.arr_name.pos_start, node.arr_name.pos_end)
+        else:
+            value = node.value 
+            if value.kind == 'FuncCallStmt':
+                return_values = evaluate(value, self.symbol_table)
+                if len(return_values) > 1:
+                    raise SemanticError(f"ValueError: Function '{value.name.symbol}' recalls more than one value.", value.pos_start, value.pos_end) 
+                elem = return_values[0]
+                if elem == []:
+                    raise SemanticError(f"ValueError: Trying to seek an array from a comms variable.", value.pos_start, value.pos_end)
+            elif value.kind in {'LoadNum', 'Load'}:
+                raise SemanticError(f"ValueError: loadNum and load function cannot be used to seek a character from a comms variable.", value.pos_start, value.pos_end)
+            else:
+                elem = evaluate(value, self.symbol_table)
+
+            if not isinstance(elem, str):
+                raise SemanticError(f"TypeError: Trying to seek a non-character value from a comms variable.", node.pos_start, node.pos_end)
+            if len(elem) > 1:
+                raise SemanticError(f"TypeError: Trying to seek a non-single character value from a comms variable.", node.pos_start, node.pos_end)
+
+            try:
+                return arr_value.index(elem)
+            except ValueError:
+                return -1
+    
     def visit_JoinStmt(self, node: JoinStmt):
         arr_name = node.arr_name.symbol
         arr_info = self.symbol_table.lookup(arr_name, node.arr_name.pos_start, node.arr_name.pos_end)
+
+        if isinstance(arr_info, dict): 
+            if "dimensions" not in arr_info and arr_info["type"] == "comms":
+                self.commsJoinStmt(node)
+                return
+            elif "dimensions" not in arr_info and arr_info["type"] != "comms":
+                raise SemanticError(f"TypeError: '{arr_name}' is not an comms variable.", node.arr_name.pos_start, node.arr_name.pos_end)
+
         if not isinstance(arr_info, dict) or "dimensions" not in arr_info:
             raise SemanticError(f"TypeError: '{arr_name}' is not an array.", node.arr_name.pos_start, node.arr_name.pos_end)
+        
         arr_immo = arr_info["immo"]
         arr_type = arr_info["type"]
         arr_dimensions = arr_info["dimensions"]
@@ -810,8 +947,20 @@ class SemanticAnalyzer(ASTVisitor):
     def visit_DropStmt(self, node: DropStmt, is_Return=False):
         arr_name = node.arr_name.symbol   
         arr_info = self.symbol_table.lookup(arr_name, node.arr_name.pos_start, node.arr_name.pos_end)
+        
+        if isinstance(arr_info, dict): 
+            if "dimensions" not in arr_info and arr_info["type"] == "comms":
+                if is_Return:
+                    return self.commsDropStmt(node, is_Return)
+                else:
+                    self.commsDropStmt(node, is_Return)
+                    return
+            elif "dimensions" not in arr_info and arr_info["type"] != "comms":
+                raise SemanticError(f"TypeError: '{arr_name}' is not an comms variable.", node.arr_name.pos_start, node.arr_name.pos_end)
+
         if not isinstance(arr_info, dict) or "dimensions" not in arr_info:
-            raise SemanticError(f"TypeError: '{arr_name}' is not an array.", node.pos_start, node.pos_end)
+            raise SemanticError(f"TypeError: '{arr_name}' is not an array.", node.arr_name.pos_start, node.arr_name.pos_end)
+        
         arr_immo = arr_info["immo"]
         arr_type = arr_info["type"]
         arr_dimensions = arr_info["dimensions"]
@@ -854,8 +1003,8 @@ class SemanticAnalyzer(ASTVisitor):
             else:    
                 elem_index = evaluate(node.elem_index, self.symbol_table)
 
-            if isinstance(row_index, UnresolvedNumber):
-                row_index = 0
+            if isinstance(elem_index, UnresolvedNumber):
+                elem_index = 0
 
             if not isinstance(elem_index, int):
                 raise SemanticError(f"IndexError: Array index must always evaluate to a positive hp value.", node.elem_index.pos_start, node.elem_index.pos_end)
@@ -907,8 +1056,13 @@ class SemanticAnalyzer(ASTVisitor):
     def visit_SeekStmt(self, node: SeekStmt):
         arr_name = node.arr_name.symbol
         arr_info = self.symbol_table.lookup(arr_name, node.arr_name.pos_start, node.arr_name.pos_end)
-        if not isinstance(arr_info, dict) or "dimensions" not in arr_info:
-            raise SemanticError(f"TypeError: '{arr_name}' is not an array.", node.pos_start, node.pos_end)
+       
+        if isinstance(arr_info, dict): 
+            if "dimensions" not in arr_info and arr_info["type"] == "comms":
+                return self.commsSeekStmt(node)
+            elif "dimensions" not in arr_info and arr_info["type"] != "comms":
+                raise SemanticError(f"TypeError: '{arr_name}' is not an comms variable.", node.arr_name.pos_start, node.arr_name.pos_end)
+
         arr_type = arr_info["type"]
         arr_dimensions = arr_info["dimensions"]
         arr_elements = arr_info["elements"]

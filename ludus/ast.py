@@ -57,7 +57,7 @@ class Semantic:
                 if info["type"] == id_type:
                     return True
                 else:
-                    raise SemanticError(f"1 NameError: Identifier '{name}' is already declared as {info["type"]}.", node.pos_start, node.pos_end)
+                    raise SemanticError(f"NameError: Identifier '{name}' is already declared as {info["type"]}.", node.pos_start, node.pos_end)
         return False
     
     def get_identifier_info(self, name, node):
@@ -337,16 +337,12 @@ class Semantic:
             elif la_token is not None and la_token.token == '.':  
                 return self.parse_inst_ass(scope)
             elif la_token is not None and la_token.token == '(':
-                if self.current_token.lexeme in self.global_func:
-                    value = self.parse_func_call(scope)
-                    self.skip_spaces()
-                    self.expect("newline", "Expected 'newline' after every statements.")
-                    return value
-                else:
-                    raise SemanticError(f"NameError: Function {self.current_token.lexeme} does not exist.", line_start, 
-                                        [self.current_token.line, self.current_token.column + len(self.current_token.lexeme) - 1])
+                value = self.parse_func_call(scope)
+                self.skip_spaces()
+                self.expect("newline", "Expected 'newline' after every statements.")
+                return value
             else:
-                raise SemanticError(f"ParserError: 3 Unexpected token found during parsing: {la_token.token}", self.current_token.line)
+                raise SemanticError(f"ParserError: Unexpected token found during parsing: {la_token.token}", self.current_token.line)
         elif self.current_token and self.current_token.token in ['hp','xp','comms','flag']:
             return self.var_or_arr(scope)
         elif self.current_token and self.current_token.token == 'build':
@@ -1599,10 +1595,7 @@ class Semantic:
                 
                 dimensions = []
                 if not self.lookup_identifier(identifier.symbol):
-                    if info["type"] == "an array":
-                        raise SemanticError(f"NameError: Array '{identifier.symbol}' does not exist.", new_pos_start, id_pos_end)
-                    else:
-                        raise SemanticError(f"NameError: Variable '{identifier.symbol}' does not exist.", new_pos_start, id_pos_end)
+                    raise SemanticError(f"NameError: Variable '{identifier.symbol}' does not exist.", new_pos_start, id_pos_end)
 
                 info = self.get_identifier_info(identifier.symbol, identifier)
                 allowed_types = {"an array", "a variable"}
@@ -2229,11 +2222,11 @@ class Semantic:
     def parse_join(self, scope, name, pos_start) -> JoinStmt:
         if self.lookup_identifier(name.symbol):
             info = self.get_identifier_info(name.symbol, name)
-            if info["type"] != "an array" and info["type"] != "a parameter":
+            if info["type"] not in ["an array", "a parameter", "a variable"]: 
                 raise SemanticError(f"NameError: Array '{name.symbol}' is not defined.", name.pos_start, name.pos_end)
         else:
             raise SemanticError(f"NameError: Array '{name.symbol}' is not defined.", name.pos_start, name.pos_end)
-        if info["type"] == "a parameter":
+        if info["type"] == "a parameter" or info["type"] == "a variable":
             dimensions = None
         elif info["type"] == "an array":
             dimensions = self.get_dimensions(name.symbol, name)
@@ -2242,6 +2235,8 @@ class Semantic:
         self.expect("(", "Expects '(' after join keyword in join function call.")
         self.skip_spaces()
         if self.current_token.token == '[':
+            if info["type"] == "a variable":
+                raise SemanticError("DimensionsError: Trying to append a new row to a variable, must be an array.", self.current_token.line)
             if dimensions is None or dimensions == 2:
                 pass
             else:
@@ -2309,11 +2304,11 @@ class Semantic:
     def parse_drop(self, scope, name, pos_start) -> DropStmt:
         if self.lookup_identifier(name.symbol):
             info = self.get_identifier_info(name.symbol, name)
-            if info["type"] != "an array" and info["type"] != "a parameter":
+            if info["type"] not in ["an array", "a parameter", "a variable"]: 
                 raise SemanticError(f"NameError: Array '{name.symbol}' is not defined.", name.pos_start, name.pos_end)
         else:
             raise SemanticError(f"NameError: Array '{name.symbol}' is not defined.", name.pos_start, name.pos_end)
-        if info["type"] == "a parameter":
+        if info["type"] == "a parameter" or info["type"] == "a variable":
             dimensions = None
         elif info["type"] == "an array":
             dimensions = self.get_dimensions(name.symbol, name)
@@ -2366,11 +2361,11 @@ class Semantic:
     def parse_seek(self, scope, name, pos_start) -> SeekStmt:
         if self.lookup_identifier(name.symbol):
             info = self.get_identifier_info(name.symbol, name)
-            if info["type"] != "an array" and info["type"] != "a parameter":
+            if info["type"] not in ["an array", "a parameter", "a variable"]: 
                 raise SemanticError(f"NameError: Array '{name.symbol}' is not defined.", name.pos_start, name.pos_end)
         else:
             raise SemanticError(f"NameError: Array '{name.symbol}' is not defined.", name.pos_start, name.pos_end)
-        if info["type"] == "a parameter":
+        if info["type"] == "a parameter" or info["type"] == "a variable":
             dimensions = None
         elif info["type"] == "an array":
             dimensions = self.get_dimensions(name.symbol, name)
@@ -2379,6 +2374,8 @@ class Semantic:
         self.expect("(", "Expects '(' after seek keyword in seek function call.")
         self.skip_spaces()
         if self.current_token.token == '[':
+            if info["type"] == "a variable":
+                raise SemanticError("DimensionsError: Trying to seek a specific row  a variable, must be an array.", self.current_token.line)
             if dimensions is None or dimensions == 2:
                 pass
             else:
