@@ -60,6 +60,7 @@ class NodeType:
     TO_NUM_STMT         = "ToNumStmt"
     TO_COMMS_STMT       = "ToCommsStmt"
     STRING_INDEX_ARR    = "StringIndexArr"
+    STR_ARR_ASS_STMT    = "StrArrAssignment"
 
 class Stmt:
     def __init__(self, kind: str):
@@ -544,5 +545,14 @@ class StringIndexArr(Expr):
         super().__init__(NodeType.STRING_INDEX_ARR)
         self.left = left
         self.index = index
+        self.pos_start = pos_start
+        self.pos_end = pos_end
+
+class StrArrAssignment(AssignmentStmt):
+    def __init__(self, left: StringIndexArr, operator: str, right: Expr, pos_start=None, pos_end=None):
+        super().__init__(NodeType.STR_ARR_ASS_STMT)
+        self.left = left
+        self.operator = operator
+        self.right = right
         self.pos_start = pos_start
         self.pos_end = pos_end

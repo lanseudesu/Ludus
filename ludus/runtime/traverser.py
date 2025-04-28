@@ -447,6 +447,70 @@ class SemanticAnalyzer(ASTVisitor):
                 raise SemanticError(f"TypeError: Type mismatch for variable '{var_name.symbol}'. Expected '{info['type']}', got '{val_type}'.", node.pos_start, node.pos_end)
             self.symbol_table.define_var(var_name.symbol, value, val_type, info["immo"])
 
+    def visit_StrArrAssignment(self, node: StrArrAssignment):
+        #print(node)
+        if node.right.kind in {'LoadNum', 'Load'} and node.operator != ':':
+            raise SemanticError(f"ValueError: loadNum and load function cannot be used in compound assignment statements.", node.right.pos_start, node.right.pos_end)
+        
+        lhs_name = node.left.left.symbol
+        lhs_info = self.symbol_table.lookup(lhs_name, node.left.pos_start, node.left.pos_end)
+        #print(lhs_info)
+        if "type" not in lhs_info or lhs_info["type"] != "comms":
+            raise SemanticError(f"TypeError: '{lhs_name}' is not a comms variable.", node.left.pos_start, node.left.pos_end)
+        lhs_immo = lhs_info["immo"]
+        lhs_type = lhs_info["type"]
+        if lhs_immo==True:
+            raise SemanticError(f"ImmoError: '{lhs_name}' is declared as an immutable variable.", node.left.left.pos_start, node.left.left.pos_end)
+        
+        lhs_data = lhs_info["value"]
+        str_list = list(lhs_data)
+
+        idx = node.left.index[0]
+        if idx.kind in {'LoadNum', 'Load'}:
+            raise SemanticError(f"IndexError: loadNum and load function cannot be used as index expression.", idx.pos_start, idx.pos_end)
+        
+        if idx.kind == 'FuncCallStmt':
+                idx_val = eval_func(idx.name.symbol, idx, self.symbol_table) 
+        else:    
+            idx_val = evaluate(idx, self.symbol_table)
+
+        if isinstance(idx_val, UnresolvedNumber):
+            idx_val = 0
+
+        if not isinstance(idx_val, int):
+            raise SemanticError(f"IndexError: Comms index must always evaluate to a positive hp value.", idx.pos_start, idx.pos_end)
+        if idx_val < 0 or idx_val >= len(lhs_data):
+            raise SemanticError(f"IndexError: Index {idx_val} out of bounds for comms '{lhs_name}'.", idx.pos_start, idx.pos_end)
+        
+    
+        if node.right.kind == 'FuncCallStmt':
+            rhs_name = node.right.name.symbol
+            return_values = evaluate(node.right, self.symbol_table)
+            if len(return_values) > 1:
+                raise SemanticError(f"ValueError: Function '{rhs_name}' recalls more than one value, but only one was expected.", node.right.pos_start, node.right.pos_end)
+            value = return_values[0]
+            if value == []:
+                raise SemanticError(f"ValueError: Mismatched values — Trying to assign a list object inside a comms variable.", node.right.pos_start, node.right.pos_end)
+        else:
+            value = evaluate(node.right, self.symbol_table, self.isRuntime)
+
+        if isinstance(value, dict):
+            raise SemanticError(f"ValueError: Mismatched values — Trying to assign a list object inside a comms variable.", node.right.pos_start, node.right.pos_end)
+
+        if not isinstance(value, str):
+            raise SemanticError(f"TypeError: Comms variable '{lhs_name}' can only be given a string value.", node.right.pos_start, node.right.pos_end)
+        
+        if len(value) > 1:
+            raise SemanticError(f"ValueError: Comms variable '{lhs_name}' can only be given a single character value.", node.right.pos_start, node.right.pos_end)
+
+        if node.operator != ":":
+            raise SemanticError(f"TypeError: Invalid operator '{node.operator}' in comms character assignment statement.", node.pos_start, node.pos_end)
+        
+        str_list[idx_val] = value
+
+        new_string = ''.join(str_list)
+        self.symbol_table.define_var(lhs_name, new_string, lhs_type, lhs_immo)    
+
     ###### ARRAYS #########
     def visit_ArrayAssignmentStmt(self, node: ArrAssignment):
         if node.right.kind in {'LoadNum', 'Load'} and node.operator != ':':

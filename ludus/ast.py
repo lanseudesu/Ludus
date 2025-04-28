@@ -788,6 +788,31 @@ class Semantic:
             self.expect("newline", "Expected 'newline' after every statements.")
             return ArrayDec(arr_name, dimensions, values, False, scope, datatype, pos_start, pos_end)      
     
+    def parse_string_arr(self, scope, arr_name, pos_start)  -> StrArrAssignment:
+        self.expect("[", "Expects '[' to specify character index of a comms.")
+        self.skip_spaces()
+        dimensions = []
+        if self.current_token.token == ']':
+            raise SemanticError("IndexError: Index must not be blank.", self.current_token.line)
+        dim = self.parse_expr(scope)
+        dimensions.append(dim)
+        self.skip_spaces()
+        self.expect("]", "Expected ']' to close comms indexing.")
+        pos_end = [self.current_token.line, self.current_token.column - 1]
+        self.skip_spaces()
+
+        if self.current_token.token not in ['+=', '-=', '*=', '/=', '%=', ':']:
+             raise SemanticError("Expected a assignment operator after comms index.", self.current_token.line)
+        operator = self.current_token.token
+        self.current_token = self.get_next_token() #eat operator
+        self.skip_spaces()
+        value = self.parse_expr(scope)
+        lhs = StringIndexArr(arr_name, dimensions, pos_start, pos_end)
+        pos_end = value.pos_end
+        self.skip_spaces()
+        self.expect("newline", "Expected 'newline' after every statements.")
+        return StrArrAssignment(lhs, operator, value, pos_start, pos_end)
+    
     def parse_array(self, scope) -> Union[ArrayDec, ArrAssignment]:
         pos_start = [self.current_token.line, self.current_token.column]
         var_name_size = len(self.current_token.lexeme)
@@ -796,6 +821,12 @@ class Semantic:
         name = arr_name.symbol
         self.current_token = self.get_next_token() # eat id
         self.skip_spaces()
+
+        if self.lookup_identifier(name):
+            info = self.get_identifier_info(name, arr_name)
+            if info["type"] == "a variable":
+                return self.parse_string_arr(scope, arr_name, pos_start)
+
         arr_exist = self.is_array(name, arr_name) or self.is_params(name, arr_name)
         if arr_exist:
             join_token = self.find_token_in_line('join')
