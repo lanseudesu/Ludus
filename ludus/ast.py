@@ -1873,7 +1873,8 @@ class Semantic:
             self.skip_spaces()
             arg_pos = [self.current_token.line, self.current_token.column]
             value = self.parse_primary_expr(scope, 'rounds', arg_pos)
-            if value.kind not in ['Identifier', 'ArrayElement', 'StructInstField', 'FuncCallStmt',
+            print("asdasd", value)
+            if value.kind not in ['Identifier', 'StringIndexArr', 'ArrayElement', 'StructInstField', 'FuncCallStmt',
                                   'CommsLiteral', 'ToCommsStmt']: 
                 raise SemanticError("ArgumentError: Invalid rounds argument.", self.current_token.line)
             self.skip_spaces()

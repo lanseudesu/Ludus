@@ -154,6 +154,9 @@ def evaluate(ast_node, symbol_table, isRuntime=False):
         name = ast_node.left.symbol
         value = symbol_table.lookup(name, ast_node.left.pos_start, ast_node.left.pos_end)
         if isinstance(value, dict):
+            if "dimensions" in value:
+                ast_node.kind = "ArrayElement"
+                return evaluate(ast_node, symbol_table)
             if "type" not in value:
                 raise SemanticError(f"TypeError: '{name}' is not a variable.", 
                                     ast_node.left.pos_start, ast_node.left.pos_end)
