@@ -709,14 +709,19 @@ class SemanticAnalyzer(ASTVisitor):
         arr_name = node.arr_name.symbol
         arr_info = self.symbol_table.lookup(arr_name, node.arr_name.pos_start, node.arr_name.pos_end)
 
-        arr_immo = arr_info["immo"]
-        arr_type = arr_info["type"]
-        arr_value = arr_info["value"]
+        if isinstance(arr_info, str):
+            arr_value = arr_info
+            arr_immo = False
+            arr_type = "comms"
+        else:
+            arr_immo = arr_info["immo"]
+            arr_type = arr_info["type"]
+            arr_value = arr_info["value"]
 
-        if arr_value == None:
-            raise SemanticError(f"TypeError: Comms variable '{arr_name}' is a dead variable and must be defined with a value first.", node.arr_name.pos_start, node.arr_name.pos_end)
-        if arr_immo==True:
-            raise SemanticError(f"ImmoError: Comms variable '{arr_name}' is declared as an immutable variable.", node.arr_name.pos_start, node.arr_name.pos_end)
+            if arr_value == None:
+                raise SemanticError(f"TypeError: Comms variable '{arr_name}' is a dead variable and must be defined with a value first.", node.arr_name.pos_start, node.arr_name.pos_end)
+            if arr_immo==True:
+                raise SemanticError(f"ImmoError: Comms variable '{arr_name}' is declared as an immutable variable.", node.arr_name.pos_start, node.arr_name.pos_end)
 
         if node.row_index:
             raise SemanticError(f"TypeError: Trying to use comms variable '{arr_name}' like a two-dimensional array.", node.arr_name.pos_start, node.arr_name.pos_end)
@@ -749,18 +754,23 @@ class SemanticAnalyzer(ASTVisitor):
     def commsDropStmt(self, node: DropStmt, is_Return=False):
         arr_name = node.arr_name.symbol
         arr_info = self.symbol_table.lookup(arr_name, node.arr_name.pos_start, node.arr_name.pos_end)
+        
+        if isinstance(arr_info, str):
+            arr_value = arr_info
+            arr_immo = False
+            arr_type = "comms"
+        else:
+            arr_immo = arr_info["immo"]
+            arr_type = arr_info["type"]
+            arr_value = arr_info["value"]
 
-        arr_immo = arr_info["immo"]
-        arr_type = arr_info["type"]
-        arr_value = arr_info["value"]
+            if arr_value == None:
+                raise SemanticError(f"TypeError: Comms variable '{arr_name}' is a dead variable and must be defined with a value first.", node.arr_name.pos_start, node.arr_name.pos_end)
+            if arr_immo==True:
+                raise SemanticError(f"ImmoError: Comms variable '{arr_name}' is declared as an immutable variable.", node.arr_name.pos_start, node.arr_name.pos_end)
 
-        if arr_value == None:
-            raise SemanticError(f"TypeError: Comms variable '{arr_name}' is a dead variable and must be defined with a value first.", node.arr_name.pos_start, node.arr_name.pos_end)
-        if arr_immo==True:
-            raise SemanticError(f"ImmoError: Comms variable '{arr_name}' is declared as an immutable variable.", node.arr_name.pos_start, node.arr_name.pos_end)
-
-        if node.row_index:
-            raise SemanticError(f"TypeError: Trying to use comms variable '{arr_name}' like a two-dimensional array.", node.arr_name.pos_start, node.arr_name.pos_end)
+            if node.row_index:
+                raise SemanticError(f"TypeError: Trying to use comms variable '{arr_name}' like a two-dimensional array.", node.arr_name.pos_start, node.arr_name.pos_end)
         
         elem_index = None
         if node.elem_index:
@@ -797,7 +807,10 @@ class SemanticAnalyzer(ASTVisitor):
         arr_name = node.arr_name.symbol
         arr_info = self.symbol_table.lookup(arr_name, node.arr_name.pos_start, node.arr_name.pos_end)
 
-        arr_value = arr_info["value"]
+        if isinstance(arr_info, str):
+            arr_value = arr_info
+        else:
+            arr_value = arr_info["value"]
 
         if arr_value == None:
             raise SemanticError(f"TypeError: Comms variable '{arr_name}' is a dead variable and must be defined with a value first.", node.arr_name.pos_start, node.arr_name.pos_end)
@@ -947,7 +960,7 @@ class SemanticAnalyzer(ASTVisitor):
     def visit_DropStmt(self, node: DropStmt, is_Return=False):
         arr_name = node.arr_name.symbol   
         arr_info = self.symbol_table.lookup(arr_name, node.arr_name.pos_start, node.arr_name.pos_end)
-        
+        print(arr_info)
         if isinstance(arr_info, dict): 
             if "dimensions" not in arr_info and arr_info["type"] == "comms":
                 if is_Return:
@@ -957,7 +970,13 @@ class SemanticAnalyzer(ASTVisitor):
                     return
             elif "dimensions" not in arr_info and arr_info["type"] != "comms":
                 raise SemanticError(f"TypeError: '{arr_name}' is not an comms variable.", node.arr_name.pos_start, node.arr_name.pos_end)
-
+        elif isinstance(arr_info, str):
+            if is_Return:
+                return self.commsDropStmt(node, is_Return)
+            else:
+                self.commsDropStmt(node, is_Return)
+                return
+        
         if not isinstance(arr_info, dict) or "dimensions" not in arr_info:
             raise SemanticError(f"TypeError: '{arr_name}' is not an array.", node.arr_name.pos_start, node.arr_name.pos_end)
         
