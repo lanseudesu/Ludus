@@ -1,6 +1,10 @@
 from ..nodes import *
 from ..error import SemanticError
 
+# symbol table defines the different symbols, their properties (values, types, etc.) and their corresponding scopes
+# var x -> 1, play, hp
+# arr y -. [1,2,3], 1d, hp, func()
+
 class SymbolTable:
     def __init__(self):
         self.scope_stack = [{}] 

@@ -2,24 +2,15 @@ from .cfg import parse_table, first_set
 from .lexer import Lexer
 import re
 
-class Node:
-    def __init__(self, tok, value=None):
-        self.tok = tok
-        self.value = value
-        self.children = []
-
-    def add_child(self, child_node):
-        self.children.append(child_node)
-
-
 class Parser:
     def __init__(self, tokens, source_code):
         self.tokens = tokens
         self.source_code = source_code.split("\n")
         self.current_token_index = 0
-        self.current_token = self.get_next_token()
+        self.current_token = self.get_next_token() 
         self.save_stack = []
 
+    # acts like self.advance from lexer, but advances tokens instead of characters
     def get_next_token(self):
         if self.current_token_index < len(self.tokens):
             token = self.tokens[self.current_token_index]
@@ -28,12 +19,12 @@ class Parser:
         return None
     
     def parser(self):
-        self.stack = ["<program>"]  
-        self.tokens.append("$")  
+        self.stack = ["<program>"]  # initialize with the first production <program>
+        self.tokens.append("$")     # append $ in tokens
         null_flag = False
 
         while self.stack:
-            self.top = self.stack.pop()
+            self.top = self.stack.pop() 
 
             while self.current_token.token in {"newline", "space"}:
                 self.current_token = self.get_next_token()
@@ -60,7 +51,7 @@ class Parser:
                     # print(f"Expand: {self.top} → {' '.join(production)}")
 
                     if "λ" not in production:
-                        self.stack.extend(reversed(production))
+                        self.stack.extend(reversed(production)) 
                     else:
                         if self.save_stack != []:
                             pass
@@ -155,7 +146,6 @@ def parse(fn, text):
 
     if error:
          return 'Lexical errors found, cannot continue with syntax analyzing. Please check lexer tab.\n\nLexical Errors:\n' + "\n\n".join(error)
-     
 
     syntax = Parser(tokens, text)
     result = syntax.parser() 

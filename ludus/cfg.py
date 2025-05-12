@@ -1,389 +1,322 @@
-cfg = {
-    "<program>": [["<global_dec>", "<func_dec>", "play", "(", ")", "{", "<body>", "}", "<fs_body>", "gameOver"]],
-    "<global_dec>": [["immo", "id", "<global_dec_tail1>", "<global_dec>"],
-                     ["id", "<global_dec_tail2>", "<global_dec>"],
-                     ["<datatype>", "id", "<global_dec_tail3>", "<global_dec>"],
-                     ["λ"]], 
-    "<global_dec_tail1>": [["[", "hp_ltr", "]", "<arr_tail1>"],
-                           ["<const_tail>"]],
-    "<global_dec_tail2>": [["<const_tail>"],
-                           ["[", "<arr_size>", "]", "<arr_tail2>"]],
-    "<global_dec_tail3>": [["<id_recur>", "<dead_dec>"],
-                           ["[", "<arr_size>", "]", "<arr_tail3>"]],
-    "<arr_tail1>": [[":", "[", "<value>", ",", "<value>", "<elems_recur>", "]"],
-                    ["[", "hp_ltr", "]", ":", "[", "<value>", ",", "<value>", "<elems_recur>", "]", ",", "[", "<value>", ",", "<value>", "<elems_recur>", "]", "<row_recur2>"]],
-    "<arr_tail2>": [[":", "[", "<value>", "<elems_recur>", "]"],
-                    ["[", "<arr_size>", "]", ":", "[", "<value>", "<elems_recur>", "]", "<row_recur>"]],
-    "<arr_tail3>": [["<dead_dec>"],
-                    ["[", "<arr_size>", "]", "<dead_dec>"]],
-    "<const_tail>": [[",", "id", "<id_recur>", ":", "<value>"],
-                     [":", "<value>", "<val_recur>"]],
-    "<arr_size>": [["hp_ltr"], 
-                   ["λ"]], 
-    "<id_recur>": [[",", "id", "<id_recur>"],
-                   ["λ"]], 
-    "<val_recur>": [[",", "id", ":", "<value>", "<val_recur>"],
-                    ["λ"]], 
-    "<dead_dec>": [[":", "dead"], 
-                   ["λ"]],
-    "<datatype>": [["hp"],
-                    ["xp"],
-                    ["comms"],
-                    ["flag"]], 
-    "<value>": [["<numeric_ltr>"],
-                ["comms_ltr"], 
-                ["flag_ltr"]], 
-    "<numeric_ltr>": [["hp_ltr"],
-                      ["xp_ltr"]],
-    "<elems_recur>": [[",", "<value>", "<elems_recur>"],
-                      ["λ"]],
-    "<row_recur>": [[",", "[", "<value>", "<elems_recur>", "]", "<row_recur>"],
-                    ["λ"]], 
-    "<row_recur2>": [[",", "[", "<value>", ",", "<value>", "<elems_recur>", "]", "<row_recur2>"],
-                     ["λ"]],
-
-    "<func_dec>": [["generate", "id", "(", "<params>", ")", "<func_dec>"],
-                   ["<struct_dec>"]],
-    "<struct_dec>": [["build", "id", "<struct_dec>"],
-                     ["λ"]],
-    "<params>": [["id", "<def_or_recur>"],
-                 ["λ"]],
-    "<def_or_recur>": [[",", "id", "<def_or_recur>"],
-                       [":", "<value>", "<defparam_recur>"],
-                       ["λ"]],
-    "<defparam>": [["id", ":", "<value>", "<defparam_recur>"]],
-    "<defparam_recur>": [[",", "<defparam>"],
-                         ["λ"]],
-    "<common_stmts>": [["<local_dec>"],
-                       ["<local_dec_or_ass>"],
-                       ["<builtin_no_ret>"],
-                       ["<local_struct>"],
-                       ["<struct_inst>"]],
-
-    # sam 63-122
-    "<main_stmts>": [["<conditional>"], 
-                     ["<looping>"], 
-                     ["<common_stmts>"]],
-    "<body>": [["<main_stmts>", "<body_recur>"]],
-    "<body_recur>": [["<body>"], 
-                     ["λ"]],
-    "<local_dec>": [["immo", "<local_immo_tail>"], 
-                    ["<datatype>", "id", "<global_dec_tail3>"]],
-    "<local_dec_or_ass>": [["id", "<dec_tail>"]],
-    "<local_immo_tail>": [["id", "<global_dec_tail1>"], 
-                          ["access", "id", "id", ":", "<value>", "<elems_recur>"]],
-    "<dec_tail>": [["<col_or_ass>"], 
-                   ["(", "<args>", ")"], 
-                   [".", "<dot_tail>"], 
-                   ["[", "<index>", "]", "<bracket_tail>"]],
-    "<dot_tail>": [["id", "<dot_tail_rhs>"], 
-                   ["drop", "(", "<index>", ")"], 
-                   ["join", "(", "<arr_rhs_tail>", ")"]], 
-    "<dot_tail_rhs>": [[":", "<expr>"], 
-                   ["<assign_op>", "<expr>"]],               
-    "<bracket_tail>": [[":", "<arr_rhs_tail>"], 
-                       ["<assign_op>", "<expr>"],
-                       ["[", "<index>", "]", "<arr2d_rhs>"], 
-                       [".", "<inner_bracket_tail>"]], 
-    "<arr_rhs_tail>": [["[", "<value>", "<elems_recur>", "]"],
-                       ["<expr>"]], 
-    "<inner_bracket_tail>": [["drop", "(", "<index>", ")"], 
-                             ["join", "(", "<expr>", ")"]],
-    "<index>": [["<expr>"], 
-                ["λ"]], 
-    "<arr2d_rhs>": [[":", "<arr2d_rhs_tail>"], 
-                    ["<assign_op>", "<expr>"]],
-    "<arr2d_rhs_tail>": [["[", "<value>", "<elems_recur>", "]", "<row_recur>"], 
-                         ["<expr>"]], 
-    "<col_or_ass>": [[":", "<col_tail>"], 
-                     [",", "id", "<id_recur>", ":", "<expr>"], 
-                     ["<assign_op>", "<expr>"]],
-    "<col_tail>": [["<expr>", "<expr_recur>"],
-                  ["[", "<value>", "<elems_recur>", "]", "<row_recur>"]],
-    "<id_tail>": [[".", "id"], 
-                  ["[", "<expr>", "]", "<id_tail_arr>"], 
-                  ["λ"]], 
-    "<id_tail_arr>": [["[", "<expr>", "]"], 
-                      ["λ"]],
-    "<expr_recur>": [[",", "id", ":", "<expr>", "<expr_recur>"], 
-                     ["λ"]], 
-    "<expr>": [["<relat_expr>", "<expr_tail>"]],
-    "<expr_tail>": [["<logic_op>", "<expr>"], 
-                    ["λ"]],
-    "<relat_expr>": [["<arith_expr>", "<relat_tail>"]],                
-    "<relat_tail>": [["<relat_op>", "<relat_expr>"], ["λ"]], 
-    "<arith_expr>": [["<factor>", "<arith_tail>"]],
-    "<arith_tail>": [["<arith_op>", "<arith_expr>"], 
-                      ["λ"]],
-
-    
-    # khar 123-179
-    "<factor>": [["id", "<id_rhs_tail>"], ["<value>"], ["-", "<negative>"],
-                 ["<builtin_w_ret>"], ["!", "<negative>"], ["(", "<expr>", ")", "<xp_format>"]],
-    "<id_rhs_tail>": [["(", "<args>", ")"], [".", "<rhs_dot_tail>"], 
-                     ["[", "<expr>", "]", "<rhs_bracket_tail>"], ["xp_formatting"], ["λ"]],
-    "<xp_format>": [["xp_formatting"], ["λ"]],               
-    "<args>": [["<expr>", "<args_recur>"], ["λ"]],
-    "<args_recur>": [[",", "<expr>", "<args_recur>"], ["λ"]],
-    "<rhs_dot_tail>": [["id"], ["seek", "(", "<arr_rhs_tail>", ")"], ["drop", "(", "<index>", ")"]],
-    "<rhs_bracket_tail>": [["[", "<expr>", "]"], [".", "<rhs_inner_bracket_tail>"], ["λ"]],
-    "<rhs_inner_bracket_tail>": [["drop", "(", "<index>", ")"], ["seek", "(", "<expr>", ")"]],
-    "<assign_op>": [["+="], ["-="], ["*="], ["/="], ["%="]],
-    "<negative>": [["(", "<expr>", ")"], ["id", "<id_tail>"]],
-    "<arith_op>": [["+"], ["-"], ["/"], ["%"], ["*"], ["^"]],
-    "<relat_op>": [["<"], [">"], ["<="], [">="], ["=="], ["!="]],
-    "<logic_op>": [["&&"], ["||"], ["AND"], ["OR"]],
-    "<builtin_no_ret>": [["shoot", "(", "<shoot_args>", ")"], 
-                         ["shootNxt", "(", "<shoot_args>", ")"],
-                         ["wipe", "(", ")"]],
-    
-    #jae 180-242
-    "<builtin_w_ret>": [["load", "(", "<load_args>", ")"], 
-                        ["loadNum", "(", "<load_args>", ")"], 
-                        ["rounds", "(", "<rounds_args>", ")"], 
-                        ["levelUp", "(", "id", "<id_args_tail>", ")"], 
-                        ["levelDown", "(", "id", "<id_args_tail>", ")"], 
-                        ["toHp", "(", "<expr>", ")"], 
-                        ["toXp", "(", "<expr>", ")"], 
-                        ["toComms", "(", "<expr>", ")"]], 
-    "<shoot_args>": [["<expr>"], 
-                     ["λ"]],
-    "<load_args>": [["comms_ltr"], 
-                    ["λ"]],
-    "<rounds_args>": [["comms_ltr"], 
-                     ["id", "<id_args_tail>"],
-                     ["toComms", "(", "id", "<id_tail>", ")"]],
-    "<id_args_tail>": [["<id_tail>" ], ["(", "<args>", ")"]],
-    "<recall_stmt>": [["recall", "<rec_elems>"]],
-    "<rec_elems>": [["<expr>", "<rec_elems_recur>"], 
-                    ["[", "]"], ["void"]],
-    "<rec_elems_recur>": [[",", "<expr>", "<rec_elems_recur>"], 
-                          ["λ"]],               
-    "<loop_control>": [["resume"], 
-                       ["checkpoint"]],
-    "<local_struct>": [["build", "id", "{", "<struct_fields>", "<struct_fields_recur>", "}"]],
-    "<struct_fields>": [["<datatype>", "id", "<field_dec>"]],
-    "<field_dec>": [[",", "<struct_fields>"], 
-                    ["λ"]],
-    "<def_recur>": [[",", "<datatype>", "id", ":", "<value>", "<def_recur>"], 
-                    ["λ"]],
-    "<struct_fields_recur>": [[":", "<value>", "<def_recur>"], 
-                              ["λ"]],
-    "<struct_inst>": [["access", "id", "id", "<inst_dec>"]],
-    "<inst_dec>": [[":", "<value>", "<instval_recur>"], 
-                   ["λ"]],
-    "<instval_recur>": [[",", "<value>", "<instval_recur>"], 
-                        ["λ"]],
-    "<conditional>": [["<if_stmt>"],["<flank_stmt>"]],
-    "<if_stmt>": [["if", "<expr>", "{", "<body>", "}", "<else_elif>"]],
-    "<else_elif>": [["<else_stmt>"], ["<elif_stmt>"], 
-                    ["λ"]],
-    "<else_stmt>": [["else", "{", "<body>", "}"]],
-    "<elif_stmt>": [["elif", "<expr>", "{", "<body>", "}", "<else_elif>"]],
-    "<flank_stmt>": [["flank", "<expr>", "{", "choice", "<valdead>", "<valdead_recur>", ":", "<flank_body>", "}"]],
-    "<flank_body>": [["<main_stmts>", "<flank_body_recur>"],
-                     ["resume", "<choice_recur>"]],
-    "<flank_body_recur>": [["<flank_body>"],
-                           ["<choice_recur>"]],                
-    "<valdead>": [["<value>"], ["dead"]],
-    "<valdead_recur>": [[",", "<valdead>", "<valdead_recur>"], 
-                        ["λ"]],
-    "<choice_recur>": [["choice", "<valdead>", "<valdead_recur>", ":", "<flank_body>"], 
-                       ["backup", ":", "<body>"]],
-    "<looping>":[["<for_loop>"], ["<while_loop>"], ["<do_while_loop>"]],
-    "<for_loop>": [["for", "id", ":", "<arith_expr>", ",", "<expr>", ",", "id", "<update>", "{", "<loop_body>", "}"]],
-    "<update>": [["<assign_op>", "<arith_expr>"], [":", "<arith_expr>"]],
-    "<while_loop>": [["while", "<expr>", "{", "<loop_body>", "}"]],
-    "<do_while_loop>": [["grind", "{", "<loop_body>", "}", "while", "<expr>"]],
-    "<loop_body>": [["<loop_stmts>", "<loop_body_recur>"]],
-    "<loop_body_recur>": [["<loop_body>"], 
-                          ["λ"]],
-   #jm 243-305
-    "<loop_stmts>": [["<common_stmts>"], ["<if_stmt_loop>"], ["<flank_stmt_loop>"], 
-                     ["<looping>"]],
-    "<if_stmt_loop>": [["if", "<expr>", "{", "<main_stmts_loop>", "}",  "<else_elif_loop>"]],
-    "<else_elif_loop>": [["<else_stmt_loop>"], ["<elif_stmt_loop>"], ["λ"],],
-    "<else_stmt_loop>": [["else", "{", "<main_stmts_loop>", "}"]],
-    "<elif_stmt_loop>": [["elif", "<expr>", "{", "<main_stmts_loop>", "}", "<else_elif_loop>"]],
-    "<flank_stmt_loop>": [["flank", "<expr>", "{", "choice", "<valdead>", "<valdead_recur>", ":", "<flank_body_loop>", "}"]],
-    "<flank_body_loop>": [["<main_stmts>", "<flank_loop_recur>"],
-                         ["<loop_control>", "<loop_choice_recur>"]],
-    "<flank_loop_recur>": [["<flank_body_loop>"],
-                           ["<loop_choice_recur>"]],    
-    "<loop_choice_recur>": [["choice", "<valdead>", "<valdead_recur>", ":", "<flank_body_loop>"], 
-                            ["backup", ":", "<backup_loop_body>"]],
-    "<backup_loop_body>": [["<body>"],["checkpoint"]],                    
-    "<main_stmts_loop>": [["<loop_stmts>", "<cond_recur_loop>"], 
-                          ["<loop_control>"]],
-    "<cond_recur_loop>": [["<main_stmts_loop>"], ["λ"]],
-    "<fs_body>": [["<func_body>"]],
-    "<func_body>": [["generate", "id", "(", "<params>", ")", "{", "<func_stmts_recur>", "}", "<func_body>"],
-                    ["<struct_body>"]],
-    "<struct_body>": [["<local_struct>", "<struct_body>"],
-                      ["λ"]],
-    "<func_stmts>": [["<common_stmts>"], ["<recall_stmt>"],
-                     ["<if_stmt_func>"], ["<flank_func>"],
-                     ["<looping_func>"]],
-    "<func_stmts_recur>": [["<func_stmts>", "<func_stmts_recur>"], ["λ"]],               
-    "<flank_func>": [["flank", "<expr>", "{", "choice", "<valdead>", "<valdead_recur>",
-                     ":", "<flank_func_body>", "}"]],
-    "<flank_func_body>": [["<main_stmts>", "<flank_func_recur>"], 
-                          ["<recall_stmt>", "<choice_func_recur>"], 
-                          ["resume", "<choice_func_recur>"]],
-    "<flank_func_recur>": [["<flank_func_body>"], ["<choice_func_recur>"]],
-    "<choice_func_recur>": [["choice", "<valdead>", "<valdead_recur>", ":", "<flank_func_body>"], 
-                            ["backup", ":", "<backup_func_body>"]],
-    "<backup_func_body>": [["<main_stmts>", "<backup_func_body>"], ["<recall_stmt>"]],
-    "<if_stmt_func>": [["if", "<expr>", "{", "<func_stmts>", "<func_stmts_recur>", "}", "<else_elif_func>"]],
-    "<else_elif_func>": [["<else_stmt_func>"], ["<elif_stmt_func>"], ["λ"]],
-    "<else_stmt_func>": [["else", "{", "<func_stmts>", "<func_stmts_recur>", "}"]],
-    "<elif_stmt_func>": [["elif", "<expr>", "{", "<func_stmts>", "<func_stmts_recur>", "}", "<else_elif_func>"]],
-    "<looping_func>": [["<for_func>"], ["<while_func>"], ["<do_while_func>"]],
-    "<for_func>": [["for", "id", ":", "<arith_expr>", ",", "<expr>", ",", "id",
-                   "<update>", "{", "<loop_body_func>", "}"]],
-    "<while_func>": [["while", "<expr>", "{", "<loop_body_func>", "}"]],
-    "<do_while_func>": [["grind", "{", "<loop_body_func>", "}", "while", "<expr>"]],
-    "<loop_body_func>": [["<func_stmts_loop>", "<loop_body_recur>"]],
-    "<func_stmts_loop>": [["<if_func_loop>"], ["<common_stmts>"], ["<flank_loop_func>"], 
-                     ["<recall_stmt>"], ["<looping_func>"]],
-    "<if_func_loop>": [["if", "<expr>", "{", "<func_loop_cond>", "}", "<else_elif_func_loop>"]],
-    "<else_elif_func_loop>": [["<else_func_loop>"], ["λ"], ["<elif_func_loop>"]],
-    "<else_func_loop>": [["else", "{", "<func_loop_cond>", "}"]],
-    "<elif_func_loop>": [["elif", "<expr>", "{", "<func_loop_cond>", "}", "<else_elif_func>"]],
-    "<func_loop_cond>": [["<func_stmts_loop>", "<func_loop_recur>"], ["<loop_control>", "<func_loop_recur>"]],
-    "<func_loop_recur>": [["<func_loop_cond>"], ["λ"]],
-    "<flank_loop_func>": [["flank", "<expr>", "{", "choice", "<valdead>", "<valdead_recur>",
-                        ":", "<flank_body_func_loop>", "}"]],
-    "<flank_body_func_loop>": [["<main_stmts>", "<flank_func_loop_recur>"], 
-                              ["<recall_stmt>", "<loop_func_choice_recur>"], 
-                              ["<loop_control>", "<loop_func_choice_recur>"]],
-    "<flank_func_loop_recur>": [["<flank_body_func_loop>"], ["<loop_func_choice_recur>"]],
-    "<loop_func_choice_recur>": [["choice", "<valdead>", "<valdead_recur>", ":", "<flank_body_func_loop>"], 
-                            ["backup", ":", "<backup_func_loop_body>"]],
-    "<backup_func_loop_body>": [["<main_stmts>", "<backup_func_loop_body>"], ["<recall_stmt>"],
-                                ["checkpoint"]],
+predict_set = {
+    ('<program>', ("<global_dec>", "<func_dec>", "play", "(", ")", "{", "<body>", "}", "<fs_body>", "gameOver",)): {'build', 'comms', 'flag', 'generate', 'hp', 'id', 'immo', 'play', 'xp'},
+    ('<global_dec>', ("immo", "id", "<global_dec_tail1>", "<global_dec>",)): {'immo'},
+    ('<global_dec>', ("id", "<global_dec_tail2>", "<global_dec>",)): {'id'},
+    ('<global_dec>', ("<datatype>", "id", "<global_dec_tail3>", "<global_dec>",)): {'comms', 'flag', 'hp', 'xp'},
+    ('<global_dec>', ("λ",)): {'build', 'generate', 'play'},
+    ('<global_dec_tail1>', ("[", "hp_ltr", "]", "<arr_tail1>",)): {'['},
+    ('<global_dec_tail1>', ("<const_tail>",)): {',', ':'},
+    ('<global_dec_tail2>', ("<const_tail>",)): {',', ':'},
+    ('<global_dec_tail2>', ("[", "<arr_size>", "]", "<arr_tail2>",)): {'['},
+    ('<global_dec_tail3>', ("<id_recur>", "<dead_dec>",)): {',', ':', 'access', 'backup', 'build', 'checkpoint', 'choice', 'comms', 'flag', 'flank', 'for', 'generate', 'grind', 'hp', 'id', 'if', 'immo', 'play', 'recall', 'resume', 'shoot', 'shootNxt', 'while', 'wipe', 'xp', '}'},
+    ('<global_dec_tail3>', ("[", "<arr_size>", "]", "<arr_tail3>",)): {'['},
+    ('<arr_tail1>', (":", "[", "<value>", ",", "<value>", "<elems_recur>", "]",)): {':'},
+    ('<arr_tail1>', ("[", "hp_ltr", "]", ":", "[", "<value>", ",", "<value>", "<elems_recur>", "]", ",", "[", "<value>", ",", "<value>", "<elems_recur>", "]", "<row_recur2>",)): {'['},
+    ('<arr_tail2>', (":", "[", "<value>", "<elems_recur>", "]",)): {':'},
+    ('<arr_tail2>', ("[", "<arr_size>", "]", ":", "[", "<value>", "<elems_recur>", "]", "<row_recur>",)): {'['},
+    ('<arr_tail3>', ("<dead_dec>",)): {':', 'access', 'backup', 'build', 'checkpoint', 'choice', 'comms', 'flag', 'flank', 'for', 'generate', 'grind', 'hp', 'id', 'if', 'immo', 'play', 'recall', 'resume', 'shoot', 'shootNxt', 'while', 'wipe', 'xp', '}'},
+    ('<arr_tail3>', ("[", "<arr_size>", "]", "<dead_dec>",)): {'['},
+    ('<const_tail>', (",", "id", "<id_recur>", ":", "<value>",)): {','},
+    ('<const_tail>', (":", "<value>", "<val_recur>",)): {':'},
+    ('<arr_size>', ("hp_ltr",)): {'hp_ltr'},
+    ('<arr_size>', ("λ",)): {']'},
+    ('<id_recur>', (",", "id", "<id_recur>",)): {','},
+    ('<id_recur>', ("λ",)): {':', 'access', 'backup', 'build', 'checkpoint', 'choice', 'comms', 'flag', 'flank', 'for', 'generate', 'grind', 'hp', 'id', 'if', 'immo', 'play', 'recall', 'resume', 'shoot', 'shootNxt', 'while', 'wipe', 'xp', '}'},
+    ('<val_recur>', (",", "id", ":", "<value>", "<val_recur>",)): {','},
+    ('<val_recur>', ("λ",)): {'access', 'backup', 'build', 'checkpoint', 'choice', 'comms', 'flag', 'flank', 'for', 'generate', 'grind', 'hp', 'id', 'if', 'immo', 'play', 'recall', 'resume', 'shoot', 'shootNxt', 'while', 'wipe', 'xp', '}'},
+    ('<dead_dec>', (":", "dead",)): {':'},
+    ('<dead_dec>', ("λ",)): {'access', 'backup', 'build', 'checkpoint', 'choice', 'comms', 'flag', 'flank', 'for', 'generate', 'grind', 'hp', 'id', 'if', 'immo', 'play', 'recall', 'resume', 'shoot', 'shootNxt', 'while', 'wipe', 'xp', '}'},
+    ('<datatype>', ("hp",)): {'hp'},
+    ('<datatype>', ("xp",)): {'xp'},
+    ('<datatype>', ("comms",)): {'comms'},
+    ('<datatype>', ("flag",)): {'flag'},
+    ('<value>', ("<numeric_ltr>",)): {'hp_ltr', 'xp_ltr'},
+    ('<value>', ("comms_ltr",)): {'comms_ltr'},
+    ('<value>', ("flag_ltr",)): {'flag_ltr'},
+    ('<numeric_ltr>', ("hp_ltr",)): {'hp_ltr'},
+    ('<numeric_ltr>', ("xp_ltr",)): {'xp_ltr'},
+    ('<elems_recur>', (",", "<value>", "<elems_recur>",)): {','},
+    ('<elems_recur>', ("λ",)): {']', 'access', 'backup', 'build', 'checkpoint', 'choice', 'comms', 'flag', 'flank', 'for', 'grind', 'hp', 'id', 'if', 'immo', 'recall', 'resume', 'shoot', 'shootNxt', 'while', 'wipe', 'xp', '}'},
+    ('<row_recur>', (",", "[", "<value>", "<elems_recur>", "]", "<row_recur>",)): {','},
+    ('<row_recur>', ("λ",)): {'access', 'backup', 'build', 'checkpoint', 'choice', 'comms', 'flag', 'flank', 'for', 'generate', 'grind', 'hp', 'id', 'if', 'immo', 'play', 'recall', 'resume', 'shoot', 'shootNxt', 'while', 'wipe', 'xp', '}'},
+    ('<row_recur2>', (",", "[", "<value>", ",", "<value>", "<elems_recur>", "]", "<row_recur2>",)): {','},
+    ('<row_recur2>', ("λ",)): {'access', 'backup', 'build', 'checkpoint', 'choice', 'comms', 'flag', 'flank', 'for', 'generate', 'grind', 'hp', 'id', 'if', 'immo', 'play', 'recall', 'resume', 'shoot', 'shootNxt', 'while', 'wipe', 'xp', '}'},
+    ('<func_dec>', ("generate", "id", "(", "<params>", ")", "<func_dec>",)): {'generate'},
+    ('<func_dec>', ("<struct_dec>",)): {'build', 'play'},
+    ('<struct_dec>', ("build", "id", "<struct_dec>",)): {'build'},
+    ('<struct_dec>', ("λ",)): {'play'},
+    ('<params>', ("id", "<def_or_recur>",)): {'id'},
+    ('<params>', ("λ",)): {')'},
+    ('<def_or_recur>', (",", "id", "<def_or_recur>",)): {','},
+    ('<def_or_recur>', (":", "<value>", "<defparam_recur>",)): {':'},
+    ('<def_or_recur>', ("λ",)): {')'},
+    ('<defparam>', ("id", ":", "<value>", "<defparam_recur>",)): {'id'},
+    ('<defparam_recur>', (",", "<defparam>",)): {','},
+    ('<defparam_recur>', ("λ",)): {')'},
+    ('<common_stmts>', ("<local_dec>",)): {'comms', 'flag', 'hp', 'immo', 'xp'},
+    ('<common_stmts>', ("<local_dec_or_ass>",)): {'id'},
+    ('<common_stmts>', ("<builtin_no_ret>",)): {'shoot', 'shootNxt', 'wipe'},
+    ('<common_stmts>', ("<local_struct>",)): {'build'},
+    ('<common_stmts>', ("<struct_inst>",)): {'access'},
+    ('<main_stmts>', ("<conditional>",)): {'flank', 'if'},
+    ('<main_stmts>', ("<looping>",)): {'for', 'grind', 'while'},
+    ('<main_stmts>', ("<common_stmts>",)): {'access', 'build', 'comms', 'flag', 'hp', 'id', 'immo', 'shoot', 'shootNxt', 'wipe', 'xp'},
+    ('<body>', ("<main_stmts>", "<body_recur>",)): {'access', 'build', 'comms', 'flag', 'flank', 'for', 'grind', 'hp', 'id', 'if', 'immo', 'shoot', 'shootNxt', 'while', 'wipe', 'xp'},
+    ('<body_recur>', ("<body>",)): {'access', 'build', 'comms', 'flag', 'flank', 'for', 'grind', 'hp', 'id', 'if', 'immo', 'shoot', 'shootNxt', 'while', 'wipe', 'xp'},
+    ('<body_recur>', ("λ",)): {'}'},
+    ('<local_dec>', ("immo", "<local_immo_tail>",)): {'immo'},
+    ('<local_dec>', ("<datatype>", "id", "<global_dec_tail3>",)): {'comms', 'flag', 'hp', 'xp'},
+    ('<local_dec_or_ass>', ("id", "<dec_tail>",)): {'id'},
+    ('<local_immo_tail>', ("id", "<global_dec_tail1>",)): {'id'},
+    ('<local_immo_tail>', ("access", "id", "id", ":", "<value>", "<elems_recur>",)): {'access'},
+    ('<dec_tail>', ("<col_or_ass>",)): {'%=', '*=', '+=', ',', '-=', '/=', ':'},
+    ('<dec_tail>', ("(", "<args>", ")",)): {'('},
+    ('<dec_tail>', (".", "<dot_tail>",)): {'.'},
+    ('<dec_tail>', ("[", "<index>", "]", "<bracket_tail>",)): {'['},
+    ('<dot_tail>', ("id", "<dot_tail_rhs>",)): {'id'},
+    ('<dot_tail>', ("drop", "(", "<index>", ")",)): {'drop'},
+    ('<dot_tail>', ("join", "(", "<arr_rhs_tail>", ")",)): {'join'},
+    ('<dot_tail_rhs>', (":", "<expr>",)): {':'},
+    ('<dot_tail_rhs>', ("<assign_op>", "<expr>",)): {'%=', '*=', '+=', '-=', '/='},
+    ('<bracket_tail>', (":", "<arr_rhs_tail>",)): {':'},
+    ('<bracket_tail>', ("<assign_op>", "<expr>",)): {'%=', '*=', '+=', '-=', '/='},
+    ('<bracket_tail>', ("[", "<index>", "]", "<arr2d_rhs>",)): {'['},
+    ('<bracket_tail>', (".", "<inner_bracket_tail>",)): {'.'},
+    ('<arr_rhs_tail>', ("[", "<value>", "<elems_recur>", "]",)): {'['},
+    ('<arr_rhs_tail>', ("<expr>",)): {'!', '(', '-', 'comms_ltr', 'flag_ltr', 'hp_ltr', 'id', 'levelDown', 'levelUp', 'load', 'loadNum', 'rounds', 'toComms', 'toHp', 'toXp', 'xp_ltr'},
+    ('<inner_bracket_tail>', ("drop", "(", "<index>", ")",)): {'drop'},
+    ('<inner_bracket_tail>', ("join", "(", "<expr>", ")",)): {'join'},
+    ('<index>', ("<expr>",)): {'!', '(', '-', 'comms_ltr', 'flag_ltr', 'hp_ltr', 'id', 'levelDown', 'levelUp', 'load', 'loadNum', 'rounds', 'toComms', 'toHp', 'toXp', 'xp_ltr'},
+    ('<index>', ("λ",)): {')', ']'},
+    ('<arr2d_rhs>', (":", "<arr2d_rhs_tail>",)): {':'},
+    ('<arr2d_rhs>', ("<assign_op>", "<expr>",)): {'%=', '*=', '+=', '-=', '/='},
+    ('<arr2d_rhs_tail>', ("[", "<value>", "<elems_recur>", "]", "<row_recur>",)): {'['},
+    ('<arr2d_rhs_tail>', ("<expr>",)): {'!', '(', '-', 'comms_ltr', 'flag_ltr', 'hp_ltr', 'id', 'levelDown', 'levelUp', 'load', 'loadNum', 'rounds', 'toComms', 'toHp', 'toXp', 'xp_ltr'},
+    ('<col_or_ass>', (":", "<col_tail>",)): {':'},
+    ('<col_or_ass>', (",", "id", "<id_recur>", ":", "<expr>",)): {','},
+    ('<col_or_ass>', ("<assign_op>", "<expr>",)): {'%=', '*=', '+=', '-=', '/='},
+    ('<col_tail>', ("<expr>", "<expr_recur>",)): {'!', '(', '-', 'comms_ltr', 'flag_ltr', 'hp_ltr', 'id', 'levelDown', 'levelUp', 'load', 'loadNum', 'rounds', 'toComms', 'toHp', 'toXp', 'xp_ltr'},
+    ('<col_tail>', ("[", "<value>", "<elems_recur>", "]", "<row_recur>",)): {'['},
+    ('<id_tail>', (".", "id",)): {'.'},
+    ('<id_tail>', ("[", "<expr>", "]", "<id_tail_arr>",)): {'['},
+    ('<id_tail>', ("λ",)): {'!=', '%', '&&', ')', '*', '+', ',', '-', '/', '<', '<=', '==', '>', '>=', 'AND', 'OR', ']', '^', 'access', 'backup', 'build', 'checkpoint', 'choice', 'comms', 'flag', 'flank', 'for', 'grind', 'hp', 'id', 'if', 'immo', 'recall', 'resume', 'shoot', 'shootNxt', 'while', 'wipe', 'xp', '{', '||', '}'},
+    ('<id_tail_arr>', ("[", "<expr>", "]",)): {'['},
+    ('<id_tail_arr>', ("λ",)): {'!=', '%', '&&', ')', '*', '+', ',', '-', '/', '<', '<=', '==', '>', '>=', 'AND', 'OR', ']', '^', 'access', 'backup', 'build', 'checkpoint', 'choice', 'comms', 'flag', 'flank', 'for', 'grind', 'hp', 'id', 'if', 'immo', 'recall', 'resume', 'shoot', 'shootNxt', 'while', 'wipe', 'xp', '{', '||', '}'},
+    ('<expr_recur>', (",", "id", ":", "<expr>", "<expr_recur>",)): {','},
+    ('<expr_recur>', ("λ",)): {'access', 'backup', 'build', 'checkpoint', 'choice', 'comms', 'flag', 'flank', 'for', 'grind', 'hp', 'id', 'if', 'immo', 'recall', 'resume', 'shoot', 'shootNxt', 'while', 'wipe', 'xp', '}'},
+    ('<expr>', ("<relat_expr>", "<expr_tail>",)): {'!', '(', '-', 'comms_ltr', 'flag_ltr', 'hp_ltr', 'id', 'levelDown', 'levelUp', 'load', 'loadNum', 'rounds', 'toComms', 'toHp', 'toXp', 'xp_ltr'},
+    ('<expr_tail>', ("<logic_op>", "<expr>",)): {'&&', 'AND', 'OR', '||'},
+    ('<expr_tail>', ("λ",)): {')', ',', ']', 'access', 'backup', 'build', 'checkpoint', 'choice', 'comms', 'flag', 'flank', 'for', 'grind', 'hp', 'id', 'if', 'immo', 'recall', 'resume', 'shoot', 'shootNxt', 'while', 'wipe', 'xp', '{', '}'},
+    ('<relat_expr>', ("<arith_expr>", "<relat_tail>",)): {'!', '(', '-', 'comms_ltr', 'flag_ltr', 'hp_ltr', 'id', 'levelDown', 'levelUp', 'load', 'loadNum', 'rounds', 'toComms', 'toHp', 'toXp', 'xp_ltr'},
+    ('<relat_tail>', ("<relat_op>", "<relat_expr>",)): {'!=', '<', '<=', '==', '>', '>='},
+    ('<relat_tail>', ("λ",)): {'&&', ')', ',', 'AND', 'OR', ']', 'access', 'backup', 'build', 'checkpoint', 'choice', 'comms', 'flag', 'flank', 'for', 'grind', 'hp', 'id', 'if', 'immo', 'recall', 'resume', 'shoot', 'shootNxt', 'while', 'wipe', 'xp', '{', '||', '}'},
+    ('<arith_expr>', ("<factor>", "<arith_tail>",)): {'!', '(', '-', 'comms_ltr', 'flag_ltr', 'hp_ltr', 'id', 'levelDown', 'levelUp', 'load', 'loadNum', 'rounds', 'toComms', 'toHp', 'toXp', 'xp_ltr'},
+    ('<arith_tail>', ("<arith_op>", "<arith_expr>",)): {'%', '*', '+', '-', '/', '^'},
+    ('<arith_tail>', ("λ",)): {'!=', '&&', ')', ',', '<', '<=', '==', '>', '>=', 'AND', 'OR', ']', 'access', 'backup', 'build', 'checkpoint', 'choice', 'comms', 'flag', 'flank', 'for', 'grind', 'hp', 'id', 'if', 'immo', 'recall', 'resume', 'shoot', 'shootNxt', 'while', 'wipe', 'xp', '{', '||', '}'},
+    ('<factor>', ("id", "<id_rhs_tail>",)): {'id'},
+    ('<factor>', ("<value>",)): {'comms_ltr', 'flag_ltr', 'hp_ltr', 'xp_ltr'},
+    ('<factor>', ("-", "<negative>",)): {'-'},
+    ('<factor>', ("<builtin_w_ret>",)): {'levelDown', 'levelUp', 'load', 'loadNum', 'rounds', 'toComms', 'toHp', 'toXp'},
+    ('<factor>', ("!", "<negative>",)): {'!'},
+    ('<factor>', ("(", "<expr>", ")", "<xp_format>",)): {'('},
+    ('<id_rhs_tail>', ("(", "<args>", ")",)): {'('},
+    ('<id_rhs_tail>', (".", "<rhs_dot_tail>",)): {'.'},
+    ('<id_rhs_tail>', ("[", "<expr>", "]", "<rhs_bracket_tail>",)): {'['},
+    ('<id_rhs_tail>', ("xp_formatting",)): {'xp_formatting'},
+    ('<id_rhs_tail>', ("λ",)): {'!=', '%', '&&', ')', '*', '+', ',', '-', '/', '<', '<=', '==', '>', '>=', 'AND', 'OR', ']', '^', 'access', 'backup', 'build', 'checkpoint', 'choice', 'comms', 'flag', 'flank', 'for', 'grind', 'hp', 'id', 'if', 'immo', 'recall', 'resume', 'shoot', 'shootNxt', 'while', 'wipe', 'xp', '{', '||', '}'},
+    ('<xp_format>', ("xp_formatting",)): {'xp_formatting'},
+    ('<xp_format>', ("λ",)): {'!=', '%', '&&', ')', '*', '+', ',', '-', '/', '<', '<=', '==', '>', '>=', 'AND', 'OR', ']', '^', 'access', 'backup', 'build', 'checkpoint', 'choice', 'comms', 'flag', 'flank', 'for', 'grind', 'hp', 'id', 'if', 'immo', 'recall', 'resume', 'shoot', 'shootNxt', 'while', 'wipe', 'xp', '{', '||', '}'},
+    ('<args>', ("<expr>", "<args_recur>",)): {'!', '(', '-', 'comms_ltr', 'flag_ltr', 'hp_ltr', 'id', 'levelDown', 'levelUp', 'load', 'loadNum', 'rounds', 'toComms', 'toHp', 'toXp', 'xp_ltr'},
+    ('<args>', ("λ",)): {')'},
+    ('<args_recur>', (",", "<expr>", "<args_recur>",)): {','},
+    ('<args_recur>', ("λ",)): {')'},
+    ('<rhs_dot_tail>', ("id",)): {'id'},
+    ('<rhs_dot_tail>', ("seek", "(", "<arr_rhs_tail>", ")",)): {'seek'},
+    ('<rhs_dot_tail>', ("drop", "(", "<index>", ")",)): {'drop'},
+    ('<rhs_bracket_tail>', ("[", "<expr>", "]",)): {'['},
+    ('<rhs_bracket_tail>', (".", "<rhs_inner_bracket_tail>",)): {'.'},
+    ('<rhs_bracket_tail>', ("λ",)): {'!=', '%', '&&', ')', '*', '+', ',', '-', '/', '<', '<=', '==', '>', '>=', 'AND', 'OR', ']', '^', 'access', 'backup', 'build', 'checkpoint', 'choice', 'comms', 'flag', 'flank', 'for', 'grind', 'hp', 'id', 'if', 'immo', 'recall', 'resume', 'shoot', 'shootNxt', 'while', 'wipe', 'xp', '{', '||', '}'},
+    ('<rhs_inner_bracket_tail>', ("drop", "(", "<index>", ")",)): {'drop'},
+    ('<rhs_inner_bracket_tail>', ("seek", "(", "<expr>", ")",)): {'seek'},
+    ('<assign_op>', ("+=",)): {'+='},
+    ('<assign_op>', ("-=",)): {'-='},
+    ('<assign_op>', ("*=",)): {'*='},
+    ('<assign_op>', ("/=",)): {'/='},
+    ('<assign_op>', ("%=",)): {'%='},
+    ('<negative>', ("(", "<expr>", ")",)): {'('},
+    ('<negative>', ("id", "<id_tail>",)): {'id'},
+    ('<arith_op>', ("+",)): {'+'},
+    ('<arith_op>', ("-",)): {'-'},
+    ('<arith_op>', ("/",)): {'/'},
+    ('<arith_op>', ("%",)): {'%'},
+    ('<arith_op>', ("*",)): {'*'},
+    ('<arith_op>', ("^",)): {'^'},
+    ('<relat_op>', ("<",)): {'<'},
+    ('<relat_op>', (">",)): {'>'},
+    ('<relat_op>', ("<=",)): {'<='},
+    ('<relat_op>', (">=",)): {'>='},
+    ('<relat_op>', ("==",)): {'=='},
+    ('<relat_op>', ("!=",)): {'!='},
+    ('<logic_op>', ("&&",)): {'&&'},
+    ('<logic_op>', ("||",)): {'||'},
+    ('<logic_op>', ("AND",)): {'AND'},
+    ('<logic_op>', ("OR",)): {'OR'},
+    ('<builtin_no_ret>', ("shoot", "(", "<shoot_args>", ")",)): {'shoot'},
+    ('<builtin_no_ret>', ("shootNxt", "(", "<shoot_args>", ")",)): {'shootNxt'},
+    ('<builtin_no_ret>', ("wipe", "(", ")",)): {'wipe'},
+    ('<builtin_w_ret>', ("load", "(", "<load_args>", ")",)): {'load'},
+    ('<builtin_w_ret>', ("loadNum", "(", "<load_args>", ")",)): {'loadNum'},
+    ('<builtin_w_ret>', ("rounds", "(", "<rounds_args>", ")",)): {'rounds'},
+    ('<builtin_w_ret>', ("levelUp", "(", "id", "<id_args_tail>", ")",)): {'levelUp'},
+    ('<builtin_w_ret>', ("levelDown", "(", "id", "<id_args_tail>", ")",)): {'levelDown'},
+    ('<builtin_w_ret>', ("toHp", "(", "<expr>", ")",)): {'toHp'},
+    ('<builtin_w_ret>', ("toXp", "(", "<expr>", ")",)): {'toXp'},
+    ('<builtin_w_ret>', ("toComms", "(", "<expr>", ")",)): {'toComms'},
+    ('<shoot_args>', ("<expr>",)): {'!', '(', '-', 'comms_ltr', 'flag_ltr', 'hp_ltr', 'id', 'levelDown', 'levelUp', 'load', 'loadNum', 'rounds', 'toComms', 'toHp', 'toXp', 'xp_ltr'},
+    ('<shoot_args>', ("λ",)): {')'},
+    ('<load_args>', ("comms_ltr",)): {'comms_ltr'},
+    ('<load_args>', ("λ",)): {')'},
+    ('<rounds_args>', ("comms_ltr",)): {'comms_ltr'},
+    ('<rounds_args>', ("id", "<id_args_tail>",)): {'id'},
+    ('<rounds_args>', ("toComms", "(", "id", "<id_tail>", ")",)): {'toComms'},
+    ('<id_args_tail>', ("<id_tail>",)): {')', '.', '['},
+    ('<id_args_tail>', ("(", "<args>", ")",)): {'('},
+    ('<recall_stmt>', ("recall", "<rec_elems>",)): {'recall'},
+    ('<rec_elems>', ("<expr>", "<rec_elems_recur>",)): {'!', '(', '-', 'comms_ltr', 'flag_ltr', 'hp_ltr', 'id', 'levelDown', 'levelUp', 'load', 'loadNum', 'rounds', 'toComms', 'toHp', 'toXp', 'xp_ltr'},
+    ('<rec_elems>', ("[", "]",)): {'['},
+    ('<rec_elems>', ("void",)): {'void'},
+    ('<rec_elems_recur>', (",", "<expr>", "<rec_elems_recur>",)): {','},
+    ('<rec_elems_recur>', ("λ",)): {'access', 'backup', 'build', 'checkpoint', 'choice', 'comms', 'flag', 'flank', 'for', 'grind', 'hp', 'id', 'if', 'immo', 'recall', 'resume', 'shoot', 'shootNxt', 'while', 'wipe', 'xp', '}'},
+    ('<loop_control>', ("resume",)): {'resume'},
+    ('<loop_control>', ("checkpoint",)): {'checkpoint'},
+    ('<local_struct>', ("build", "id", "{", "<struct_fields>", "<struct_fields_recur>", "}",)): {'build'},
+    ('<struct_fields>', ("<datatype>", "id", "<field_dec>",)): {'comms', 'flag', 'hp', 'xp'},
+    ('<field_dec>', (",", "<struct_fields>",)): {','},
+    ('<field_dec>', ("λ",)): {':', '}'},
+    ('<def_recur>', (",", "<datatype>", "id", ":", "<value>", "<def_recur>",)): {','},
+    ('<def_recur>', ("λ",)): {'}'},
+    ('<struct_fields_recur>', (":", "<value>", "<def_recur>",)): {':'},
+    ('<struct_fields_recur>', ("λ",)): {'}'},
+    ('<struct_inst>', ("access", "id", "id", "<inst_dec>",)): {'access'},
+    ('<inst_dec>', (":", "<value>", "<instval_recur>",)): {':'},
+    ('<inst_dec>', ("λ",)): {'access', 'backup', 'build', 'checkpoint', 'choice', 'comms', 'flag', 'flank', 'for', 'grind', 'hp', 'id', 'if', 'immo', 'recall', 'resume', 'shoot', 'shootNxt', 'while', 'wipe', 'xp', '}'},
+    ('<instval_recur>', (",", "<value>", "<instval_recur>",)): {','},
+    ('<instval_recur>', ("λ",)): {'access', 'backup', 'build', 'checkpoint', 'choice', 'comms', 'flag', 'flank', 'for', 'grind', 'hp', 'id', 'if', 'immo', 'recall', 'resume', 'shoot', 'shootNxt', 'while', 'wipe', 'xp', '}'},
+    ('<conditional>', ("<if_stmt>",)): {'if'},
+    ('<conditional>', ("<flank_stmt>",)): {'flank'},
+    ('<if_stmt>', ("if", "<expr>", "{", "<body>", "}", "<else_elif>",)): {'if'},
+    ('<else_elif>', ("<else_stmt>",)): {'else'},
+    ('<else_elif>', ("<elif_stmt>",)): {'elif'},
+    ('<else_elif>', ("λ",)): {'access', 'backup', 'build', 'checkpoint', 'choice', 'comms', 'flag', 'flank', 'for', 'grind', 'hp', 'id', 'if', 'immo', 'recall', 'resume', 'shoot', 'shootNxt', 'while', 'wipe', 'xp', '}'},
+    ('<else_stmt>', ("else", "{", "<body>", "}",)): {'else'},
+    ('<elif_stmt>', ("elif", "<expr>", "{", "<body>", "}", "<else_elif>",)): {'elif'},
+    ('<flank_stmt>', ("flank", "<expr>", "{", "choice", "<valdead>", "<valdead_recur>", ":", "<flank_body>", "}",)): {'flank'},
+    ('<flank_body>', ("<main_stmts>", "<flank_body_recur>",)): {'access', 'build', 'comms', 'flag', 'flank', 'for', 'grind', 'hp', 'id', 'if', 'immo', 'shoot', 'shootNxt', 'while', 'wipe', 'xp'},
+    ('<flank_body>', ("resume", "<choice_recur>",)): {'resume'},
+    ('<flank_body_recur>', ("<flank_body>",)): {'access', 'build', 'comms', 'flag', 'flank', 'for', 'grind', 'hp', 'id', 'if', 'immo', 'resume', 'shoot', 'shootNxt', 'while', 'wipe', 'xp'},
+    ('<flank_body_recur>', ("<choice_recur>",)): {'backup', 'choice'},
+    ('<valdead>', ("<value>",)): {'comms_ltr', 'flag_ltr', 'hp_ltr', 'xp_ltr'},
+    ('<valdead>', ("dead",)): {'dead'},
+    ('<valdead_recur>', (",", "<valdead>", "<valdead_recur>",)): {','},
+    ('<valdead_recur>', ("λ",)): {':'},
+    ('<choice_recur>', ("choice", "<valdead>", "<valdead_recur>", ":", "<flank_body>",)): {'choice'},
+    ('<choice_recur>', ("backup", ":", "<body>",)): {'backup'},
+    ('<looping>', ("<for_loop>",)): {'for'},
+    ('<looping>', ("<while_loop>",)): {'while'},
+    ('<looping>', ("<do_while_loop>",)): {'grind'},
+    ('<for_loop>', ("for", "id", ":", "<arith_expr>", ",", "<expr>", ",", "id", "<update>", "{", "<loop_body>", "}",)): {'for'},
+    ('<update>', ("<assign_op>", "<arith_expr>",)): {'%=', '*=', '+=', '-=', '/='},
+    ('<update>', (":", "<arith_expr>",)): {':'},
+    ('<while_loop>', ("while", "<expr>", "{", "<loop_body>", "}",)): {'while'},
+    ('<do_while_loop>', ("grind", "{", "<loop_body>", "}", "while", "<expr>",)): {'grind'},
+    ('<loop_body>', ("<loop_stmts>", "<loop_body_recur>",)): {'access', 'build', 'comms', 'flag', 'flank', 'for', 'grind', 'hp', 'id', 'if', 'immo', 'shoot', 'shootNxt', 'while', 'wipe', 'xp'},
+    ('<loop_body_recur>', ("<loop_body>",)): {'access', 'build', 'comms', 'flag', 'flank', 'for', 'grind', 'hp', 'id', 'if', 'immo', 'shoot', 'shootNxt', 'while', 'wipe', 'xp'},
+    ('<loop_body_recur>', ("λ",)): {'}'},
+    ('<loop_stmts>', ("<common_stmts>",)): {'access', 'build', 'comms', 'flag', 'hp', 'id', 'immo', 'shoot', 'shootNxt', 'wipe', 'xp'},
+    ('<loop_stmts>', ("<if_stmt_loop>",)): {'if'},
+    ('<loop_stmts>', ("<flank_stmt_loop>",)): {'flank'},
+    ('<loop_stmts>', ("<looping>",)): {'for', 'grind', 'while'},
+    ('<if_stmt_loop>', ("if", "<expr>", "{", "<main_stmts_loop>", "}", "<else_elif_loop>",)): {'if'},
+    ('<else_elif_loop>', ("<else_stmt_loop>",)): {'else'},
+    ('<else_elif_loop>', ("<elif_stmt_loop>",)): {'elif'},
+    ('<else_elif_loop>', ("λ",)): {'access', 'build', 'checkpoint', 'comms', 'flag', 'flank', 'for', 'grind', 'hp', 'id', 'if', 'immo', 'resume', 'shoot', 'shootNxt', 'while', 'wipe', 'xp', '}'},
+    ('<else_stmt_loop>', ("else", "{", "<main_stmts_loop>", "}",)): {'else'},
+    ('<elif_stmt_loop>', ("elif", "<expr>", "{", "<main_stmts_loop>", "}", "<else_elif_loop>",)): {'elif'},
+    ('<flank_stmt_loop>', ("flank", "<expr>", "{", "choice", "<valdead>", "<valdead_recur>", ":", "<flank_body_loop>", "}",)): {'flank'},
+    ('<flank_body_loop>', ("<main_stmts>", "<flank_loop_recur>",)): {'access', 'build', 'comms', 'flag', 'flank', 'for', 'grind', 'hp', 'id', 'if', 'immo', 'shoot', 'shootNxt', 'while', 'wipe', 'xp'},
+    ('<flank_body_loop>', ("<loop_control>", "<loop_choice_recur>",)): {'checkpoint', 'resume'},
+    ('<flank_loop_recur>', ("<flank_body_loop>",)): {'access', 'build', 'checkpoint', 'comms', 'flag', 'flank', 'for', 'grind', 'hp', 'id', 'if', 'immo', 'resume', 'shoot', 'shootNxt', 'while', 'wipe', 'xp'},
+    ('<flank_loop_recur>', ("<loop_choice_recur>",)): {'backup', 'choice'},
+    ('<loop_choice_recur>', ("choice", "<valdead>", "<valdead_recur>", ":", "<flank_body_loop>",)): {'choice'},
+    ('<loop_choice_recur>', ("backup", ":", "<backup_loop_body>",)): {'backup'},
+    ('<backup_loop_body>', ("<body>",)): {'access', 'build', 'comms', 'flag', 'flank', 'for', 'grind', 'hp', 'id', 'if', 'immo', 'shoot', 'shootNxt', 'while', 'wipe', 'xp'},
+    ('<backup_loop_body>', ("checkpoint",)): {'checkpoint'},
+    ('<main_stmts_loop>', ("<loop_stmts>", "<cond_recur_loop>",)): {'access', 'build', 'comms', 'flag', 'flank', 'for', 'grind', 'hp', 'id', 'if', 'immo', 'shoot', 'shootNxt', 'while', 'wipe', 'xp'},
+    ('<main_stmts_loop>', ("<loop_control>",)): {'checkpoint', 'resume'},
+    ('<cond_recur_loop>', ("<main_stmts_loop>",)): {'access', 'build', 'checkpoint', 'comms', 'flag', 'flank', 'for', 'grind', 'hp', 'id', 'if', 'immo', 'resume', 'shoot', 'shootNxt', 'while', 'wipe', 'xp'},
+    ('<cond_recur_loop>', ("λ",)): {'}'},
+    ('<fs_body>', ("<func_body>",)): {'build', 'gameOver', 'generate'},
+    ('<func_body>', ("generate", "id", "(", "<params>", ")", "{", "<func_stmts_recur>", "}", "<func_body>",)): {'generate'},
+    ('<func_body>', ("<struct_body>",)): {'build', 'gameOver'},
+    ('<struct_body>', ("<local_struct>", "<struct_body>",)): {'build'},
+    ('<struct_body>', ("λ",)): {'gameOver'},
+    ('<func_stmts>', ("<common_stmts>",)): {'access', 'build', 'comms', 'flag', 'hp', 'id', 'immo', 'shoot', 'shootNxt', 'wipe', 'xp'},
+    ('<func_stmts>', ("<recall_stmt>",)): {'recall'},
+    ('<func_stmts>', ("<if_stmt_func>",)): {'if'},
+    ('<func_stmts>', ("<flank_func>",)): {'flank'},
+    ('<func_stmts>', ("<looping_func>",)): {'for', 'grind', 'while'},
+    ('<func_stmts_recur>', ("<func_stmts>", "<func_stmts_recur>",)): {'access', 'build', 'comms', 'flag', 'flank', 'for', 'grind', 'hp', 'id', 'if', 'immo', 'recall', 'shoot', 'shootNxt', 'while', 'wipe', 'xp'},      
+    ('<func_stmts_recur>', ("λ",)): {'}'},
+    ('<flank_func>', ("flank", "<expr>", "{", "choice", "<valdead>", "<valdead_recur>", ":", "<flank_func_body>", "}",)): {'flank'},
+    ('<flank_func_body>', ("<main_stmts>", "<flank_func_recur>",)): {'access', 'build', 'comms', 'flag', 'flank', 'for', 'grind', 'hp', 'id', 'if', 'immo', 'shoot', 'shootNxt', 'while', 'wipe', 'xp'},
+    ('<flank_func_body>', ("<recall_stmt>", "<choice_func_recur>",)): {'recall'},
+    ('<flank_func_body>', ("resume", "<choice_func_recur>",)): {'resume'},
+    ('<flank_func_recur>', ("<flank_func_body>",)): {'access', 'build', 'comms', 'flag', 'flank', 'for', 'grind', 'hp', 'id', 'if', 'immo', 'recall', 'resume', 'shoot', 'shootNxt', 'while', 'wipe', 'xp'},
+    ('<flank_func_recur>', ("<choice_func_recur>",)): {'backup', 'choice'},
+    ('<choice_func_recur>', ("choice", "<valdead>", "<valdead_recur>", ":", "<flank_func_body>",)): {'choice'},
+    ('<choice_func_recur>', ("backup", ":", "<backup_func_body>",)): {'backup'},
+    ('<backup_func_body>', ("<main_stmts>", "<backup_func_body>",)): {'access', 'build', 'comms', 'flag', 'flank', 'for', 'grind', 'hp', 'id', 'if', 'immo', 'shoot', 'shootNxt', 'while', 'wipe', 'xp'},
+    ('<backup_func_body>', ("<recall_stmt>",)): {'recall'},
+    ('<if_stmt_func>', ("if", "<expr>", "{", "<func_stmts>", "<func_stmts_recur>", "}", "<else_elif_func>",)): {'if'},
+    ('<else_elif_func>', ("<else_stmt_func>",)): {'else'},
+    ('<else_elif_func>', ("<elif_stmt_func>",)): {'elif'},
+    ('<else_elif_func>', ("λ",)): {'access', 'build', 'checkpoint', 'comms', 'flag', 'flank', 'for', 'grind', 'hp', 'id', 'if', 'immo', 'recall', 'resume', 'shoot', 'shootNxt', 'while', 'wipe', 'xp', '}'},
+    ('<else_stmt_func>', ("else", "{", "<func_stmts>", "<func_stmts_recur>", "}",)): {'else'},
+    ('<elif_stmt_func>', ("elif", "<expr>", "{", "<func_stmts>", "<func_stmts_recur>", "}", "<else_elif_func>",)): {'elif'},
+    ('<looping_func>', ("<for_func>",)): {'for'},
+    ('<looping_func>', ("<while_func>",)): {'while'},
+    ('<looping_func>', ("<do_while_func>",)): {'grind'},
+    ('<for_func>', ("for", "id", ":", "<arith_expr>", ",", "<expr>", ",", "id", "<update>", "{", "<loop_body_func>", "}",)): {'for'},
+    ('<while_func>', ("while", "<expr>", "{", "<loop_body_func>", "}",)): {'while'},
+    ('<do_while_func>', ("grind", "{", "<loop_body_func>", "}", "while", "<expr>",)): {'grind'},
+    ('<loop_body_func>', ("<func_stmts_loop>", "<loop_body_recur>",)): {'access', 'build', 'comms', 'flag', 'flank', 'for', 'grind', 'hp', 'id', 'if', 'immo', 'recall', 'shoot', 'shootNxt', 'while', 'wipe', 'xp'},    
+    ('<func_stmts_loop>', ("<if_func_loop>",)): {'if'},
+    ('<func_stmts_loop>', ("<common_stmts>",)): {'access', 'build', 'comms', 'flag', 'hp', 'id', 'immo', 'shoot', 'shootNxt', 'wipe', 'xp'},
+    ('<func_stmts_loop>', ("<flank_loop_func>",)): {'flank'},
+    ('<func_stmts_loop>', ("<recall_stmt>",)): {'recall'},
+    ('<func_stmts_loop>', ("<looping_func>",)): {'for', 'grind', 'while'},
+    ('<if_func_loop>', ("if", "<expr>", "{", "<func_loop_cond>", "}", "<else_elif_func_loop>",)): {'if'},
+    ('<else_elif_func_loop>', ("<else_func_loop>",)): {'else'},
+    ('<else_elif_func_loop>', ("λ",)): {'access', 'build', 'checkpoint', 'comms', 'flag', 'flank', 'for', 'grind', 'hp', 'id', 'if', 'immo', 'recall', 'resume', 'shoot', 'shootNxt', 'while', 'wipe', 'xp', '}'},       
+    ('<else_elif_func_loop>', ("<elif_func_loop>",)): {'elif'},
+    ('<else_func_loop>', ("else", "{", "<func_loop_cond>", "}",)): {'else'},
+    ('<elif_func_loop>', ("elif", "<expr>", "{", "<func_loop_cond>", "}", "<else_elif_func>",)): {'elif'},
+    ('<func_loop_cond>', ("<func_stmts_loop>", "<func_loop_recur>",)): {'access', 'build', 'comms', 'flag', 'flank', 'for', 'grind', 'hp', 'id', 'if', 'immo', 'recall', 'shoot', 'shootNxt', 'while', 'wipe', 'xp'},    
+    ('<func_loop_cond>', ("<loop_control>", "<func_loop_recur>",)): {'checkpoint', 'resume'},
+    ('<func_loop_recur>', ("<func_loop_cond>",)): {'access', 'build', 'checkpoint', 'comms', 'flag', 'flank', 'for', 'grind', 'hp', 'id', 'if', 'immo', 'recall', 'resume', 'shoot', 'shootNxt', 'while', 'wipe', 'xp'}, 
+    ('<func_loop_recur>', ("λ",)): {'}'},
+    ('<flank_loop_func>', ("flank", "<expr>", "{", "choice", "<valdead>", "<valdead_recur>", ":", "<flank_body_func_loop>", "}",)): {'flank'},
+    ('<flank_body_func_loop>', ("<main_stmts>", "<flank_func_loop_recur>",)): {'access', 'build', 'comms', 'flag', 'flank', 'for', 'grind', 'hp', 'id', 'if', 'immo', 'shoot', 'shootNxt', 'while', 'wipe', 'xp'},       
+    ('<flank_body_func_loop>', ("<recall_stmt>", "<loop_func_choice_recur>",)): {'recall'},
+    ('<flank_body_func_loop>', ("<loop_control>", "<loop_func_choice_recur>",)): {'checkpoint', 'resume'},
+    ('<flank_func_loop_recur>', ("<flank_body_func_loop>",)): {'access', 'build', 'checkpoint', 'comms', 'flag', 'flank', 'for', 'grind', 'hp', 'id', 'if', 'immo', 'recall', 'resume', 'shoot', 'shootNxt', 'while', 'wipe', 'xp'},
+    ('<flank_func_loop_recur>', ("<loop_func_choice_recur>",)): {'backup', 'choice'},
+    ('<loop_func_choice_recur>', ("choice", "<valdead>", "<valdead_recur>", ":", "<flank_body_func_loop>",)): {'choice'},
+    ('<loop_func_choice_recur>', ("backup", ":", "<backup_func_loop_body>",)): {'backup'},
+    ('<backup_func_loop_body>', ("<main_stmts>", "<backup_func_loop_body>",)): {'access', 'build', 'comms', 'flag', 'flank', 'for', 'grind', 'hp', 'id', 'if', 'immo', 'shoot', 'shootNxt', 'while', 'wipe', 'xp'},      
+    ('<backup_func_loop_body>', ("<recall_stmt>",)): {'recall'},
+    ('<backup_func_loop_body>', ("checkpoint",)): {'checkpoint'},
 }
-
-def compute_first_set(cfg):
-    first_set = {non_terminal: set() for non_terminal in cfg.keys()}
-
-    def first_of(symbol):
-        if symbol not in cfg:
-            return {symbol} 
-
-        if symbol in first_set and first_set[symbol]:
-            return first_set[symbol]
-
-        result = set()
-        
-        for production in cfg[symbol]:
-            for sub_symbol in production:
-                if sub_symbol not in cfg: # terminal
-                    result.add(sub_symbol)
-                    break  
-                else: # non-terminal
-                    sub_first = first_of(sub_symbol)
-                    result.update(sub_first - {"λ"})  
-                    if "λ" not in sub_first:
-                        break  
-            
-            else: # all symbols in the production derive λ
-                result.add("λ")
-
-        first_set[symbol] = result
-        return result
-
-    for non_terminal in cfg:
-        first_of(non_terminal)
-
-    return first_set
-
-
-def compute_follow_set(cfg, start_symbol, first_set):
-    follow_set = {non_terminal: set() for non_terminal in cfg.keys()}
-    follow_set[start_symbol].add("$")  
-
-    changed = True  
-
-    while changed:
-        changed = False 
-    
-        for non_terminal, productions in cfg.items():
-            for production in productions:
-                for i, item in enumerate(production):
-                    if item in cfg:  # nt only
-                        follow_before = follow_set[item].copy()
-
-                        if i + 1 < len(production):  # A -> <alpha>B<beta>
-                            beta = production[i + 1]
-                            if beta in cfg:  # if <beta> is a non-terminal
-                                follow_set[item].update(first_set[beta] - {"λ"})
-                                if "λ" in first_set[beta]:
-                                    follow_set[item].update(follow_set[beta])
-                            else:  # if <beta> is a terminal
-                                follow_set[item].add(beta)
-                        else:  # nothing follows B
-                            follow_set[item].update(follow_set[non_terminal])
-
-                        if follow_set[item] != follow_before:
-                            changed = True  
-
-    return follow_set
-
-
-def compute_predict_set(cfg, first_set, follow_set):
-    predict_set = {}  
-
-    for non_terminal, productions in cfg.items():
-        for production in productions:
-            production_key = (non_terminal, tuple(production))  # A = (A,(prod))
-            predict_set[production_key] = set()
-
-            first_alpha = set()
-            for symbol in production:
-                if symbol in first_set:  # non-terminal
-                    first_alpha.update(first_set[symbol] - {"λ"})
-                    if "λ" not in first_set[symbol]:
-                        break
-                else:  # terminal
-                    first_alpha.add(symbol)
-                    break
-            else:  
-                first_alpha.add("λ")
-
-            predict_set[production_key].update(first_alpha - {"λ"})
-
-            # if λ in first_alpha, add follow set of lhs to predict set
-            if "λ" in first_alpha:
-                predict_set[production_key].update(follow_set[non_terminal])
-
-    return predict_set
-
-# for non_terminal, productions in cfg.items():
-#     for i, item in enumerate(productions):
-#         print(f"{non_terminal} -> {productions[i]}")
-
-first_set = compute_first_set(cfg)
-# print("First Sets:")
-# for non_terminal, first in first_set.items():
-#     print(f"{first}")
-
-# terminals = set()
-# for productions in cfg.values():
-#     for production in productions:
-#         for symbol in production:
-#             if not symbol.startswith("<"):  
-#                 terminals.add(symbol)
-
-# unique_terminals = sorted(terminals)
-# print(unique_terminals)
-
-follow_set = compute_follow_set(cfg, "<program>", first_set)
-# print("\nFollow Sets:")
-# for non_terminal, follow in follow_set.items():
-#     print(f"{follow}")
-
-predict_set = compute_predict_set(cfg, first_set, follow_set)
 
 def display_predict_sets(predict_set):
     print("\nPredict Sets:")
@@ -424,21 +357,25 @@ def save_parse_table(parse_table, filename="parse_table.txt"):
 # save_parse_table(parse_table)
 # print("Parse table saved to file.")
 
-def check_ambiguity(cfg, predict_set):
-    ambiguous_productions = []
+# def check_ambiguity(cfg, predict_set):
+#     ambiguous_productions = []
 
-    for non_terminal, productions in cfg.items():
-        prediction_sets = [predict_set[(non_terminal, tuple(prod))] for prod in productions]
-        for i in range(len(prediction_sets)):
-            for j in range(i + 1, len(prediction_sets)):
-                if prediction_sets[i].intersection(prediction_sets[j]):
-                    ambiguous_productions.append((non_terminal, productions[i], productions[j]))
+#     for non_terminal, productions in cfg.items():
+#         prediction_sets = [predict_set[(non_terminal, tuple(prod))] for prod in productions]
+#         for i in range(len(prediction_sets)):
+#             for j in range(i + 1, len(prediction_sets)):
+#                 if prediction_sets[i].intersection(prediction_sets[j]):
+#                     ambiguous_productions.append((non_terminal, productions[i], productions[j]))
 
-    if ambiguous_productions:
-        print("\nAmbiguities found in the CFG:")
-        for non_terminal, prod1, prod2 in ambiguous_productions:
-            print(f"  {non_terminal} -> {prod1} | {prod2}")
-    else:
-        print("\nNo ambiguities found in the CFG.")
+#     if ambiguous_productions:
+#         print("\nAmbiguities found in the CFG:")
+#         for non_terminal, prod1, prod2 in ambiguous_productions:
+#             print(f"  {non_terminal} -> {prod1} | {prod2}")
+#     else:
+#         print("\nNo ambiguities found in the CFG.")
 
 # check_ambiguity(cfg, predict_set)
+
+from .cfg2 import first_set 
+
+first_set = first_set

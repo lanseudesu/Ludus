@@ -7,6 +7,10 @@ from .runtime.traverser import ASTVisitor, SemanticAnalyzer
 from .error import SemanticError
 from .helper_parser import Helper
 
+# This builds the AST (Abstract Syntax Tree) from the tokens
+# the AST will then be traverse from child node to parent node
+
+
 class Semantic:
     def __init__(self, tokens):
         self.tokens = tokens
@@ -476,7 +480,7 @@ class Semantic:
     ######### ARRAYS AND VARIABLES #########    
     def var_or_arr(self, scope) -> Union[VarDec, ArrayDec]:
         pos_start = [self.current_token.line, self.current_token.column]
-        datatype = self.current_token.token  
+        datatype = self.current_token.token   
         self.current_token = self.get_next_token()
         self.skip_spaces()
 
@@ -497,7 +501,7 @@ class Semantic:
         else:
             if self.lookup_identifier(name):
                 info = self.get_identifier_info(name, name_node)
-                raise SemanticError(f"NameError: Identifier {name}' was "
+                raise SemanticError(f"NameError: Identifier '{name}' was "
                                     f"already declared as {info["type"]}.", name_start, name_end)
             return self.parse_var_dec(datatype, scope, pos_start)
     
@@ -2453,7 +2457,7 @@ def check(fn, text, isRuntime=False):
 
     semantic = Semantic(tokens)
     result = semantic.produce_ast()
-    #print(result)
+    print(result)
 
     if isinstance(result, SemanticError):
         result.source_code = text.splitlines()
@@ -2474,7 +2478,7 @@ def check(fn, text, isRuntime=False):
     else:
         try:
             visitor = ASTVisitor()
-            visitor.visit(result)
+            visitor.visit(result) # result is 'yung ast na finifeed sa traverser
 
             analyzer = SemanticAnalyzer(visitor.symbol_table)
             analyzer.visit(result)
