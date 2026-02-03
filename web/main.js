@@ -74,7 +74,6 @@ document.addEventListener("DOMContentLoaded", () => {
     if (window.location.href.includes("syntax.html")) {
         console.log("Running Syntax analyzer after navigation...");
         syntaxAnalyzer();
-        lexicalAnalyzer();
     }
 
     if (window.location.href.includes("semantic_page.html")) {

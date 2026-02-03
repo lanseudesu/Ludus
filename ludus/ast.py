@@ -16,15 +16,16 @@ class Semantic:
         self.tokens = tokens
         self.current_token_index = 0
         self.current_token = self.get_next_token()
-        self.globalstruct = {}
-        self.global_func = {}
-        self.scope_stack = [{}]
-        self.loop_flag_stack = []
-        self.flank_flag_stack = []
-        self.func_flag = False
-        self.func_call_flag = False
-        self.recall_stmts = []
+        self.globalstruct = {} # map to keep track of global structs
+        self.global_func = {} # map to keep track of global func
+        self.scope_stack = [{}] # scope stack
+        self.loop_flag_stack = []  # list to keep track of inner loops 
+        self.flank_flag_stack = [] #  list to keep track of inner flanks 
+        self.func_flag = False # flag if token is currently inside a function
+        self.func_call_flag = False # flag if a function is called
+        self.recall_stmts = [] # list to keep track of recall stmts
     
+    # map to change datatype to proper keywords (e.g. int -> hp)
     TYPE_MAP = {
         int: "hp",
         float: "xp",
@@ -32,15 +33,18 @@ class Semantic:
         bool: "flag"
     }
 
+    # push scope into scope_stack
     def push_scope(self):
         self.scope_stack.append({})
 
+    # pop top scope in scope_stack
     def pop_scope(self):
         if len(self.scope_stack) > 1:  
             self.scope_stack.pop()
         else:
             raise SemanticError("Attempted to pop global scope")
 
+    # declare id depending on type
     def declare_id(self, name, type, dimensions=0):
         current_scope = self.scope_stack[-1]
         current_scope[name] = {
@@ -48,12 +52,14 @@ class Semantic:
             "dimensions": dimensions
         } 
     
+    # lookup function to determine if id exitts
     def lookup_identifier(self, name):
         for scope in reversed(self.scope_stack):
             if name  in scope:
                 return True
         return False
     
+    # lookup function to determine the type of id
     def lookup_id_type(self, name, id_type, node):
         for scope in reversed(self.scope_stack):
             if name  in scope:
@@ -70,6 +76,7 @@ class Semantic:
                 return scope[name]  
         raise SemanticError(f"Identifier '{name}' not declared.", node.pos_start, node.pos_end)
     
+    # checks if id is an array
     def is_array(self, name, node):
         if self.lookup_identifier(name):
             info = self.get_identifier_info(name, node)
@@ -80,6 +87,7 @@ class Semantic:
         else:
             return False
         
+    # checks if id was passed on as a param 
     def is_params(self, name, node):
         if self.lookup_identifier(name):
             info = self.get_identifier_info(name, node)
@@ -90,12 +98,14 @@ class Semantic:
         else:
             return False
     
+    # gets dimension of an array
     def get_dimensions(self, name, node):
         info = self.get_identifier_info(name, node)
         if info["type"] != "an array":
             raise SemanticError(f"Identifier '{name}' is not an array", node.pos_start, node.pos_end)
         return info["dimensions"]
 
+    # move token to the next
     def get_next_token(self):
         if self.current_token_index < len(self.tokens):
             token = self.tokens[self.current_token_index]
@@ -103,6 +113,7 @@ class Semantic:
             return token
         return None
     
+    # skin \n and ' '
     def skip_whitespace(self):
         while self.current_token and self.current_token.token in {"newline", "space"}:
             self.current_token = self.get_next_token()
@@ -111,6 +122,7 @@ class Semantic:
         while self.current_token and self.current_token.token == "space":
             self.current_token = self.get_next_token()
 
+    
     def expect(self, token_type, error_message):
         prev_token = self.current_token
         start = [prev_token.line, prev_token.column]
@@ -119,6 +131,7 @@ class Semantic:
         if not prev_token or prev_token.token != token_type:
             raise SemanticError(f"ParserError: {error_message}", start, end)
         
+    # checks the nxt token  of the current token
     def look_ahead(self):
         la_token_index = self.current_token_index 
         while la_token_index < len(self.tokens):
@@ -129,6 +142,7 @@ class Semantic:
 
         return None  
     
+    # checks if a current token is in the line
     def find_token_in_line(self, target_token):
         la_token_index = self.current_token_index
 
@@ -145,11 +159,16 @@ class Semantic:
 
         return None  
     
+    # the actual main func to produce the AST
     def produce_ast(self) -> Program:
+        # program is the main node or parent node for AST
         program = Program(body=[])
         try:
             while self.current_token and self.current_token.token != 'gameOver':
                 self.skip_whitespace()
+
+                
+                # checks every possible statements within the program body
                 if self.current_token and re.match(r'^id\d+$', self.current_token.token):
                     la_token = self.look_ahead()
                     name = self.current_token.lexeme
@@ -1226,7 +1245,7 @@ class Semantic:
                 immo_arr = self.parse_immo_arr(scope)
                 return immo_arr
             else:
-                raise SemanticError(f"ParserError: 5 Unexpected token found during parsing: {la_token}", self.current_token.line)  
+                raise SemanticError(f"ParserError: Unexpected token found during parsing: {la_token}", self.current_token.line)  
             
     def parse_immo_var(self, scope) -> Union[VarDec, BatchVarDec]:
         pos_start = [self.current_token.line, self.current_token.column]

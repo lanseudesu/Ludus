@@ -6,7 +6,7 @@ DIGITS          = '123456789'
 NUM             = '0' + DIGITS
 ALPHA           = string.ascii_letters
 ALPHANUM        = ALPHA + NUM
-ASCII_PRINTABLE = ''.join(chr(i) for i in range(32, 127))
+ASCII_PRINTABLE = ''.join(chr(i) for i in range(32, 127)) 
 NUM_TO_6        = '0123456' 
 
 arith_op   = '+-*/%^'
@@ -20,7 +20,10 @@ numlit_delim   = arith_op + relat_op + whitespace + ',){}:]'
 commslit_delim = whitespace + ',:={])+!'
 flag_delim     = whitespace + relat_op + arith_op + ',:]){'
 
-lparen_delim   = ALPHANUM + '_ .()"-!['
+lparen_delim   = ALPHANUM + '_ .()"-![' # ^
+# abcdefgh....ABCDEFG...1234567890
+# lparen_delim[0] = 'a' lparen_delim[104] = '0'
+
 lbracket_delim = ALPHANUM + '_ .]-("'
 lcurly_delim   = ALPHANUM + whitespace + '_{(-!'
 comma_delim    = ALPHANUM + whitespace + '_.["-(!'
@@ -104,7 +107,7 @@ TT_EOF = 'EOF'
 ### POSITION ###
 
 class Position:
-    def __init__(self, idx, ln, col, fn, ftxt):
+    def __init__(self, idx, ln, col, fn, ftxt): # initialization neto is -1, 0, -1
         self.idx = idx
         self.ln = ln
         self.col = col
@@ -112,18 +115,18 @@ class Position:
         self.ftxt = ftxt
 
     def advance(self, current_char):
-        self.idx += 1
+        self.idx += 1 # 0 -> 1
 
-        if current_char == '\t':
+        if current_char == '\t': # pass, 
             self.col += 4 - (self.col % 4)
         else:
-            self.col += 1
+            self.col += 1 # -1, 0 -> 1
         
-        if current_char == '\n':
+        if current_char == '\n': # pass, 0
             self.ln += 1
             self.col = 0
 
-        return self
+        return self # 1, 0, 1
     
     def retreat(self, current_char):
         self.idx -= 1
@@ -149,30 +152,38 @@ class Token:
     
     def __repr__(self):
         return f'{self.lexeme}:{self.token}'
+    
+    
 
 ### lexer ###
 class Lexer:
+    # 'self' represents the current instance of the class, allowing it to access its own variables and methods.
     def __init__(self, fn, text):
         self.fn = fn
         self.text = text
-        self.pos = Position(-1, 0, -1, fn, text)
-        self.identifier_map = {}
+        self.pos = Position(-1, 0, -1, fn, text) # pos is an instance ng Position class
+        self.identifier_map = {} # nagsstore ng ids na madadaanan sa lexer
         self.current_id = 1
         self.current_char = None
         self.prev_char = None
         self.advance()
     
     def advance(self):
-        self.prev_char = self.current_char
-        self.pos.advance(self.current_char)
+        self.prev_char = self.current_char # p, prev_char = p
+        self.pos.advance(self.current_char) # 0, 0, 0 -> 1, 0, 1
         self.current_char = self.text[self.pos.idx] if self.pos.idx < len(self.text) else None
+        # self.text[1] = 'l', current_char = 'l'
+
+        # self.text[0], current_char = 'p', prev_char = None
+
+        # strVar = "asdasd" , strVar[1] = 's'
 
     def retreat(self):
         self.pos.retreat(self.current_char)
         self.current_char = self.text[self.pos.idx] if self.pos.idx < len(self.text) else None
     
     def invalid_delim_error(self, valid_delims, error_msg): 
-        valid_delims = ",".join(valid_delims) 
+        valid_delims = ",".join(valid_delims)  # 'asdasdasd' -> 'a,s,d,a,s,d'
         if valid_delims[0] == 'a' and valid_delims[104] == '0':
             valid_delims = list(valid_delims)
             valid_delims[0:123] = ['ALPHANUM']
@@ -190,13 +201,12 @@ class Lexer:
         if (self.current_char == '\n' and '\n' not in valid_delims) or (self.current_char is None and '\n' not in valid_delims):
             error_msg = f"Lexical Error: Invalid delimiter for ' {lexeme} '. Cause: ' \\n '"
             errors.append(self.invalid_delim_error(valid_delims, error_msg))
-            
             self.advance()
         elif self.current_char is not None and self.current_char not in valid_delims:
             error_msg = f"Lexical Error: Invalid delimiter for ' {lexeme} '. Cause: ' {self.current_char} '"
             errors.append(self.invalid_delim_error(valid_delims, error_msg))
             self.advance()
-        else:
+        else: # '(' == valid_delims, valid_delims of play = '('
             if token == TT_COMMENTS2 or token == TT_COMMENTS1:
                 pass
             else:
@@ -212,6 +222,11 @@ class Lexer:
                 else:
                     tokens.append(Token(lexeme, token, cur_ln, cur_col, state_num)) 
 
+                    # tokens = [
+                    # Token('play', 'play', 1, 4, [0,139,...]),
+                    # Token('(','(', 1, 5, [0,1,23...])
+                    # ]
+
                 #tokens.append(Token(lexeme, token, pos_start=self.pos))  -- use if not using webbased gui
 
     def make_tokens(self):
@@ -220,9 +235,9 @@ class Lexer:
         lhs_space = '' # this records the character before a space
         # 'lhs_space' is used in checking the lhs of a '-' character to determine if its a negative token or part of a negative numeric
     
-        while self.current_char is not None:
-            cur_ln = self.pos.ln + 1   
-            cur_col = self.pos.col + 1 
+        while self.current_char is not None: # (
+            cur_ln = self.pos.ln + 1   # 1
+            cur_col = self.pos.col + 1 # 1
 
             # tab, lexer ignores this
             if self.current_char == '\t':
@@ -997,25 +1012,27 @@ class Lexer:
                         self.tokenize_id(cur_ln, cur_col, char_str, id_delim, errors, tokens) 
       
                 elif self.current_char == 'p':
-                    char_str += 'p'
+                    char_str += 'p' # '' -> 'p'
                     cur_state = 139
-                    state_num.append(cur_state)
+                    state_num.append(cur_state) #'[0]' -> '[0, 139]'
                     self.advance() 
                     if self.current_char == 'l':
-                        char_str += 'l'
-                        cur_state += 1
-                        state_num.append(cur_state)
-                        self.advance()
+                        char_str += 'l' # 'p' -> 'pl'
+                        cur_state += 1 # 140
+                        state_num.append(cur_state) # '[0, 139]' - > '[0, 139, 140]'
+                        self.advance() 
                         if self.current_char == 'a':
                             char_str += 'a'
                             cur_state += 1
                             state_num.append(cur_state)
                             self.advance()
                             if self.current_char == 'y':
-                                char_str += 'y'
-                                cur_state += 1
-                                state_num.append(cur_state)
-                                self.advance()
+                                char_str += 'y' # 'play'
+                                cur_state += 1 
+                                state_num.append(cur_state) # '[0, 139, 140, 141, 142]'
+                                self.advance() # (
+                                # tokenizing means chinecheck niya yung kasunod na character na nabuong keyword,
+                                # symbol, id, literals, etc. is nasa valid_delims ng tinatry natin tokenize
                                 self.tokenize_keyword(cur_ln, cur_col, char_str, '(', errors, tokens, state_num)
                             else:
                                 self.tokenize_id(cur_ln, cur_col, char_str, id_delim, errors, tokens)
@@ -1625,7 +1642,7 @@ class Lexer:
 
             elif self.current_char == '(':
                 state_num = [0, 312, 313]
-                self.advance()
+                self.advance() # ^
                 self.process_token(cur_ln, cur_col, '(', TT_LPAREN, lparen_delim, errors, tokens, state_num)
 
             elif self.current_char == '[':
@@ -1803,7 +1820,7 @@ class Lexer:
         int_len = 0                 # hp whole number length ctr
         dec_len = 0                 # xp decimal length ctr
         errors = []
-        zero_int = False            # flag to know when to start counting digits (for leading 0s)
+        zero_int = False            # flag to know when to start counting digits (for leading 0s) 00001
         reserved_dec = ''           # reserved decimal 
         cur_ln = self.pos.ln + 1
         cur_col = self.pos.col + 1
@@ -1858,13 +1875,13 @@ class Lexer:
                         cur_state += 2
                         state_num.append(cur_state)
                     dot_count += 1
-                    num_str += '.'
+                    num_str += '.' # '1123.'
             else:  
                 if dot_count == 0:  
                     if int_len < 10:
                         if self.current_char in DIGITS and not zero_int:
                             if num_str == '0':
-                                num_str = self.current_char
+                                num_str = self.current_char # 0 -> 1
                                 int_len = 1
                                 zero_int = True  
                             else:
@@ -1884,10 +1901,10 @@ class Lexer:
                             int_len = 1
                             # leading zeroes
                         elif zero_int:
-                            cur_state += 2
+                            cur_state += 2 # 0, 331, 333, 335, 337
                             state_num.append(cur_state)
-                            num_str += self.current_char
-                            int_len += 1
+                            num_str += self.current_char # '1', '11', '112', '1123'
+                            int_len += 1 # 1, 2, 3, 4
                     else:  
                         # throw an error if length of whole num exceeds 10
                         while self.current_char is not None and self.current_char not in numlit_delim:
@@ -1900,19 +1917,19 @@ class Lexer:
                     if dec_len < 7:
                         if self.current_char == '0' and self.prev_char in NUM:
                             # reserved decimal is used to store the leading zeroes in decimal part
-                            reserved_dec += '0'
+                            reserved_dec += '0' # '0', '00'. '000'
 
                         elif self.current_char == '0' and self.prev_char == '.':
                             # if '.0', increment cur_state by 1, check TD
                             cur_state += 1
                             state_num.append(cur_state)
-                            num_str += '0'
-                            dec_len = 1
+                            num_str += '0' # '1123.0'
+                            dec_len = 1 # 1
 
                         elif self.current_char in DIGITS and self.prev_char == '0':
                             # no more leading zeroes, concat reserved_dec (if any) + current_char to num_str
-                            num_str += reserved_dec + self.current_char
-                            dec_len += 1 + len(reserved_dec)
+                            num_str += reserved_dec + self.current_char # '1123.00001'
+                            dec_len += 1 + len(reserved_dec) # 1 + 1 + 3 = 5
                             if dec_len > 7: 
                                 # throw error if decimal length exceeds 7
                                 self.advance()
@@ -1957,7 +1974,7 @@ class Lexer:
         
         if not negate:
             # token_type changes whether dot_count is 1 or 0
-            token_type = TT_XP if dot_count >  0 else TT_HP
+            token_type = TT_XP if dot_count > 0 else TT_HP
         else:
             # if negative, add '-' at the beginning of the num_str
             num_str = '-' + num_str
@@ -1978,16 +1995,16 @@ class Lexer:
             errors.append(f"{message} at line {self.pos.ln + 1}, column {self.pos.col - len(id_str) + 1}")
 
         cur_state = state_num[-1]  # start from the last state
-        for _ in range(len(id_str) - 1):  # already have first state, so only add len - 1
+        for _ in range(len(id_str) - 1):  # already have first state, so only add len - 1 [0,207,209,211]
             cur_state += 2
             state_num.append(cur_state)
 
         while self.current_char != None and self.current_char in ALPHANUM + '_':
             if id_len < 30:
-                id_str += self.current_char
-                id_len += 1
-                cur_state += 2
-                state_num.append(cur_state)
+                id_str += self.current_char # acc, accx, accxs
+                id_len += 1 # 3 -> 4 -> 5
+                cur_state += 2 # 211 -> 213 -> 215
+                state_num.append(cur_state) # [0,207,209,211] -> [0,207,209,211,213] -> [0,207,209,211,213,215]
                 self.advance()
             else:
                 # throw error if id length exceeds 30
@@ -1997,14 +2014,14 @@ class Lexer:
                 add_error(f"Lexical Error: Maximum number characters reached in '{id_str}'")
                 return [], errors
             
-        state_num.append(cur_state + 1) # add final state
+        state_num.append(cur_state + 1) # add final state, [0,207,209,211,213,215,216]
         return Token(id_str, self.identifiers(id_str), cur_ln, cur_col, state_num), errors
 
     ### helper function to keep track of existing id, and add number to new ids ###
     def identifiers(self, id_str):
         if id_str not in self.identifier_map:
             self.identifier_map[id_str] = f'id{self.current_id}'
-            self.current_id += 1
+            self.current_id += 1 # -> 2
 
         return self.identifier_map[id_str]
 
@@ -2028,8 +2045,8 @@ class Lexer:
         elif self.current_char in ALPHANUM or self.current_char == '_':
             self.tokenize_id(cur_ln, cur_col, char_str, id_delim, errors, tokens)
         else:
-            cur_state = state_num[-1]
-            state_num.append(cur_state+1)
+            cur_state = state_num[-1] # [0, 139, 140, 141, 142]
+            state_num.append(cur_state+1) # [0, 139, 140, 141, 142, 143]
             self.process_token(cur_ln, cur_col, char_str, char_str, valid_delim, errors, tokens, state_num)
 
     ### helper function to create string literals ###
@@ -2096,7 +2113,11 @@ class Lexer:
 def run(fn, text):
     if text == "":
         return [], ["No code in the module."]
+    
     lexer = Lexer(fn, text)
+
+    # lexer is an instance (or object) of the Lexer class.
+
     tokens, error = lexer.make_tokens()
 
     # for tok in tokens:
